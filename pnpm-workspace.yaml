@@ -1,0 +1,21 @@
+allowBuilds:
+  '@prisma/engines': set this to true or false
+  esbuild: set this to true or false
+  prisma: set this to true or false
+  sharp: true
+  unrs-resolver: true
+ignoredBuiltDependencies:
+  - sharp
+  - unrs-resolver
+# Supply-chain hardening (react-doctor/require-pnpm-hardening)
+# minimumReleaseAge: 10080
+minimumReleaseAge: 0
+minimumReleaseAgeExclude:
+  - oxlint
+  - oxfmt
+  - '@oxlint/*'
+  - '@oxfmt/*'
+trustPolicy: no-downgrade
+blockExoticSubdeps: true
+# Older publishes often lack modern provenance — don't block them.
+trustPolicyIgnoreAfter: 525600

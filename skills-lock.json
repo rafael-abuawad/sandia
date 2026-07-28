@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "across-protocol-ai-agent-skill": {
+      "source": "across-protocol/skills",
+      "sourceType": "github",
+      "skillPath": "skills/SKILL.md",
+      "computedHash": "6858b2934555eea7d8e7f1d63d338ea1d3e3c5ab6bf10d8da23241e93e3dfaa4"
+    }
+  }
+}

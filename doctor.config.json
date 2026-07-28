@@ -1,0 +1,16 @@
+{
+  "$schema": "https://react.doctor/schema/config.json",
+  "ignore": {
+    "files": ["convex/_generated/**"],
+    "overrides": [
+      {
+        "files": ["convex/**"],
+        "rules": ["deslop/unused-file", "deslop/unused-export"]
+      },
+      {
+        "files": ["components/pay-flow/use-pay-flow.ts"],
+        "rules": ["react-doctor/async-await-in-loop"]
+      }
+    ]
+  }
+}
