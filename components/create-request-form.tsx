@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAccount } from "wagmi";
 import { ConnectKitButton } from "connectkit";
@@ -8,6 +8,7 @@ import { useMutation } from "convex/react";
 import { isAddress } from "viem";
 import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
+import { FieldError } from "@/components/ui/field-error";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { TokenChainChip } from "@/components/token-chain-select";
@@ -18,6 +19,7 @@ export function CreateRequestForm() {
   const router = useRouter();
   const { address, isConnected } = useAccount();
   const createRequest = useMutation(api.paymentRequests.create);
+  const errorId = useId();
 
   const [amount, setAmount] = useState("10");
   const [recipient, setRecipient] = useState("");
@@ -25,6 +27,9 @@ export function CreateRequestForm() {
   const [expiresAtLocal, setExpiresAtLocal] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [invalidField, setInvalidField] = useState<"amount" | "recipient" | "expires" | null>(
+    null,
+  );
 
   useEffect(() => {
     if (address) {
@@ -35,12 +40,27 @@ export function CreateRequestForm() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setInvalidField(null);
+
     if (!isConnected || !address) {
       setError("Connect a wallet to create a request");
       return;
     }
+    if (!amount.trim()) {
+      setError("Enter an amount in USD");
+      setInvalidField("amount");
+      return;
+    }
+    try {
+      parseUsdToMicros(amount);
+    } catch {
+      setError("Enter a valid USD amount (for example 10.00)");
+      setInvalidField("amount");
+      return;
+    }
     if (!isAddress(recipient)) {
       setError("Enter a valid recipient address");
+      setInvalidField("recipient");
       return;
     }
 
@@ -49,7 +69,10 @@ export function CreateRequestForm() {
       const amountUsdMicros = parseUsdToMicros(amount);
       const expiresAt = expiresAtLocal ? new Date(expiresAtLocal).getTime() : undefined;
       if (expiresAt !== undefined && Number.isNaN(expiresAt)) {
-        throw new Error("Invalid expiration date");
+        setError("Choose a valid expiration date and time");
+        setInvalidField("expires");
+        setSubmitting(false);
+        return;
       }
 
       const result = await createRequest({
@@ -64,14 +87,14 @@ export function CreateRequestForm() {
       });
       router.push(`/requests/${result.publicId}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create request");
+      setError(err instanceof Error ? err.message : "Unable to create request. Try again.");
     } finally {
       setSubmitting(false);
     }
   }
 
   return (
-    <form onSubmit={onSubmit} className="mx-auto max-w-lg space-y-5">
+    <form onSubmit={onSubmit} className="mx-auto max-w-lg space-y-5" noValidate>
       <div className="space-y-2">
         <Label htmlFor="amount">Amount (USD)</Label>
         <Input
@@ -81,8 +104,12 @@ export function CreateRequestForm() {
           onChange={(e) => setAmount(e.target.value)}
           placeholder="10.00"
           required
+          aria-invalid={invalidField === "amount" || undefined}
+          aria-describedby={error && invalidField === "amount" ? errorId : "amount-help"}
         />
-        <p className="pr-help">Settled 1:1 as USDG on Robinhood Chain via Across.</p>
+        <p id="amount-help" className="pr-help">
+          Settled 1:1 as USDG on Robinhood Chain via Across.
+        </p>
       </div>
 
       <div className="space-y-2">
@@ -93,6 +120,8 @@ export function CreateRequestForm() {
           onChange={(e) => setRecipient(e.target.value)}
           placeholder="0x…"
           required
+          aria-invalid={invalidField === "recipient" || undefined}
+          aria-describedby={error && invalidField === "recipient" ? errorId : undefined}
         />
       </div>
 
@@ -126,23 +155,27 @@ export function CreateRequestForm() {
           type="datetime-local"
           value={expiresAtLocal}
           onChange={(e) => setExpiresAtLocal(e.target.value)}
+          aria-invalid={invalidField === "expires" || undefined}
+          aria-describedby={error && invalidField === "expires" ? errorId : undefined}
         />
       </div>
 
-      {error && <p className="text-sm text-danger">{error}</p>}
+      <FieldError id={errorId} message={error} />
 
-      {!isConnected ? (
-        <div className="flex flex-col items-stretch gap-3">
-          <p className="text-sm text-muted">
-            Connect a wallet to create a request. No message signature required.
-          </p>
-          <ConnectKitButton />
-        </div>
-      ) : (
-        <Button type="submit" className="w-full" disabled={submitting}>
-          {submitting ? "Creating…" : "Create payment request"}
-        </Button>
-      )}
+      <div className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-10 -mx-1 bg-[color-mix(in_srgb,var(--background)_92%,transparent)] px-1 py-3 backdrop-blur-sm md:static md:bottom-auto md:bg-transparent md:p-0 md:backdrop-blur-none">
+        {!isConnected ? (
+          <div className="flex flex-col items-stretch gap-3">
+            <p className="text-sm text-muted">
+              Connect a wallet to create a request. No message signature required.
+            </p>
+            <ConnectKitButton />
+          </div>
+        ) : (
+          <Button type="submit" className="w-full" disabled={submitting}>
+            {submitting ? "Creating…" : "Create payment request"}
+          </Button>
+        )}
+      </div>
     </form>
   );
 }

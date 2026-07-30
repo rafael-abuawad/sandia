@@ -91,20 +91,20 @@ export function LendingPanel() {
         <p className="text-sm leading-relaxed text-muted">{VAULT.description}</p>
       </div>
 
-      <dl className="grid grid-cols-3 gap-3 border-y border-border py-4">
-        <div className="space-y-1">
+      <dl className="grid grid-cols-1 gap-4 border-y border-border py-4 sm:grid-cols-3 sm:gap-3">
+        <div className="flex items-baseline justify-between gap-3 sm:block sm:space-y-1">
           <dt className="text-[10px] font-bold uppercase tracking-[0.16em] text-subtle">
             Deposits
           </dt>
           <dd className="pr-mono text-sm font-semibold text-foreground">{VAULT.totalDeposits}</dd>
         </div>
-        <div className="space-y-1">
+        <div className="flex items-baseline justify-between gap-3 sm:block sm:space-y-1">
           <dt className="text-[10px] font-bold uppercase tracking-[0.16em] text-subtle">
             Liquidity
           </dt>
           <dd className="pr-mono text-sm font-semibold text-foreground">{VAULT.liquidity}</dd>
         </div>
-        <div className="space-y-1">
+        <div className="flex items-baseline justify-between gap-3 sm:block sm:space-y-1">
           <dt className="text-[10px] font-bold uppercase tracking-[0.16em] text-subtle">Net APY</dt>
           <dd className="pr-mono text-sm font-semibold text-foreground">
             {VAULT.netApy.toFixed(2)}%
@@ -136,7 +136,7 @@ export function LendingPanel() {
               type="button"
               onClick={setMax}
               disabled={!isConnected || balanceLoading || !balanceExact}
-              className="text-xs font-semibold text-[var(--accent-ink)] disabled:opacity-50"
+              className="min-h-11 min-w-11 text-xs font-semibold text-[var(--accent-ink)] disabled:opacity-50 sm:min-h-0 sm:min-w-0"
             >
               Max
             </button>

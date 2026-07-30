@@ -1,6 +1,8 @@
 "use client";
 
+import { useId } from "react";
 import { Button } from "@/components/ui/button";
+import { FieldError } from "@/components/ui/field-error";
 import { formatUsdFromMicros } from "@/lib/money";
 import { truncateAddress } from "@/components/send-form/helpers";
 import type { ReviewPayload } from "@/components/send-form/state";
@@ -18,6 +20,8 @@ export function SendReviewPanel({
   onBack: () => void;
   onConfirm: () => void;
 }) {
+  const errorId = useId();
+
   return (
     <div className="mx-auto max-w-lg space-y-5">
       <section className="pr-panel space-y-4 p-5">
@@ -49,8 +53,8 @@ export function SendReviewPanel({
               key={`${r.address}-${r.amountUsdMicros}`}
               className="flex items-center justify-between gap-3 text-sm"
             >
-              <span className="pr-mono text-muted">{truncateAddress(r.address)}</span>
-              <span className="pr-mono font-medium">
+              <span className="pr-mono truncate text-muted">{truncateAddress(r.address)}</span>
+              <span className="pr-mono shrink-0 font-medium">
                 {formatUsdFromMicros(r.amountUsdMicros)} USDG
               </span>
             </li>
@@ -58,9 +62,9 @@ export function SendReviewPanel({
         </ul>
       </section>
 
-      {error && <p className="text-sm text-danger">{error}</p>}
+      <FieldError id={errorId} message={error} />
 
-      <div className="flex gap-3">
+      <div className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-10 flex gap-3 bg-[color-mix(in_srgb,var(--background)_92%,transparent)] py-3 backdrop-blur-sm md:static md:bg-transparent md:p-0 md:backdrop-blur-none">
         <Button
           type="button"
           variant="outline"

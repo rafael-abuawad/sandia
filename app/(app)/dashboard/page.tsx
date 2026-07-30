@@ -31,9 +31,9 @@ export default function DashboardPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="pr-display text-2xl">Your requests</h1>
-        <Button asChild>
+        <Button asChild className="w-full sm:w-auto">
           <Link href="/requests/new">New request</Link>
         </Button>
       </div>
@@ -41,16 +41,16 @@ export default function DashboardPage() {
       {requests === undefined && <p className="text-sm text-muted">Loading…</p>}
 
       {requests && requests.length === 0 && (
-        <p className="text-sm text-muted">
-          No payment requests yet.{" "}
-          <Link
-            href="/requests/new"
-            className="text-[var(--accent-ink)] underline decoration-accent underline-offset-2"
-          >
-            Create one
-          </Link>
-          .
-        </p>
+        <div className="pr-panel space-y-3 p-6 text-center sm:text-left">
+          <p className="font-medium text-foreground">No payment requests yet</p>
+          <p className="text-sm text-muted">
+            Create a USD payment link so payers can settle via Across — no account required for
+            them.
+          </p>
+          <Button asChild className="w-full sm:w-auto">
+            <Link href="/requests/new">Create a request</Link>
+          </Button>
+        </div>
       )}
 
       <ul className="space-y-3">
@@ -68,11 +68,11 @@ export default function DashboardPage() {
                 href={`/requests/${r.publicId}`}
                 className="pr-panel flex items-center justify-between gap-4 px-4 py-4 transition hover:border-[var(--border-strong)]"
               >
-                <div className="space-y-1">
+                <div className="min-w-0 space-y-1">
                   <p className="font-medium text-foreground">
                     ${formatUsdFromMicros(r.amountUsdMicros)} → {r.destinationTokenSymbol}
                   </p>
-                  <p className="text-xs text-subtle">
+                  <p className="truncate text-xs text-subtle">
                     To {shortenAddress(r.recipientAddress, 5)} · /pay/{r.publicId}
                   </p>
                 </div>

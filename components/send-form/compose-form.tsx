@@ -1,9 +1,10 @@
 "use client";
 
-import { useRef } from "react";
+import { useId, useRef } from "react";
 import { ConnectKitButton } from "connectkit";
 import { Plus, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { FieldError } from "@/components/ui/field-error";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { TokenChainChip } from "@/components/token-chain-select";
@@ -36,15 +37,17 @@ export function SendComposeForm({
   onSubmit,
 }: SendComposeFormProps) {
   const csvInputRef = useRef<HTMLInputElement>(null);
+  const errorId = useId();
 
   return (
-    <form onSubmit={onSubmit} className="mx-auto max-w-lg space-y-5">
+    <form onSubmit={onSubmit} className="mx-auto max-w-lg space-y-5" noValidate>
       <div className="space-y-2">
         <Label>Send mode</Label>
         <div className="grid grid-cols-2 gap-2" role="group" aria-label="Send mode">
           <Button
             type="button"
             variant={mode === "single" ? "default" : "outline"}
+            aria-pressed={mode === "single"}
             className={cn(mode === "single" && "pointer-events-none")}
             onClick={() => dispatch({ type: "setMode", mode: "single" })}
           >
@@ -53,6 +56,7 @@ export function SendComposeForm({
           <Button
             type="button"
             variant={mode === "massive" ? "default" : "outline"}
+            aria-pressed={mode === "massive"}
             className={cn(mode === "massive" && "pointer-events-none")}
             onClick={() => dispatch({ type: "setMode", mode: "massive" })}
           >
@@ -88,6 +92,8 @@ export function SendComposeForm({
               onChange={(e) => dispatch({ type: "setSingleAmount", amount: e.target.value })}
               placeholder="10.00"
               required
+              aria-invalid={Boolean(error) || undefined}
+              aria-describedby={error ? errorId : undefined}
             />
           </div>
           <div className="space-y-2">
@@ -98,6 +104,8 @@ export function SendComposeForm({
               onChange={(e) => dispatch({ type: "setSingleAddress", address: e.target.value })}
               placeholder="0x…"
               required
+              aria-invalid={Boolean(error) || undefined}
+              aria-describedby={error ? errorId : undefined}
             />
           </div>
         </>
@@ -119,12 +127,12 @@ export function SendComposeForm({
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="size-8 text-muted hover:text-danger"
+                    className="size-11 text-muted hover:text-danger"
                     disabled={rows.length <= 2}
                     aria-label={`Remove recipient ${index + 1}`}
                     onClick={() => dispatch({ type: "removeRow", id: row.id })}
                   >
-                    <Trash2 className="size-4" />
+                    <Trash2 className="size-4" aria-hidden />
                   </Button>
                 </div>
                 <div className="space-y-2">
@@ -178,18 +186,18 @@ export function SendComposeForm({
               } catch (err) {
                 dispatch({
                   type: "setError",
-                  error: err instanceof Error ? err.message : "Failed to parse CSV",
+                  error: err instanceof Error ? err.message : "Unable to parse CSV. Check the format and try again.",
                 });
               }
             }}
           />
           <div className="grid grid-cols-2 gap-2">
             <Button type="button" variant="secondary" onClick={() => dispatch({ type: "addRow" })}>
-              <Plus className="size-4" />
+              <Plus className="size-4" aria-hidden />
               Add recipient
             </Button>
             <Button type="button" variant="secondary" onClick={() => csvInputRef.current?.click()}>
-              <Upload className="size-4" />
+              <Upload className="size-4" aria-hidden />
               Upload CSV
             </Button>
           </div>
@@ -208,20 +216,22 @@ export function SendComposeForm({
         </div>
       )}
 
-      {error && <p className="text-sm text-danger">{error}</p>}
+      <FieldError id={errorId} message={error} />
 
-      {!isConnected ? (
-        <div className="flex flex-col items-stretch gap-3">
-          <p className="text-sm text-muted">
-            Connect a wallet to continue this demo send. No transaction will be sent yet.
-          </p>
-          <ConnectKitButton />
-        </div>
-      ) : (
-        <Button type="submit" className="w-full">
-          Continue
-        </Button>
-      )}
+      <div className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-10 -mx-1 bg-[color-mix(in_srgb,var(--background)_92%,transparent)] px-1 py-3 backdrop-blur-sm md:static md:bottom-auto md:bg-transparent md:p-0 md:backdrop-blur-none">
+        {!isConnected ? (
+          <div className="flex flex-col items-stretch gap-3">
+            <p className="text-sm text-muted">
+              Connect a wallet to continue this demo send. No transaction will be sent yet.
+            </p>
+            <ConnectKitButton />
+          </div>
+        ) : (
+          <Button type="submit" className="w-full">
+            Continue
+          </Button>
+        )}
+      </div>
     </form>
   );
 }

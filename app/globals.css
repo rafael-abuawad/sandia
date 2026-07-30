@@ -322,6 +322,14 @@ samp {
   -webkit-backdrop-filter: blur(16px);
 }
 
+.pr-account-sheet {
+  max-height: min(85dvh, 32rem);
+}
+
+.pr-account-sheet::backdrop {
+  background: color-mix(in srgb, var(--foreground) 30%, transparent);
+}
+
 .pr-nav-item {
   display: flex;
   align-items: center;
@@ -425,17 +433,25 @@ samp {
 .pr-input,
 .pr-select {
   width: 100%;
-  min-height: 2.5rem;
+  min-height: 2.75rem;
   padding: 0.5rem 0.75rem;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius);
   background: var(--panel-elevated);
   color: var(--foreground);
   font-family: var(--font-sans);
-  font-size: 0.875rem;
+  font-size: 1rem;
   transition:
     border-color var(--duration) var(--ease-out),
     box-shadow var(--duration) var(--ease-out);
+}
+
+@media (min-width: 640px) {
+  .pr-input,
+  .pr-select {
+    min-height: 2.5rem;
+    font-size: 0.875rem;
+  }
 }
 
 .pr-input::placeholder {

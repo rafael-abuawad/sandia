@@ -1,7 +1,9 @@
 "use client";
 
+import { useId } from "react";
 import { ConnectKitButton } from "connectkit";
 import { Button } from "@/components/ui/button";
+import { FieldError } from "@/components/ui/field-error";
 import { Label } from "@/components/ui/label";
 import {
   ChainSelect,
@@ -13,7 +15,7 @@ import { QuoteSkeleton } from "@/components/quote-skeleton";
 import { PayQuoteDetails } from "@/components/pay-flow/quote-details";
 import type { PayStep } from "@/components/pay-flow/state";
 import type { AcrossChain, AcrossSwapQuote, AcrossToken } from "@/lib/across/client";
-import { shortenAddress } from "@/lib/utils";
+import { cn, shortenAddress } from "@/lib/utils";
 import type { Hex } from "viem";
 
 type PayAcrossPanelProps = {
@@ -42,6 +44,28 @@ type PayAcrossPanelProps = {
   onPay: () => void;
 };
 
+function payBlockerMessage({
+  originChainId,
+  inputToken,
+  step,
+  quote,
+  quoteError,
+}: {
+  originChainId: number | null;
+  inputToken: string;
+  step: PayStep;
+  quote: AcrossSwapQuote | null;
+  quoteError: string | null;
+}): string | null {
+  if (step === "approving" || step === "paying" || step === "tracking") return null;
+  if (!originChainId) return "Select a chain to continue.";
+  if (!inputToken) return "Select a token to continue.";
+  if (step === "quoting") return "Fetching a quote…";
+  if (quoteError) return quoteError;
+  if (!quote?.swapTx) return "Waiting for a valid route before you can pay.";
+  return null;
+}
+
 export function PayAcrossPanel({
   isConnected,
   originChainId,
@@ -67,11 +91,25 @@ export function PayAcrossPanel({
   onRefreshQuote,
   onPay,
 }: PayAcrossPanelProps) {
+  const errorId = useId();
+  const blockerId = useId();
+  const blocker = isConnected
+    ? payBlockerMessage({ originChainId, inputToken, step, quote, quoteError })
+    : null;
+  const busy = step === "approving" || step === "paying" || step === "tracking";
+
+  function handlePay() {
+    if (!canPay) return;
+    onPay();
+  }
+
   return (
-    <section className="pr-panel space-y-5 p-6">
-      <div className="flex items-center justify-between">
+    <section className="pr-panel space-y-5 p-4 sm:p-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="pr-display text-lg text-foreground">Pay with Across</h2>
-        <ConnectKitButton />
+        <div className="[&_button]:w-full sm:[&_button]:w-auto">
+          <ConnectKitButton />
+        </div>
       </div>
 
       {!isConnected ? (
@@ -107,7 +145,7 @@ export function PayAcrossPanel({
 
           {quoteError && step !== "quoting" && (
             <div className="space-y-2">
-              <p className="text-sm text-danger">{quoteError}</p>
+              <FieldError id={errorId} message={quoteError} />
               <Button variant="secondary" size="sm" onClick={onRefreshQuote}>
                 Retry quote
               </Button>
@@ -127,19 +165,36 @@ export function PayAcrossPanel({
             />
           )}
 
-          <Button className="w-full" disabled={!canPay} onClick={onPay}>
-            {step === "approving"
-              ? "Confirm approval…"
-              : step === "paying"
-                ? "Confirm payment…"
-                : step === "tracking"
-                  ? "Waiting for settlement…"
-                  : quoteError
-                    ? "No valid route"
-                    : "Pay request"}
-          </Button>
+          <div className="sticky bottom-0 z-10 -mx-4 space-y-2 border-t border-border bg-[var(--panel-elevated)] px-4 py-3 sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0">
+            {blocker && !busy && (
+              <p id={blockerId} className="text-sm text-muted" role="status">
+                {blocker}
+              </p>
+            )}
+            <Button
+              className={cn("w-full", !canPay && !busy && "opacity-60")}
+              disabled={busy}
+              aria-disabled={!canPay || undefined}
+              aria-describedby={!canPay && blocker ? blockerId : undefined}
+              onClick={handlePay}
+            >
+              {step === "approving"
+                ? "Confirm approval…"
+                : step === "paying"
+                  ? "Confirm payment…"
+                  : step === "tracking"
+                    ? "Waiting for settlement…"
+                    : quoteError
+                      ? "No valid route"
+                      : "Pay request"}
+            </Button>
+          </div>
 
-          {statusMsg && <p className="text-sm text-muted">{statusMsg}</p>}
+          {statusMsg && (
+            <p className="text-sm text-muted" role="status">
+              {statusMsg}
+            </p>
+          )}
           {(txSuccess || txError) && pendingTx && (
             <p className="pr-mono text-xs text-subtle">Last tx: {shortenAddress(pendingTx, 8)}</p>
           )}

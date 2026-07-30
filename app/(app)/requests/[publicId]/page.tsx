@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useId, useState } from "react";
 import Link from "next/link";
 import { useAccount } from "wagmi";
 import { ConnectKitButton } from "connectkit";
@@ -8,6 +8,7 @@ import { useMutation, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
+import { FieldError } from "@/components/ui/field-error";
 import { formatTokenAmount, formatUsdFromMicros } from "@/lib/money";
 import { shortenAddress } from "@/lib/utils";
 
@@ -20,7 +21,9 @@ export default function RequestDetailPage({ params }: { params: Promise<{ public
   );
   const attempts = useQuery(api.paymentAttempts.listByRequest, { publicId });
   const cancel = useMutation(api.paymentRequests.cancel);
+  const errorId = useId();
   const [busy, setBusy] = useState(false);
+  const [confirmCancel, setConfirmCancel] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -54,8 +57,9 @@ export default function RequestDetailPage({ params }: { params: Promise<{ public
     setError(null);
     try {
       await cancel({ creatorAddress: address, publicId });
+      setConfirmCancel(false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Cancel failed");
+      setError(e instanceof Error ? e.message : "Unable to cancel request. Try again.");
     } finally {
       setBusy(false);
     }
@@ -69,8 +73,8 @@ export default function RequestDetailPage({ params }: { params: Promise<{ public
 
   return (
     <div className="mx-auto max-w-xl space-y-6">
-      <div className="flex items-start justify-between gap-3">
-        <div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
           <h1 className="pr-display text-2xl">${formatUsdFromMicros(request.amountUsdMicros)}</h1>
           <p className="mt-1 text-sm text-muted">
             {formatTokenAmount(request.outputAmountBaseUnits, request.destinationTokenDecimals)}{" "}
@@ -92,13 +96,47 @@ export default function RequestDetailPage({ params }: { params: Promise<{ public
           <Button asChild size="sm" variant="outline">
             <Link href={`/pay/${publicId}`}>Open pay page</Link>
           </Button>
-          {request.status === "open" && (
-            <Button size="sm" variant="destructive" disabled={busy} onClick={() => void onCancel()}>
+          {request.status === "open" && !confirmCancel && (
+            <Button
+              size="sm"
+              variant="destructive"
+              disabled={busy}
+              onClick={() => setConfirmCancel(true)}
+            >
               Cancel request
             </Button>
           )}
         </div>
-        {error && <p className="text-sm text-danger">{error}</p>}
+        {confirmCancel && request.status === "open" && (
+          <div
+            className="space-y-3 rounded-lg border border-danger/30 bg-[var(--danger-soft)] p-3"
+            role="group"
+            aria-label="Confirm cancel request"
+          >
+            <p className="text-sm text-foreground">
+              Cancel this payment request? Payers will no longer be able to settle it.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                variant="destructive"
+                disabled={busy}
+                onClick={() => void onCancel()}
+              >
+                {busy ? "Cancelling…" : "Cancel request"}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={busy}
+                onClick={() => setConfirmCancel(false)}
+              >
+                Keep request
+              </Button>
+            </div>
+          </div>
+        )}
+        <FieldError id={errorId} message={error} />
       </div>
 
       {request.description && <p className="text-sm text-muted">{request.description}</p>}
@@ -110,9 +148,9 @@ export default function RequestDetailPage({ params }: { params: Promise<{ public
             {attempts.map((a: { _id: string; depositTxnRef?: string; acrossStatus: string }) => (
               <li
                 key={a._id}
-                className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-xs text-muted"
+                className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2 text-xs text-muted"
               >
-                <span className="pr-mono">
+                <span className="pr-mono min-w-0 truncate">
                   {a.depositTxnRef ? shortenAddress(a.depositTxnRef, 6) : "—"}
                 </span>
                 <StatusBadge status={a.acrossStatus} />

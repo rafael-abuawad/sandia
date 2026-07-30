@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 
 export default function HomePage() {
   return (
-    <div className="pr-shell pr-stack max-w-4xl">
+    <div className="pr-stack mx-auto max-w-4xl">
       <section className="pr-panel pr-panel--hero pr-animate-in">
         <div className="relative max-w-2xl space-y-6">
           <p className="pr-eyebrow pr-animate-in">Payrequest</p>
@@ -11,7 +11,8 @@ export default function HomePage() {
             Request dollars. Receive stablecoins on Robinhood Chain.
           </h1>
           <p className="pr-lede pr-animate-in pr-animate-in-delay-2">
-            Create a payment link, send funds, or settle OTC. Use the sidebar to switch modes.
+            Create a payment link, send funds, or settle OTC. Switch modes from the navigation to get
+            started.
           </p>
           <div className="pr-animate-in pr-animate-in-delay-3 flex flex-wrap gap-3 pt-2">
             <Button asChild size="lg">

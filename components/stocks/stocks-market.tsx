@@ -203,7 +203,20 @@ export function StocksMarket() {
               {!loading && filtered.length === 0 && (
                 <tr>
                   <td colSpan={5} className="px-4 py-10 text-center text-sm text-muted">
-                    No stock tokens match your search.
+                    {query.trim() ? (
+                      <span className="inline-flex flex-col items-center gap-2">
+                        <span>No results for &lsquo;{query.trim()}&rsquo;.</span>
+                        <button
+                          type="button"
+                          className="font-semibold text-foreground underline underline-offset-2"
+                          onClick={() => setQuery("")}
+                        >
+                          Clear search
+                        </button>
+                      </span>
+                    ) : (
+                      "No stock tokens available."
+                    )}
                   </td>
                 </tr>
               )}
@@ -220,7 +233,20 @@ export function StocksMarket() {
           )}
           {!loading && filtered.length === 0 && (
             <li className="px-4 py-10 text-center text-sm text-muted">
-              No stock tokens match your search.
+              {query.trim() ? (
+                <span className="inline-flex flex-col items-center gap-2">
+                  <span>No results for &lsquo;{query.trim()}&rsquo;.</span>
+                  <button
+                    type="button"
+                    className="font-semibold text-foreground underline underline-offset-2"
+                    onClick={() => setQuery("")}
+                  >
+                    Clear search
+                  </button>
+                </span>
+              ) : (
+                "No stock tokens available."
+              )}
             </li>
           )}
           {filtered.map((row) => (
@@ -355,7 +381,10 @@ function MobileRow({ row }: { row: MarketRow }) {
     <li>
       <Link
         href={`/stocks/${encodeURIComponent(row.symbol)}`}
-        className={cn("flex items-center justify-between gap-3 px-4 py-3", halted && "opacity-60")}
+        className={cn(
+          "flex min-h-14 items-center justify-between gap-3 px-4 py-3",
+          halted && "opacity-60",
+        )}
       >
         <TokenCell row={row} />
         <div className="shrink-0 text-right">
