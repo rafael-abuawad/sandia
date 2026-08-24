@@ -78,7 +78,7 @@ export function isPayerTokenAllowed(symbol: string, address: string): boolean {
   return true;
 }
 
-/** EVM chains we expose in ConnectKit / wagmi. */
+/** EVM chains we expose in Privy / wagmi. */
 export const appChains = [
   mainnet,
   optimism,

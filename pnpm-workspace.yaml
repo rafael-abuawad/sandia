@@ -1,12 +1,20 @@
 allowBuilds:
-  '@prisma/engines': set this to true or false
+  '@prisma/engines': false
+  '@reown/appkit': false
+  bufferutil: false
   esbuild: true
-  prisma: set this to true or false
+  keccak: false
+  prisma: false
   sharp: true
   unrs-resolver: true
+  utf-8-validate: false
 ignoredBuiltDependencies:
+  - '@reown/appkit'
+  - bufferutil
+  - keccak
   - sharp
   - unrs-resolver
+  - utf-8-validate
 # Supply-chain hardening (react-doctor/require-pnpm-hardening)
 # minimumReleaseAge: 10080
 minimumReleaseAge: 0
@@ -16,6 +24,9 @@ minimumReleaseAgeExclude:
   - '@oxlint/*'
   - '@oxfmt/*'
 trustPolicy: no-downgrade
+# WalletConnect logger dep: later slow-redact dropped trusted-publisher evidence.
+trustPolicyExclude:
+  - slow-redact@0.3.2
 blockExoticSubdeps: true
 # Older publishes often lack modern provenance — don't block them.
 trustPolicyIgnoreAfter: 525600

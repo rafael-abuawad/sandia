@@ -1,29 +1,26 @@
 "use client";
 
 import Link from "next/link";
-import { useAccount } from "wagmi";
-import { ConnectKitButton } from "connectkit";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
+import { LoginButton } from "@/components/login-button";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { formatUsdFromMicros } from "@/lib/money";
+import { useSignedInWallet } from "@/lib/use-signed-in-wallet";
 import { shortenAddress } from "@/lib/utils";
 
 export default function DashboardPage() {
-  const { address, isConnected } = useAccount();
-  const requests = useQuery(
-    api.paymentRequests.listMine,
-    address ? { creatorAddress: address } : "skip",
-  );
+  const { ready, isSignedIn } = useSignedInWallet();
+  const requests = useQuery(api.paymentRequests.listMine, isSignedIn ? {} : "skip");
 
-  if (!isConnected || !address) {
+  if (!ready || !isSignedIn) {
     return (
       <div className="pr-page pr-page--narrow text-center">
         <h1 className="pr-display text-2xl">Dashboard</h1>
-        <p className="text-sm text-muted">Connect your wallet to manage payment requests.</p>
+        <p className="text-sm text-muted">Sign in to manage payment requests.</p>
         <div className="flex justify-center">
-          <ConnectKitButton />
+          <LoginButton />
         </div>
       </div>
     );
@@ -44,8 +41,7 @@ export default function DashboardPage() {
         <div className="pr-panel pr-panel--padded space-y-3 text-center sm:text-left">
           <p className="font-medium text-foreground">No payment requests yet</p>
           <p className="text-sm text-muted">
-            Create a USD payment link so payers can settle from their own chain — no account
-            required for them.
+            Create a USD payment link so payers can settle from their own chain.
           </p>
           <Button asChild className="w-full sm:w-auto">
             <Link href="/requests/new">Create a request</Link>

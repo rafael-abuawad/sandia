@@ -2,9 +2,9 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useAccount } from "wagmi";
-import { ConnectKitButton } from "connectkit";
 import { useMutation } from "convex/react";
+import { LoginButton } from "@/components/login-button";
+import { useSignedInWallet } from "@/lib/use-signed-in-wallet";
 import { isAddress } from "viem";
 import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
@@ -17,7 +17,7 @@ import { parseUsdToMicros } from "@/lib/money";
 
 export function CreateRequestForm() {
   const router = useRouter();
-  const { address, isConnected } = useAccount();
+  const { address, isSignedIn } = useSignedInWallet();
   const createRequest = useMutation(api.paymentRequests.create);
   const errorId = useId();
   const amountRef = useRef<HTMLInputElement>(null);
@@ -49,8 +49,8 @@ export function CreateRequestForm() {
     setError(null);
     setInvalidField(null);
 
-    if (!isConnected || !address) {
-      setError("Connect a wallet to create a request");
+    if (!isSignedIn || !address) {
+      setError("Sign in to create a request");
       return;
     }
     if (!amount.trim()) {
@@ -83,7 +83,6 @@ export function CreateRequestForm() {
       }
 
       const result = await createRequest({
-        creatorAddress: address,
         amountUsdMicros,
         recipientAddress: recipient,
         destinationTokenSymbol: ROBINHOOD_USDG.symbol,
@@ -171,12 +170,12 @@ export function CreateRequestForm() {
       <FieldError id={errorId} message={error} />
 
       <div className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-10 -mx-1 bg-[color-mix(in_srgb,var(--background)_92%,transparent)] px-1 py-3 backdrop-blur-sm md:static md:bottom-auto md:bg-transparent md:p-0 md:backdrop-blur-none">
-        {!isConnected ? (
+        {!isSignedIn ? (
           <div className="flex flex-col items-stretch gap-3">
             <p className="text-sm text-muted">
-              Connect a wallet to create a request. No message signature required.
+              Sign in with a wallet, Google, or email to create a request.
             </p>
-            <ConnectKitButton />
+            <LoginButton />
           </div>
         ) : (
           <Button type="submit" className="w-full" disabled={submitting}>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef } from "react";
-import { ConnectKitButton } from "connectkit";
+import { LoginButton } from "@/components/login-button";
 import { Plus, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FieldError } from "@/components/ui/field-error";
@@ -247,9 +247,9 @@ export function SendComposeForm({
         {!isConnected ? (
           <div className="flex flex-col items-stretch gap-3">
             <p className="text-sm text-muted">
-              Connect a wallet to continue this demo send. No transaction will be sent yet.
+              Sign in to continue this demo send. No transaction will be sent yet.
             </p>
-            <ConnectKitButton />
+            <LoginButton />
           </div>
         ) : (
           <Button type="submit" className="w-full">

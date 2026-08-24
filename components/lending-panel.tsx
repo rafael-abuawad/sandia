@@ -2,9 +2,10 @@
 
 import Image from "next/image";
 import { useMemo, useState } from "react";
-import { ConnectKitButton } from "connectkit";
-import { useAccount, useReadContract } from "wagmi";
+import { LoginButton } from "@/components/login-button";
+import { useSignedInWallet } from "@/lib/use-signed-in-wallet";
 import { erc20Abi, type Address } from "viem";
+import { useReadContract } from "wagmi";
 import { ROBINHOOD_USDG } from "@/lib/destination";
 import { formatTokenAmount, formatTokenAmountGrouped } from "@/lib/money";
 import { TokenChainChip } from "@/components/token-chain-select";
@@ -48,7 +49,7 @@ function projectedEarnings(amount: string, apyPct: number, days: number): string
 }
 
 export function LendingPanel() {
-  const { address, isConnected } = useAccount();
+  const { address, isSignedIn } = useSignedInWallet();
   const [amount, setAmount] = useState("");
   const { data: balanceValue, isLoading: balanceLoading } = useReadContract({
     address: ROBINHOOD_USDG.address as Address,
@@ -133,14 +134,14 @@ export function LendingPanel() {
               variant="ghost"
               size="sm"
               onClick={setMax}
-              disabled={!isConnected || balanceLoading || !balanceExact}
+              disabled={!isSignedIn || balanceLoading || !balanceExact}
             >
               Max
             </Button>
           </div>
           <p className="pr-mono text-xs text-muted">
             Available:{" "}
-            {!isConnected
+            {!isSignedIn
               ? "—"
               : balanceLoading
                 ? "…"
@@ -163,10 +164,10 @@ export function LendingPanel() {
           </p>
         </div>
 
-        {!isConnected ? (
+        {!isSignedIn ? (
           <div className="flex flex-col items-stretch gap-3">
-            <p className="text-sm text-muted">Connect a wallet to deposit into the vault.</p>
-            <ConnectKitButton />
+            <p className="text-sm text-muted">Sign in to deposit into the vault.</p>
+            <LoginButton />
           </div>
         ) : (
           <div className="space-y-2">
