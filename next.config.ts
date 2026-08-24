@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 import imageLoader from "./lib/image-loader";
 
 const nextConfig: NextConfig = {
+  transpilePackages: ["@privy-io/react-auth", "@privy-io/wagmi"],
   images: {
     loader: "custom",
     loaderFile: "./lib/image-loader.ts",

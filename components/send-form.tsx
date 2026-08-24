@@ -1,8 +1,8 @@
 "use client";
 
 import { useMemo, useReducer } from "react";
-import { useAccount } from "wagmi";
 import { formatUsdFromMicros, parseUsdToMicros } from "@/lib/money";
+import { useSignedInWallet } from "@/lib/use-signed-in-wallet";
 import { buildReviewPayload } from "@/components/send-form/helpers";
 import { SendComposeForm } from "@/components/send-form/compose-form";
 import { SendReviewPanel } from "@/components/send-form/review-panel";
@@ -10,7 +10,7 @@ import { SendSuccessPanel } from "@/components/send-form/success-panel";
 import { createInitialSendFormState, sendFormReducer } from "@/components/send-form/state";
 
 export function SendForm() {
-  const { isConnected } = useAccount();
+  const { isSignedIn } = useSignedInWallet();
   const [state, dispatch] = useReducer(sendFormReducer, undefined, createInitialSendFormState);
   const { mode, step, singleAddress, singleAmount, rows, review, error, confirming } = state;
 
@@ -37,8 +37,8 @@ export function SendForm() {
   function onContinue(e: React.FormEvent) {
     e.preventDefault();
     dispatch({ type: "setError", error: null });
-    if (!isConnected) {
-      dispatch({ type: "setError", error: "Connect a wallet to continue" });
+    if (!isSignedIn) {
+      dispatch({ type: "setError", error: "Sign in to continue" });
       return;
     }
     try {
@@ -87,7 +87,7 @@ export function SendForm() {
       rows={rows}
       liveTotalLabel={liveTotalLabel}
       error={error}
-      isConnected={isConnected}
+      isConnected={isSignedIn}
       dispatch={dispatch}
       onSubmit={onContinue}
     />

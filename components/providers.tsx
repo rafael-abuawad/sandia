@@ -1,41 +1,44 @@
 "use client";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { WagmiProvider, createConfig, http } from "wagmi";
-import { ConnectKitProvider, getDefaultConfig } from "connectkit";
-import { ConvexProvider, ConvexReactClient } from "convex/react";
+import { PrivyProvider } from "@privy-io/react-auth";
+import { WagmiProvider } from "@privy-io/wagmi";
+import { ConvexProviderWithAuth, ConvexReactClient } from "convex/react";
 import { useState } from "react";
-import { AuthProvider } from "@/components/auth-provider";
-import { appChains } from "@/lib/chains";
-
-const walletConnectProjectId =
-  process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID ?? "00000000000000000000000000000000";
-
-const wagmiConfig = createConfig(
-  getDefaultConfig({
-    appName: "Payrequest",
-    appDescription: "USD payment requests settled as stablecoins on Robinhood Chain via Across",
-    appUrl: process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
-    walletConnectProjectId,
-    chains: [...appChains],
-    transports: Object.fromEntries(appChains.map((chain) => [chain.id, http()])) as Record<
-      number,
-      ReturnType<typeof http>
-    >,
-  }),
-);
+import { EnsureConvexUser } from "@/components/ensure-convex-user";
+import { useConvexPrivyAuth } from "@/lib/convex-privy-auth";
+import { privyConfig } from "@/lib/privy-config";
+import { wagmiConfig } from "@/lib/wagmi-config";
 
 const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
+const privyAppId = process.env.NEXT_PUBLIC_PRIVY_APP_ID;
 
-export function Providers({
-  children,
-  initialSessionToken = null,
-}: {
-  children: React.ReactNode;
-  initialSessionToken?: string | null;
-}) {
+export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(() => new QueryClient());
   const [convex] = useState(() => (convexUrl ? new ConvexReactClient(convexUrl) : null));
+
+  if (!privyAppId) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background px-6 text-center text-foreground">
+        <div className="max-w-md space-y-3">
+          <h1 className="pr-brand text-2xl">Payrequest</h1>
+          <p className="text-sm text-muted">
+            Set <code className="text-[var(--accent-ink)]">NEXT_PUBLIC_PRIVY_APP_ID</code> in{" "}
+            <code className="text-[var(--accent-ink)]">.env.local</code> from the{" "}
+            <a
+              className="underline underline-offset-2"
+              href="https://dashboard.privy.io"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Privy dashboard
+            </a>
+            .
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (!convex) {
     return (
@@ -53,21 +56,15 @@ export function Providers({
   }
 
   return (
-    <WagmiProvider config={wagmiConfig}>
+    <PrivyProvider appId={privyAppId} config={privyConfig}>
       <QueryClientProvider client={queryClient}>
-        <ConnectKitProvider
-          theme="soft"
-          mode="light"
-          options={{
-            enforceSupportedChains: false,
-            initialChainId: 0,
-          }}
-        >
-          <ConvexProvider client={convex}>
-            <AuthProvider initialSessionToken={initialSessionToken}>{children}</AuthProvider>
-          </ConvexProvider>
-        </ConnectKitProvider>
+        <WagmiProvider config={wagmiConfig}>
+          <ConvexProviderWithAuth client={convex} useAuth={useConvexPrivyAuth}>
+            <EnsureConvexUser />
+            {children}
+          </ConvexProviderWithAuth>
+        </WagmiProvider>
       </QueryClientProvider>
-    </WagmiProvider>
+    </PrivyProvider>
   );
 }

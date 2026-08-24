@@ -21,26 +21,14 @@ export const acrossAttemptStatus = v.union(
 
 export default defineSchema({
   users: defineTable({
+    privyDid: v.optional(v.string()),
     address: v.string(),
+    email: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
-  }).index("by_address", ["address"]),
-
-  authNonces: defineTable({
-    address: v.string(),
-    nonce: v.string(),
-    expiresAt: v.number(),
-  }).index("by_address", ["address"]),
-
-  sessions: defineTable({
-    token: v.string(),
-    userId: v.id("users"),
-    address: v.string(),
-    expiresAt: v.number(),
-    createdAt: v.number(),
   })
-    .index("by_token", ["token"])
-    .index("by_address", ["address"]),
+    .index("by_address", ["address"])
+    .index("by_privyDid", ["privyDid"]),
 
   paymentRequests: defineTable({
     publicId: v.string(),

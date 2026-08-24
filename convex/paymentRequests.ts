@@ -1,6 +1,6 @@
-import { mutation, query, internalMutation, type MutationCtx } from "./_generated/server";
+import { mutation, query, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
-import type { Doc } from "./_generated/dataModel";
+import { getCurrentUser, getCurrentUserOrNull } from "./lib/auth";
 
 const ROBINHOOD_CHAIN_ID = 4663;
 const ALLOWED_DEST_SYMBOLS = new Set(["USDC", "USDT", "USDG"]);
@@ -47,29 +47,8 @@ export function usdMicrosToTokenBaseUnits(amountUsdMicros: number, tokenDecimals
   return result.toString();
 }
 
-async function upsertUserByAddress(ctx: MutationCtx, address: string): Promise<Doc<"users">> {
-  const now = Date.now();
-  let user = await ctx.db
-    .query("users")
-    .withIndex("by_address", (q) => q.eq("address", address))
-    .unique();
-
-  if (!user) {
-    const userId = await ctx.db.insert("users", {
-      address,
-      createdAt: now,
-      updatedAt: now,
-    });
-    user = (await ctx.db.get(userId))!;
-  } else {
-    await ctx.db.patch(user._id, { updatedAt: now });
-  }
-  return user;
-}
-
 export const create = mutation({
   args: {
-    creatorAddress: v.string(),
     amountUsdMicros: v.number(),
     recipientAddress: v.string(),
     destinationTokenSymbol: v.string(),
@@ -79,8 +58,8 @@ export const create = mutation({
     expiresAt: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const creatorAddress = normalizeAddress(args.creatorAddress);
-    const user = await upsertUserByAddress(ctx, creatorAddress);
+    const user = await getCurrentUser(ctx);
+    const creatorAddress = normalizeAddress(user.address);
 
     const symbol = args.destinationTokenSymbol.toUpperCase();
     if (!ALLOWED_DEST_SYMBOLS.has(symbol)) {
@@ -124,17 +103,24 @@ export const create = mutation({
       updatedAt: now,
     });
 
+    console.log("Created payment request", {
+      publicId: id,
+      creatorAddress,
+      userId: user._id,
+    });
+
     return { requestId, publicId: id };
   },
 });
 
 export const listMine = query({
-  args: { creatorAddress: v.string() },
-  handler: async (ctx, args) => {
-    const creatorAddress = normalizeAddress(args.creatorAddress);
+  args: {},
+  handler: async (ctx) => {
+    const user = await getCurrentUserOrNull(ctx);
+    if (!user) return [];
     return await ctx.db
       .query("paymentRequests")
-      .withIndex("by_creator_address", (q) => q.eq("creatorAddress", creatorAddress))
+      .withIndex("by_creator", (q) => q.eq("creatorId", user._id))
       .order("desc")
       .collect();
   },
@@ -162,28 +148,29 @@ export const getByPublicId = query({
 });
 
 export const getMineByPublicId = query({
-  args: { creatorAddress: v.string(), publicId: v.string() },
+  args: { publicId: v.string() },
   handler: async (ctx, args) => {
-    const creatorAddress = normalizeAddress(args.creatorAddress);
+    const user = await getCurrentUserOrNull(ctx);
+    if (!user) return null;
     const request = await ctx.db
       .query("paymentRequests")
       .withIndex("by_publicId", (q) => q.eq("publicId", args.publicId))
       .unique();
-    if (!request || request.creatorAddress !== creatorAddress) return null;
+    if (!request || request.creatorId !== user._id) return null;
     return request;
   },
 });
 
 export const cancel = mutation({
-  args: { creatorAddress: v.string(), publicId: v.string() },
+  args: { publicId: v.string() },
   handler: async (ctx, args) => {
-    const creatorAddress = normalizeAddress(args.creatorAddress);
+    const user = await getCurrentUser(ctx);
     const request = await ctx.db
       .query("paymentRequests")
       .withIndex("by_publicId", (q) => q.eq("publicId", args.publicId))
       .unique();
     if (!request) throw new Error("Request not found");
-    if (request.creatorAddress !== creatorAddress) throw new Error("Forbidden");
+    if (request.creatorId !== user._id) throw new Error("Forbidden");
     if (request.status !== "open") {
       throw new Error(`Cannot cancel request in status ${request.status}`);
     }
@@ -191,6 +178,7 @@ export const cancel = mutation({
       status: "cancelled",
       updatedAt: Date.now(),
     });
+    console.log("Cancelled payment request", { publicId: args.publicId, userId: user._id });
     return { ok: true };
   },
 });

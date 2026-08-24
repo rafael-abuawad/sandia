@@ -2,9 +2,9 @@
 
 import { use, useId, useState } from "react";
 import Link from "next/link";
-import { useAccount } from "wagmi";
-import { ConnectKitButton } from "connectkit";
 import { useMutation, useQuery } from "convex/react";
+import { LoginButton } from "@/components/login-button";
+import { useSignedInWallet } from "@/lib/use-signed-in-wallet";
 import { api } from "@/convex/_generated/api";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
@@ -14,10 +14,10 @@ import { shortenAddress } from "@/lib/utils";
 
 export default function RequestDetailPage({ params }: { params: Promise<{ publicId: string }> }) {
   const { publicId } = use(params);
-  const { address, isConnected } = useAccount();
+  const { isSignedIn } = useSignedInWallet();
   const request = useQuery(
     api.paymentRequests.getMineByPublicId,
-    address ? { creatorAddress: address, publicId } : "skip",
+    isSignedIn ? { publicId } : "skip",
   );
   const attempts = useQuery(api.paymentAttempts.listByRequest, { publicId });
   const cancel = useMutation(api.paymentRequests.cancel);
@@ -27,13 +27,15 @@ export default function RequestDetailPage({ params }: { params: Promise<{ public
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  if (!isConnected || !address) {
+  if (!isSignedIn) {
     return (
       <div className="pr-page pr-page--narrow text-center">
         <h1 className="pr-display text-2xl">Payment request</h1>
-        <p className="text-sm text-muted">Connect the creator wallet to manage this request.</p>
+        <p className="text-sm text-muted">
+          Sign in with the creator account to manage this request.
+        </p>
         <div className="flex justify-center">
-          <ConnectKitButton />
+          <LoginButton />
         </div>
       </div>
     );
@@ -47,7 +49,7 @@ export default function RequestDetailPage({ params }: { params: Promise<{ public
     return (
       <div className="pr-page pr-page--narrow">
         <h1 className="pr-display text-2xl">Request not found</h1>
-        <p className="text-sm text-danger">This request is not available for this wallet.</p>
+        <p className="text-sm text-danger">This request is not available for this account.</p>
       </div>
     );
   }
@@ -58,11 +60,10 @@ export default function RequestDetailPage({ params }: { params: Promise<{ public
       : `/pay/${publicId}`;
 
   async function onCancel() {
-    if (!address) return;
     setBusy(true);
     setError(null);
     try {
-      await cancel({ creatorAddress: address, publicId });
+      await cancel({ publicId });
       setConfirmCancel(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unable to cancel request. Try again.");

@@ -9,11 +9,11 @@
  */
 
 import type * as across from "../across.js";
-import type * as auth from "../auth.js";
-import type * as authActions from "../authActions.js";
 import type * as crons from "../crons.js";
+import type * as lib_auth from "../lib/auth.js";
 import type * as paymentAttempts from "../paymentAttempts.js";
 import type * as paymentRequests from "../paymentRequests.js";
+import type * as users from "../users.js";
 
 import type {
   ApiFromModules,
@@ -23,11 +23,11 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   across: typeof across;
-  auth: typeof auth;
-  authActions: typeof authActions;
   crons: typeof crons;
+  "lib/auth": typeof lib_auth;
   paymentAttempts: typeof paymentAttempts;
   paymentRequests: typeof paymentRequests;
+  users: typeof users;
 }>;
 
 /**
