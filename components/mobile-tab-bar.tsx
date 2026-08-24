@@ -27,12 +27,7 @@ export function MobileTabBar() {
                   active && "bg-accent-soft text-accent-ink",
                 )}
               >
-                <Icon
-                  className="size-5 shrink-0"
-                  strokeWidth={1.5}
-                  fill={active ? "currentColor" : "none"}
-                  aria-hidden
-                />
+                <Icon className="size-5 shrink-0" strokeWidth={1.5} aria-hidden />
                 <span className="truncate">{label}</span>
               </Link>
             </li>

@@ -27,12 +27,7 @@ export function AppSidebar() {
               data-active={active ? "true" : undefined}
               className={cn("pr-nav-item justify-start")}
             >
-              <Icon
-                className="size-4 shrink-0"
-                strokeWidth={1.5}
-                fill={active ? "currentColor" : "none"}
-                aria-hidden
-              />
+              <Icon className="size-4 shrink-0" strokeWidth={1.5} aria-hidden />
               <span>{label}</span>
             </Link>
           );
