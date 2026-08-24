@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAccount } from "wagmi";
 import { ConnectKitButton } from "connectkit";
@@ -20,6 +20,9 @@ export function CreateRequestForm() {
   const { address, isConnected } = useAccount();
   const createRequest = useMutation(api.paymentRequests.create);
   const errorId = useId();
+  const amountRef = useRef<HTMLInputElement>(null);
+  const recipientRef = useRef<HTMLInputElement>(null);
+  const expiresRef = useRef<HTMLInputElement>(null);
 
   const [amount, setAmount] = useState("10");
   const [recipient, setRecipient] = useState("");
@@ -27,15 +30,19 @@ export function CreateRequestForm() {
   const [expiresAtLocal, setExpiresAtLocal] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [invalidField, setInvalidField] = useState<"amount" | "recipient" | "expires" | null>(
-    null,
-  );
+  const [invalidField, setInvalidField] = useState<"amount" | "recipient" | "expires" | null>(null);
 
   useEffect(() => {
     if (address) {
       setRecipient((prev) => (prev ? prev : address));
     }
   }, [address]);
+
+  useEffect(() => {
+    if (invalidField === "amount") amountRef.current?.focus();
+    if (invalidField === "recipient") recipientRef.current?.focus();
+    if (invalidField === "expires") expiresRef.current?.focus();
+  }, [invalidField]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -94,10 +101,11 @@ export function CreateRequestForm() {
   }
 
   return (
-    <form onSubmit={onSubmit} className="mx-auto max-w-lg space-y-5" noValidate>
+    <form onSubmit={onSubmit} className="space-y-5" noValidate>
       <div className="space-y-2">
         <Label htmlFor="amount">Amount (USD)</Label>
         <Input
+          ref={amountRef}
           id="amount"
           inputMode="decimal"
           value={amount}
@@ -108,13 +116,14 @@ export function CreateRequestForm() {
           aria-describedby={error && invalidField === "amount" ? errorId : "amount-help"}
         />
         <p id="amount-help" className="pr-help">
-          Settled 1:1 as USDG on Robinhood Chain via Across.
+          Settled 1:1 as USDG on Robinhood Chain. Payers bridge from their own chain.
         </p>
       </div>
 
       <div className="space-y-2">
         <Label htmlFor="recipient">Recipient wallet</Label>
         <Input
+          ref={recipientRef}
           id="recipient"
           value={recipient}
           onChange={(e) => setRecipient(e.target.value)}
@@ -133,9 +142,7 @@ export function CreateRequestForm() {
           chainName={ROBINHOOD_USDG.chainName}
           chainLogoUrl={ROBINHOOD_USDG.chainLogoUrl}
         />
-        <p className="pr-help">
-          Across currently settles payment requests as USDG on Robinhood Chain.
-        </p>
+        <p className="pr-help">Payment requests settle as USDG on Robinhood Chain.</p>
       </div>
 
       <div className="space-y-2">
@@ -151,6 +158,7 @@ export function CreateRequestForm() {
       <div className="space-y-2">
         <Label htmlFor="expires">Expires (optional)</Label>
         <Input
+          ref={expiresRef}
           id="expires"
           type="datetime-local"
           value={expiresAtLocal}

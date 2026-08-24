@@ -29,12 +29,7 @@ export function UsdgBalanceCard({ className }: UsdgBalanceCardProps) {
     data !== undefined ? formatTokenAmountGrouped(data.toString(), ROBINHOOD_USDG.decimals) : null;
 
   return (
-    <div
-      className={cn(
-        "rounded-[var(--radius-lg)] border border-border bg-[var(--accent-soft)] px-3 py-3",
-        className,
-      )}
-    >
+    <div className={cn("pr-inset pr-inset--accent px-3 py-3", className)}>
       <div className="flex items-start gap-2.5">
         <Image
           src={ROBINHOOD_USDG.logoUrl}
@@ -45,16 +40,14 @@ export function UsdgBalanceCard({ className }: UsdgBalanceCardProps) {
           unoptimized
         />
         <div className="min-w-0 flex-1">
-          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted">
-            {ROBINHOOD_USDG.symbol}
-          </p>
+          <p className="pr-kicker">{ROBINHOOD_USDG.symbol}</p>
           <p
-            className="pr-mono mt-1 truncate text-xl font-semibold leading-none tracking-tight text-foreground"
+            className="pr-money mt-1 truncate text-xl font-semibold leading-none tracking-tight text-foreground"
             aria-live="polite"
           >
             {!isConnected ? "—" : isLoading ? "…" : isError || formatted === null ? "—" : formatted}
           </p>
-          <p className="mt-1.5 text-[11px] text-subtle">
+          <p className="mt-1.5 text-xs text-muted">
             {isConnected ? "Robinhood Chain" : "Connect to view balance"}
           </p>
         </div>

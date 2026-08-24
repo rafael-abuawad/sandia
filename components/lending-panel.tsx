@@ -80,7 +80,7 @@ export function LendingPanel() {
   const yearly = projectedEarnings(amount, VAULT.netApy, 365);
 
   return (
-    <div className="mx-auto max-w-lg space-y-6">
+    <div className="pr-page">
       <div className="space-y-2">
         <div className="flex flex-wrap items-baseline gap-2">
           <h1 className="pr-display text-2xl">{VAULT.name}</h1>
@@ -93,19 +93,15 @@ export function LendingPanel() {
 
       <dl className="grid grid-cols-1 gap-4 border-y border-border py-4 sm:grid-cols-3 sm:gap-3">
         <div className="flex items-baseline justify-between gap-3 sm:block sm:space-y-1">
-          <dt className="text-[10px] font-bold uppercase tracking-[0.16em] text-subtle">
-            Deposits
-          </dt>
+          <dt className="pr-kicker">Deposits</dt>
           <dd className="pr-mono text-sm font-semibold text-foreground">{VAULT.totalDeposits}</dd>
         </div>
         <div className="flex items-baseline justify-between gap-3 sm:block sm:space-y-1">
-          <dt className="text-[10px] font-bold uppercase tracking-[0.16em] text-subtle">
-            Liquidity
-          </dt>
+          <dt className="pr-kicker">Liquidity</dt>
           <dd className="pr-mono text-sm font-semibold text-foreground">{VAULT.liquidity}</dd>
         </div>
         <div className="flex items-baseline justify-between gap-3 sm:block sm:space-y-1">
-          <dt className="text-[10px] font-bold uppercase tracking-[0.16em] text-subtle">Net APY</dt>
+          <dt className="pr-kicker">Net APY</dt>
           <dd className="pr-mono text-sm font-semibold text-foreground">
             {VAULT.netApy.toFixed(2)}%
           </dd>
@@ -132,16 +128,17 @@ export function LendingPanel() {
               ≈ {formatUsdFromAmount(amount)}
               {amount.trim() ? ` · ~${yearly}/yr at ${VAULT.netApy}%` : null}
             </p>
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="sm"
               onClick={setMax}
               disabled={!isConnected || balanceLoading || !balanceExact}
-              className="min-h-11 min-w-11 text-xs font-semibold text-[var(--accent-ink)] disabled:opacity-50 sm:min-h-0 sm:min-w-0"
             >
               Max
-            </button>
+            </Button>
           </div>
-          <p className="pr-mono text-xs text-subtle">
+          <p className="pr-mono text-xs text-muted">
             Available:{" "}
             {!isConnected
               ? "—"
@@ -172,18 +169,21 @@ export function LendingPanel() {
             <ConnectKitButton />
           </div>
         ) : (
-          <Button
-            type="submit"
-            className="w-full"
-            disabled
-            title="Vault deposit contract wiring coming next"
-          >
-            Deposit (coming soon)
-          </Button>
+          <div className="space-y-2">
+            <Button
+              type="submit"
+              className="w-full"
+              disabled
+              title="Vault deposit contract wiring coming next"
+            >
+              Deposit (coming soon)
+            </Button>
+            <p className="text-center text-xs text-muted">Preview — deposits are not open yet.</p>
+          </div>
         )}
       </form>
 
-      <div className="flex items-center gap-2 text-xs text-subtle">
+      <div className="flex items-center gap-2 text-xs text-muted">
         <Image
           src={ROBINHOOD_USDG.logoUrl}
           alt=""

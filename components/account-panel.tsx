@@ -39,7 +39,7 @@ export function AccountPanel({ className, onAfterLogout }: AccountPanelProps) {
           className="w-full justify-center text-muted hover:text-foreground md:justify-start"
           onClick={() => void handleLogout()}
         >
-          <LogOut className="size-4" aria-hidden />
+          <LogOut className="size-4" strokeWidth={1.5} aria-hidden />
           Logout
         </Button>
       </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useRef } from "react";
+import { useEffect, useId, useRef } from "react";
 import { ConnectKitButton } from "connectkit";
 import { Plus, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -37,10 +37,23 @@ export function SendComposeForm({
   onSubmit,
 }: SendComposeFormProps) {
   const csvInputRef = useRef<HTMLInputElement>(null);
+  const amountRef = useRef<HTMLInputElement>(null);
+  const recipientRef = useRef<HTMLInputElement>(null);
+  const firstRowRef = useRef<HTMLInputElement>(null);
   const errorId = useId();
 
+  useEffect(() => {
+    if (!error) return;
+    if (mode === "single") {
+      if (!singleAmount.trim()) amountRef.current?.focus();
+      else recipientRef.current?.focus();
+      return;
+    }
+    firstRowRef.current?.focus();
+  }, [error, mode, singleAmount]);
+
   return (
-    <form onSubmit={onSubmit} className="mx-auto max-w-lg space-y-5" noValidate>
+    <form onSubmit={onSubmit} className="space-y-5" noValidate>
       <div className="space-y-2">
         <Label>Send mode</Label>
         <div className="grid grid-cols-2 gap-2" role="group" aria-label="Send mode">
@@ -86,6 +99,7 @@ export function SendComposeForm({
           <div className="space-y-2">
             <Label htmlFor="send-amount">Amount (USDG)</Label>
             <Input
+              ref={amountRef}
               id="send-amount"
               inputMode="decimal"
               value={singleAmount}
@@ -99,6 +113,7 @@ export function SendComposeForm({
           <div className="space-y-2">
             <Label htmlFor="send-recipient">Recipient wallet</Label>
             <Input
+              ref={recipientRef}
               id="send-recipient"
               value={singleAddress}
               onChange={(e) => dispatch({ type: "setSingleAddress", address: e.target.value })}
@@ -120,49 +135,56 @@ export function SendComposeForm({
 
           <ul className="space-y-3">
             {rows.map((row, index) => (
-              <li key={row.id} className="pr-panel space-y-2 p-3">
+              <li key={row.id} className="pr-inset space-y-2 p-3">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-xs font-medium text-muted">Recipient {index + 1}</span>
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="size-11 text-muted hover:text-danger"
+                    className="text-muted hover:text-danger"
                     disabled={rows.length <= 2}
                     aria-label={`Remove recipient ${index + 1}`}
                     onClick={() => dispatch({ type: "removeRow", id: row.id })}
                   >
-                    <Trash2 className="size-4" aria-hidden />
+                    <Trash2 className="size-4" strokeWidth={1.5} aria-hidden />
                   </Button>
                 </div>
-                <div className="space-y-2">
-                  <Input
-                    value={row.address}
-                    onChange={(e) =>
-                      dispatch({
-                        type: "updateRow",
-                        id: row.id,
-                        patch: { address: e.target.value },
-                      })
-                    }
-                    placeholder="0x…"
-                    aria-label={`Address for recipient ${index + 1}`}
-                    required
-                  />
-                  <Input
-                    inputMode="decimal"
-                    value={row.amount}
-                    onChange={(e) =>
-                      dispatch({
-                        type: "updateRow",
-                        id: row.id,
-                        patch: { amount: e.target.value },
-                      })
-                    }
-                    placeholder="Amount (USDG)"
-                    aria-label={`Amount for recipient ${index + 1}`}
-                    required
-                  />
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <Label htmlFor={`send-addr-${row.id}`}>Wallet</Label>
+                    <Input
+                      ref={index === 0 ? firstRowRef : undefined}
+                      id={`send-addr-${row.id}`}
+                      value={row.address}
+                      onChange={(e) =>
+                        dispatch({
+                          type: "updateRow",
+                          id: row.id,
+                          patch: { address: e.target.value },
+                        })
+                      }
+                      placeholder="0x…"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor={`send-amt-${row.id}`}>Amount (USDG)</Label>
+                    <Input
+                      id={`send-amt-${row.id}`}
+                      inputMode="decimal"
+                      value={row.amount}
+                      onChange={(e) =>
+                        dispatch({
+                          type: "updateRow",
+                          id: row.id,
+                          patch: { amount: e.target.value },
+                        })
+                      }
+                      placeholder="10.00"
+                      required
+                    />
+                  </div>
                 </div>
               </li>
             ))}
@@ -186,18 +208,21 @@ export function SendComposeForm({
               } catch (err) {
                 dispatch({
                   type: "setError",
-                  error: err instanceof Error ? err.message : "Unable to parse CSV. Check the format and try again.",
+                  error:
+                    err instanceof Error
+                      ? err.message
+                      : "Unable to parse CSV. Check the format and try again.",
                 });
               }
             }}
           />
           <div className="grid grid-cols-2 gap-2">
             <Button type="button" variant="secondary" onClick={() => dispatch({ type: "addRow" })}>
-              <Plus className="size-4" aria-hidden />
+              <Plus className="size-4" strokeWidth={1.5} aria-hidden />
               Add recipient
             </Button>
             <Button type="button" variant="secondary" onClick={() => csvInputRef.current?.click()}>
-              <Upload className="size-4" aria-hidden />
+              <Upload className="size-4" strokeWidth={1.5} aria-hidden />
               Upload CSV
             </Button>
           </div>
@@ -208,7 +233,7 @@ export function SendComposeForm({
                 "address,amount\n0x0000000000000000000000000000000000000001,10.00\n0x0000000000000000000000000000000000000002,25.50\n",
               )}`}
               download="usdg-send-template.csv"
-              className="font-medium text-foreground underline underline-offset-2 hover:text-[var(--accent-ink)]"
+              className="font-medium text-foreground underline underline-offset-2 hover:text-foreground"
             >
               Download template
             </a>
@@ -228,7 +253,7 @@ export function SendComposeForm({
           </div>
         ) : (
           <Button type="submit" className="w-full">
-            Continue
+            Review send
           </Button>
         )}
       </div>

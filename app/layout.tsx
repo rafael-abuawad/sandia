@@ -32,7 +32,7 @@ export default async function RootLayout({
   const initialSessionToken = jar.get(SESSION_COOKIE_NAME)?.value ?? null;
 
   return (
-    <html lang="en" className={`${mono.variable} h-full`}>
+    <html lang="en" className={`${mono.variable} h-full`} data-scroll-behavior="smooth">
       <head>
         <link
           href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=clash-display@500,600,700&display=swap"
@@ -40,6 +40,9 @@ export default async function RootLayout({
         />
       </head>
       <body className="min-h-full flex flex-col antialiased">
+        <a href="#main" className="pr-skip-link">
+          Skip to content
+        </a>
         <Providers initialSessionToken={initialSessionToken}>{children}</Providers>
       </body>
     </html>

@@ -23,10 +23,10 @@ export function SendReviewPanel({
   const errorId = useId();
 
   return (
-    <div className="mx-auto max-w-lg space-y-5">
-      <section className="pr-panel space-y-4 p-5">
+    <div className="space-y-5">
+      <section className="pr-panel pr-panel--padded space-y-4">
         <div>
-          <h2 className="text-base font-semibold">Review send</h2>
+          <h2 className="pr-section-title">Review send</h2>
           <p className="mt-1 text-sm text-muted">Confirm details before the demo mock completes.</p>
         </div>
 

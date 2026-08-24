@@ -22,12 +22,17 @@ export function MobileTabBar() {
                 href={href}
                 data-active={active ? "true" : undefined}
                 className={cn(
-                  "flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-[var(--radius)] px-1 py-1.5 text-[10px] font-semibold tracking-wide text-muted transition-[color,background-color] duration-[var(--duration)] ease-[var(--ease-out)]",
+                  "flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-md px-1 py-1.5 text-xs font-semibold tracking-wide text-muted transition-[color,background-color] duration-[var(--duration)] ease-[var(--ease-out)]",
                   "hover:text-foreground",
-                  active && "bg-[var(--accent-soft)] text-[var(--accent-ink)]",
+                  active && "bg-accent-soft text-accent-ink",
                 )}
               >
-                <Icon className="size-5 shrink-0" aria-hidden />
+                <Icon
+                  className="size-5 shrink-0"
+                  strokeWidth={1.5}
+                  fill={active ? "currentColor" : "none"}
+                  aria-hidden
+                />
                 <span className="truncate">{label}</span>
               </Link>
             </li>

@@ -15,7 +15,7 @@ import { QuoteSkeleton } from "@/components/quote-skeleton";
 import { PayQuoteDetails } from "@/components/pay-flow/quote-details";
 import type { PayStep } from "@/components/pay-flow/state";
 import type { AcrossChain, AcrossSwapQuote, AcrossToken } from "@/lib/across/client";
-import { cn, shortenAddress } from "@/lib/utils";
+import { shortenAddress } from "@/lib/utils";
 import type { Hex } from "viem";
 
 type PayAcrossPanelProps = {
@@ -93,10 +93,13 @@ export function PayAcrossPanel({
 }: PayAcrossPanelProps) {
   const errorId = useId();
   const blockerId = useId();
+  const chainId = useId();
+  const tokenId = useId();
   const blocker = isConnected
     ? payBlockerMessage({ originChainId, inputToken, step, quote, quoteError })
     : null;
   const busy = step === "approving" || step === "paying" || step === "tracking";
+  const isError = step === "error";
 
   function handlePay() {
     if (!canPay) return;
@@ -104,9 +107,9 @@ export function PayAcrossPanel({
   }
 
   return (
-    <section className="pr-panel space-y-5 p-4 sm:p-6">
+    <section className="pr-panel pr-panel--padded space-y-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="pr-display text-lg text-foreground">Pay with Across</h2>
+        <h2 className="pr-section-title">Pay with Across</h2>
         <div className="[&_button]:w-full sm:[&_button]:w-auto">
           <ConnectKitButton />
         </div>
@@ -120,8 +123,9 @@ export function PayAcrossPanel({
         <>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label>Chain</Label>
+              <Label htmlFor={chainId}>Chain</Label>
               <ChainSelect
+                id={chainId}
                 value={originChainId !== null ? String(originChainId) : undefined}
                 onValueChange={onChainChange}
                 options={chainOptions}
@@ -130,8 +134,9 @@ export function PayAcrossPanel({
               />
             </div>
             <div className="space-y-2">
-              <Label>Token</Label>
+              <Label htmlFor={tokenId}>Token</Label>
               <TokenSelect
+                id={tokenId}
                 value={inputToken || undefined}
                 onValueChange={onTokenChange}
                 options={tokenOptions}
@@ -165,16 +170,26 @@ export function PayAcrossPanel({
             />
           )}
 
-          <div className="sticky bottom-0 z-10 -mx-4 space-y-2 border-t border-border bg-[var(--panel-elevated)] px-4 py-3 sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0">
+          {isError && statusMsg && (
+            <div className="pr-inset pr-inset--danger space-y-2 p-3">
+              <p className="text-sm text-danger" role="alert">
+                {statusMsg}
+              </p>
+              <Button variant="secondary" size="sm" onClick={quote ? onPay : onRefreshQuote}>
+                Try again
+              </Button>
+            </div>
+          )}
+
+          <div className="sticky bottom-0 z-10 -mx-4 space-y-2 border-t border-border bg-panel-elevated px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0">
             {blocker && !busy && (
               <p id={blockerId} className="text-sm text-muted" role="status">
                 {blocker}
               </p>
             )}
             <Button
-              className={cn("w-full", !canPay && !busy && "opacity-60")}
-              disabled={busy}
-              aria-disabled={!canPay || undefined}
+              className="w-full"
+              disabled={!canPay || busy}
               aria-describedby={!canPay && blocker ? blockerId : undefined}
               onClick={handlePay}
             >
@@ -190,13 +205,13 @@ export function PayAcrossPanel({
             </Button>
           </div>
 
-          {statusMsg && (
+          {statusMsg && !isError && (
             <p className="text-sm text-muted" role="status">
               {statusMsg}
             </p>
           )}
           {(txSuccess || txError) && pendingTx && (
-            <p className="pr-mono text-xs text-subtle">Last tx: {shortenAddress(pendingTx, 8)}</p>
+            <p className="pr-mono text-xs text-muted">Last tx: {shortenAddress(pendingTx, 8)}</p>
           )}
         </>
       )}

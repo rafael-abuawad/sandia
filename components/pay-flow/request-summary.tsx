@@ -26,17 +26,17 @@ export function PayRequestSummary({
   description,
 }: PayRequestSummaryProps) {
   return (
-    <section className="pr-panel space-y-3 p-6">
+    <section className="pr-panel pr-panel--padded space-y-3">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-xs uppercase tracking-[0.2em] text-subtle">Payment request</p>
-          <h1 className="mt-1 pr-display text-3xl text-foreground">
+          <p className="pr-kicker">Payment request</p>
+          <h1 className="mt-1 pr-display pr-money text-3xl text-foreground">
             ${formatUsdFromMicros(amountUsdMicros)} USD
           </h1>
         </div>
         <StatusBadge status={status} />
       </div>
-      <div className="flex items-center gap-3 rounded-lg border border-border bg-[var(--panel-elevated)] px-3 py-2.5">
+      <div className="pr-inset flex items-center gap-3 px-3 py-2.5">
         <TokenChainIcon
           tokenSymbol={destinationTokenSymbol}
           tokenLogoUrl={ROBINHOOD_USDG.logoUrl}
@@ -45,11 +45,11 @@ export function PayRequestSummary({
           size="lg"
         />
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold text-foreground">
+          <p className="pr-money text-sm font-semibold text-foreground">
             {formatTokenAmount(outputAmountBaseUnits, destinationTokenDecimals)}{" "}
             {destinationTokenSymbol}
           </p>
-          <p className="text-xs text-subtle">
+          <p className="text-xs text-muted">
             Robinhood Chain → {shortenAddress(recipientAddress, 6)}
           </p>
         </div>
@@ -62,10 +62,9 @@ export function PayRequestSummary({
           </div>
         )}
       </dl>
-      <p className="text-xs text-subtle">
-        The USD amount is converted 1:1 into {destinationTokenSymbol} base units. Across fees may
-        increase what you send on the origin chain; the recipient must receive at least the
-        requested token amount before this request is marked paid.
+      <p className="text-xs text-muted">
+        The USD amount is converted 1:1 into {destinationTokenSymbol}. Across may add a bridge fee
+        on what you send; the recipient still receives at least the requested amount.
       </p>
     </section>
   );

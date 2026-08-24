@@ -12,9 +12,9 @@ export function SendSuccessPanel({
   onReset: () => void;
 }) {
   return (
-    <div className="mx-auto max-w-lg space-y-5">
-      <section className="pr-panel space-y-3 p-5">
-        <p className="text-sm font-semibold text-[var(--success)]">Send prepared (demo)</p>
+    <div className="space-y-5">
+      <section className="pr-panel pr-panel--padded space-y-3">
+        <p className="text-sm font-semibold text-success">Send prepared (demo)</p>
         <p className="text-sm leading-relaxed text-muted">
           Mock success — no on-chain transfer ran. The batch transfer contract that moves USDG to
           multiple recipients in one call is not wired yet.

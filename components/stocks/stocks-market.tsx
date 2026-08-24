@@ -3,11 +3,13 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowDown, ArrowUp, Search } from "lucide-react";
+import { ArrowDown, ArrowUp } from "lucide-react";
 import type { StockQuote, StockToken } from "@/lib/rhj/client";
 import { formatSpreadPct, formatUsdPrice, formatVolume } from "@/lib/rhj/format";
-import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+
+const TOP_STOCKS = 6;
 
 type MarketRow = StockToken & {
   quote: StockQuote | null;
@@ -21,7 +23,6 @@ export function StocksMarket() {
   const [quotesBySymbol, setQuotesBySymbol] = useState<Record<string, StockQuote>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [query, setQuery] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("volume");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
@@ -67,27 +68,21 @@ export function StocksMarket() {
     return () => window.clearInterval(id);
   }, [load]);
 
-  const rows: MarketRow[] = useMemo(() => {
-    return assets.map((asset) => ({
-      ...asset,
-      quote: quotesBySymbol[asset.symbol.toUpperCase()] ?? null,
-    }));
+  const topRows: MarketRow[] = useMemo(() => {
+    return assets
+      .map((asset) => ({
+        ...asset,
+        quote: quotesBySymbol[asset.symbol.toUpperCase()] ?? null,
+      }))
+      .sort(
+        (a, b) => (b.quote?.dailyTradingVolume ?? -1) - (a.quote?.dailyTradingVolume ?? -1),
+      )
+      .slice(0, TOP_STOCKS);
   }, [assets, quotesBySymbol]);
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    let list = rows;
-    if (q) {
-      list = list.filter(
-        (row) =>
-          row.symbol.toLowerCase().includes(q) ||
-          row.shortName.toLowerCase().includes(q) ||
-          row.name.toLowerCase().includes(q),
-      );
-    }
-
     const dir = sortDir === "asc" ? 1 : -1;
-    return [...list].sort((a, b) => {
+    return [...topRows].sort((a, b) => {
       const qa = a.quote;
       const qb = b.quote;
       switch (sortKey) {
@@ -111,7 +106,7 @@ export function StocksMarket() {
         }
       }
     });
-  }, [rows, query, sortKey, sortDir]);
+  }, [topRows, sortKey, sortDir]);
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) {
@@ -127,28 +122,13 @@ export function StocksMarket() {
       <div className="space-y-2">
         <h1 className="pr-display text-2xl sm:text-3xl">Stocks</h1>
         <p className="max-w-2xl text-sm leading-relaxed text-muted">
-          Tokenized equities on Robinhood Chain. Prices track the underlying stock — these are not
-          the shares themselves.
+          The {TOP_STOCKS} most actively traded tokenized equities on Robinhood Chain. Prices track
+          the underlying stock — these are not the shares themselves.
         </p>
       </div>
 
-      <div className="relative max-w-md">
-        <Search
-          className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-subtle"
-          aria-hidden
-        />
-        <Input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search symbol or name"
-          className="pl-9"
-          aria-label="Search stock tokens"
-        />
-      </div>
-
-      <p className="text-xs text-subtle">
-        Live quotes from Robinhood Stock Token APIs. Stats may lag; volume is underlying daily
-        trading volume.
+      <p className="text-xs text-muted">
+        Ranked by underlying 1D volume. Quotes may lag.
       </p>
 
       {error && (
@@ -161,7 +141,7 @@ export function StocksMarket() {
         <div className="hidden overflow-x-auto md:block">
           <table className="w-full min-w-[40rem] border-collapse text-left text-sm">
             <thead className="sticky top-0 z-10 border-b border-border bg-[var(--panel-elevated)]">
-              <tr className="text-[11px] font-bold uppercase tracking-[0.14em] text-subtle">
+              <tr className="pr-kicker">
                 <SortHeader
                   label="Token"
                   active={sortKey === "symbol"}
@@ -203,20 +183,7 @@ export function StocksMarket() {
               {!loading && filtered.length === 0 && (
                 <tr>
                   <td colSpan={5} className="px-4 py-10 text-center text-sm text-muted">
-                    {query.trim() ? (
-                      <span className="inline-flex flex-col items-center gap-2">
-                        <span>No results for &lsquo;{query.trim()}&rsquo;.</span>
-                        <button
-                          type="button"
-                          className="font-semibold text-foreground underline underline-offset-2"
-                          onClick={() => setQuery("")}
-                        >
-                          Clear search
-                        </button>
-                      </span>
-                    ) : (
-                      "No stock tokens available."
-                    )}
+                    No stock tokens available.
                   </td>
                 </tr>
               )}
@@ -233,20 +200,7 @@ export function StocksMarket() {
           )}
           {!loading && filtered.length === 0 && (
             <li className="px-4 py-10 text-center text-sm text-muted">
-              {query.trim() ? (
-                <span className="inline-flex flex-col items-center gap-2">
-                  <span>No results for &lsquo;{query.trim()}&rsquo;.</span>
-                  <button
-                    type="button"
-                    className="font-semibold text-foreground underline underline-offset-2"
-                    onClick={() => setQuery("")}
-                  >
-                    Clear search
-                  </button>
-                </span>
-              ) : (
-                "No stock tokens available."
-              )}
+              No stock tokens available.
             </li>
           )}
           {filtered.map((row) => (
@@ -271,23 +225,27 @@ function SortHeader({
   onClick: () => void;
   align?: "left" | "right";
 }) {
+  const sortState = active ? (dir === "asc" ? "ascending" : "descending") : "none";
   return (
-    <th className={cn("px-4 py-3", align === "right" && "text-right")}>
+    <th className={cn("px-4 py-3", align === "right" && "text-right")} aria-sort={sortState}>
       <button
         type="button"
         onClick={onClick}
+        aria-label={`${label}, ${
+          active ? (dir === "asc" ? "sorted ascending" : "sorted descending") : "not sorted"
+        }`}
         className={cn(
-          "inline-flex items-center gap-1 transition-colors hover:text-foreground",
-          active ? "text-foreground" : "text-subtle",
+          "inline-flex shrink-0 items-center gap-1 whitespace-nowrap transition-[color] duration-[var(--duration)] ease-[var(--ease-out)] hover:text-foreground",
+          active ? "text-foreground" : "text-muted",
           align === "right" && "flex-row-reverse",
         )}
       >
         {label}
         {active ? (
           dir === "asc" ? (
-            <ArrowUp className="size-3" aria-hidden />
+            <ArrowUp className="size-3" strokeWidth={1.5} aria-hidden />
           ) : (
-            <ArrowDown className="size-3" aria-hidden />
+            <ArrowDown className="size-3" strokeWidth={1.5} aria-hidden />
           )
         ) : null}
       </button>
@@ -300,8 +258,8 @@ function TokenCell({ row }: { row: MarketRow }) {
     <div className="flex min-w-0 items-center gap-3">
       <TokenLogo src={row.logoUrl} symbol={row.symbol} />
       <div className="min-w-0">
-        <p className="truncate font-semibold text-foreground">{row.shortName}</p>
-        <p className="pr-mono text-xs text-subtle">{row.symbol}</p>
+        <p className="pr-mono truncate font-semibold text-foreground">{row.symbol}</p>
+        <p className="truncate text-xs text-muted">{row.shortName}</p>
       </div>
     </div>
   );
@@ -311,7 +269,7 @@ function TokenLogo({ src, symbol }: { src: string | null; symbol: string }) {
   const [broken, setBroken] = useState(false);
   if (!src || broken) {
     return (
-      <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-panel text-[10px] font-bold uppercase text-muted ring-1 ring-border">
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-panel text-xs font-bold uppercase text-muted ring-1 ring-border">
         {symbol.slice(0, 2)}
       </span>
     );
@@ -331,45 +289,40 @@ function TokenLogo({ src, symbol }: { src: string | null; symbol: string }) {
 
 function DesktopRow({ row }: { row: MarketRow }) {
   const halted = row.quote?.isTradingHalt;
+  const href = `/stocks/${encodeURIComponent(row.symbol)}`;
   return (
     <tr
       className={cn(
-        "border-b border-border last:border-b-0 transition-colors hover:bg-foreground/[0.03]",
+        "relative border-b border-border last:border-b-0 transition-[background-color] duration-[var(--duration)] ease-[var(--ease-out)] hover:bg-foreground/[0.03]",
         halted && "opacity-60",
       )}
     >
       <td className="px-4 py-3">
-        <Link href={`/stocks/${encodeURIComponent(row.symbol)}`} className="block">
+        <Link
+          href={href}
+          className="after:absolute after:inset-0"
+          aria-label={`${row.symbol}, ${row.shortName}`}
+        >
           <TokenCell row={row} />
         </Link>
       </td>
       <td className="px-4 py-3 text-right">
-        <Link
-          href={`/stocks/${encodeURIComponent(row.symbol)}`}
-          className="block pr-mono font-semibold text-foreground"
-          aria-label={`${row.symbol} price ${formatUsdPrice(row.quote?.mid)}`}
-        >
+        <span className="pr-mono font-semibold text-foreground">
           {formatUsdPrice(row.quote?.mid)}
-        </Link>
+        </span>
       </td>
       <td className="px-4 py-3 text-right">
-        <span className="pr-mono text-muted">{formatSpreadPct(row.quote?.spreadPct)}</span>
+        <span className="pr-mono whitespace-nowrap text-muted">
+          {formatSpreadPct(row.quote?.spreadPct)}
+        </span>
       </td>
       <td className="px-4 py-3 text-right">
         <span className="pr-mono text-foreground">
           {formatVolume(row.quote?.dailyTradingVolume)}
         </span>
       </td>
-      <td className="px-4 py-3">
-        {halted ? (
-          <span className="rounded-md bg-[var(--danger-soft)] px-2 py-0.5 text-xs font-semibold text-danger">
-            Halted
-          </span>
-        ) : (
-          <span className="rounded-md bg-[var(--success-soft)] px-2 py-0.5 text-xs font-semibold text-success">
-            Open
-          </span>
-        )}
+      <td className="relative z-10 px-4 py-3">
+        {halted ? <Badge variant="danger">Halted</Badge> : <Badge variant="success">Open</Badge>}
       </td>
     </tr>
   );

@@ -8,6 +8,7 @@ import type { StockQuote, StockToken } from "@/lib/rhj/client";
 import { explorerTokenUrl } from "@/lib/rhj/client";
 import { formatSpreadPct, formatUsdPrice, formatVolume } from "@/lib/rhj/format";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { shortenAddress } from "@/lib/utils";
 
 export function StockDetail({ params }: { params: Promise<{ symbol: string }> }) {
@@ -66,12 +67,12 @@ export function StockDetail({ params }: { params: Promise<{ symbol: string }> })
 
   if (error && !asset) {
     return (
-      <div className="mx-auto max-w-lg space-y-4">
+      <div className="pr-page">
         <Link
           href="/stocks"
           className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-foreground"
         >
-          <ArrowLeft className="size-4" aria-hidden />
+          <ArrowLeft className="size-4" strokeWidth={1.5} aria-hidden />
           Back to stocks
         </Link>
         <p className="text-sm text-danger">{error}</p>
@@ -84,12 +85,12 @@ export function StockDetail({ params }: { params: Promise<{ symbol: string }> })
   const explorerUrl = explorerTokenUrl(asset.contractAddress);
 
   return (
-    <div className="mx-auto max-w-lg space-y-6">
+    <div className="pr-page">
       <Link
         href="/stocks"
         className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-foreground"
       >
-        <ArrowLeft className="size-4" aria-hidden />
+        <ArrowLeft className="size-4" strokeWidth={1.5} aria-hidden />
         Back to stocks
       </Link>
 
@@ -110,45 +111,41 @@ export function StockDetail({ params }: { params: Promise<{ symbol: string }> })
           </span>
         )}
         <div className="min-w-0 space-y-1">
-          <h1 className="pr-display text-2xl">{asset.shortName}</h1>
-          <p className="pr-mono text-sm text-muted">{asset.symbol}</p>
+          <h1 className="pr-display pr-mono text-2xl">{asset.symbol}</h1>
+          <p className="text-sm text-muted">{asset.shortName}</p>
         </div>
         {quote?.isTradingHalt ? (
-          <span className="ml-auto rounded-md bg-[var(--danger-soft)] px-2 py-0.5 text-xs font-semibold text-danger">
+          <Badge variant="danger" className="ml-auto">
             Halted
-          </span>
+          </Badge>
         ) : (
-          <span className="ml-auto rounded-md bg-[var(--success-soft)] px-2 py-0.5 text-xs font-semibold text-success">
+          <Badge variant="success" className="ml-auto">
             Open
-          </span>
+          </Badge>
         )}
       </div>
 
       <dl className="grid grid-cols-2 gap-4 border-y border-border py-4 sm:grid-cols-4">
         <div className="space-y-1">
-          <dt className="text-[10px] font-bold uppercase tracking-[0.16em] text-subtle">Mid</dt>
+          <dt className="pr-kicker">Mid</dt>
           <dd className="pr-mono text-lg font-semibold text-foreground">
             {formatUsdPrice(quote?.mid)}
           </dd>
         </div>
         <div className="space-y-1">
-          <dt className="text-[10px] font-bold uppercase tracking-[0.16em] text-subtle">
-            Bid / Ask
-          </dt>
+          <dt className="pr-kicker">Bid / Ask</dt>
           <dd className="pr-mono text-sm font-semibold text-foreground">
             {formatUsdPrice(quote?.bid)} / {formatUsdPrice(quote?.ask)}
           </dd>
         </div>
         <div className="space-y-1">
-          <dt className="text-[10px] font-bold uppercase tracking-[0.16em] text-subtle">Spread</dt>
-          <dd className="pr-mono text-sm font-semibold text-foreground">
+          <dt className="pr-kicker">Spread</dt>
+          <dd className="pr-mono whitespace-nowrap text-sm font-semibold text-foreground">
             {formatSpreadPct(quote?.spreadPct)}
           </dd>
         </div>
         <div className="space-y-1">
-          <dt className="text-[10px] font-bold uppercase tracking-[0.16em] text-subtle">
-            1D Volume
-          </dt>
+          <dt className="pr-kicker">1D Volume</dt>
           <dd className="pr-mono text-sm font-semibold text-foreground">
             {formatVolume(quote?.dailyTradingVolume)}
           </dd>
@@ -156,22 +153,22 @@ export function StockDetail({ params }: { params: Promise<{ symbol: string }> })
       </dl>
 
       {(quote?.dailyHigh != null || quote?.dailyLow != null) && (
-        <p className="pr-mono text-xs text-subtle">
+        <p className="pr-mono text-xs text-muted">
           Day range {formatUsdPrice(quote.dailyLow)} – {formatUsdPrice(quote.dailyHigh)}
         </p>
       )}
 
       <div className="space-y-2">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-subtle">Contract</p>
+        <p className="pr-kicker">Contract</p>
         <p className="pr-mono break-all text-sm text-foreground">{asset.contractAddress}</p>
         <a
           href={explorerUrl}
           target="_blank"
           rel="noreferrer"
-          className="inline-flex items-center gap-1.5 text-sm font-medium text-[var(--accent-ink)] underline-offset-2 hover:underline"
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-foreground underline-offset-2 hover:underline"
         >
           View on explorer ({shortenAddress(asset.contractAddress, 5)})
-          <ExternalLink className="size-3.5" aria-hidden />
+          <ExternalLink className="size-3.5" strokeWidth={1.5} aria-hidden />
         </a>
       </div>
 

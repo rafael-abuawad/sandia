@@ -59,7 +59,7 @@ function AssetIcon({
           onError={() => setBroken(true)}
         />
       ) : (
-        <span className="flex h-full w-full items-center justify-center bg-panel text-[10px] font-semibold uppercase text-[var(--accent-ink)]">
+        <span className="flex h-full w-full items-center justify-center bg-panel text-xs font-semibold uppercase text-accent-ink">
           {label.slice(0, 2)}
         </span>
       )}
@@ -68,6 +68,7 @@ function AssetIcon({
 }
 
 type IconSelectProps<T extends { value: string }> = {
+  id?: string;
   value?: string;
   onValueChange: (value: string) => void;
   options: T[];
@@ -78,6 +79,7 @@ type IconSelectProps<T extends { value: string }> = {
 };
 
 function IconSelect<T extends { value: string }>({
+  id,
   value,
   onValueChange,
   options,
@@ -91,8 +93,9 @@ function IconSelect<T extends { value: string }>({
   return (
     <Select value={value || undefined} onValueChange={onValueChange} disabled={disabled}>
       <SelectTrigger
+        id={id}
         className={cn(
-          "h-14 w-full gap-3 border-[var(--border-strong)] bg-[var(--panel-elevated)] px-3 py-2",
+          "h-14 w-full gap-3 border-border-strong bg-panel-elevated px-3 py-2",
           className,
         )}
       >
@@ -110,6 +113,7 @@ function IconSelect<T extends { value: string }>({
 }
 
 export function ChainSelect({
+  id,
   value,
   onValueChange,
   options,
@@ -117,6 +121,7 @@ export function ChainSelect({
   disabled,
   className,
 }: {
+  id?: string;
   value?: string;
   onValueChange: (value: string) => void;
   options: ChainOption[];
@@ -126,6 +131,7 @@ export function ChainSelect({
 }) {
   return (
     <IconSelect
+      id={id}
       value={value}
       onValueChange={onValueChange}
       options={options}
@@ -143,6 +149,7 @@ export function ChainSelect({
 }
 
 export function TokenSelect({
+  id,
   value,
   onValueChange,
   options,
@@ -150,6 +157,7 @@ export function TokenSelect({
   disabled,
   className,
 }: {
+  id?: string;
   value?: string;
   onValueChange: (value: string) => void;
   options: TokenOption[];
@@ -159,6 +167,7 @@ export function TokenSelect({
 }) {
   return (
     <IconSelect
+      id={id}
       value={value}
       onValueChange={onValueChange}
       options={options}
@@ -186,7 +195,7 @@ export function TokenChainChip({
   return (
     <div
       className={cn(
-        "flex h-14 items-center gap-3 rounded-md border border-[var(--border-strong)] bg-[var(--panel-elevated)] px-3",
+        "flex h-14 items-center gap-3 rounded-md border border-border-strong bg-panel-elevated px-3",
         className,
       )}
     >

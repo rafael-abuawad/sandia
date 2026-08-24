@@ -29,7 +29,8 @@ export default function RequestDetailPage({ params }: { params: Promise<{ public
 
   if (!isConnected || !address) {
     return (
-      <div className="mx-auto max-w-md space-y-4 text-center">
+      <div className="pr-page pr-page--narrow text-center">
+        <h1 className="pr-display text-2xl">Payment request</h1>
         <p className="text-sm text-muted">Connect the creator wallet to manage this request.</p>
         <div className="flex justify-center">
           <ConnectKitButton />
@@ -43,7 +44,12 @@ export default function RequestDetailPage({ params }: { params: Promise<{ public
   }
 
   if (request === null) {
-    return <p className="text-sm text-danger">Request not found for this wallet.</p>;
+    return (
+      <div className="pr-page pr-page--narrow">
+        <h1 className="pr-display text-2xl">Request not found</h1>
+        <p className="text-sm text-danger">This request is not available for this wallet.</p>
+      </div>
+    );
   }
 
   const payUrl =
@@ -72,11 +78,13 @@ export default function RequestDetailPage({ params }: { params: Promise<{ public
   }
 
   return (
-    <div className="mx-auto max-w-xl space-y-6">
+    <div className="pr-page pr-page--measure">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <h1 className="pr-display text-2xl">${formatUsdFromMicros(request.amountUsdMicros)}</h1>
-          <p className="mt-1 text-sm text-muted">
+          <h1 className="pr-display pr-money text-2xl">
+            ${formatUsdFromMicros(request.amountUsdMicros)}
+          </h1>
+          <p className="mt-1 pr-money text-sm text-muted">
             {formatTokenAmount(request.outputAmountBaseUnits, request.destinationTokenDecimals)}{" "}
             {request.destinationTokenSymbol} → {shortenAddress(request.recipientAddress, 6)}
           </p>
@@ -84,11 +92,9 @@ export default function RequestDetailPage({ params }: { params: Promise<{ public
         <StatusBadge status={request.status} />
       </div>
 
-      <div className="pr-panel space-y-3 p-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-subtle">
-          Public payment URL
-        </p>
-        <p className="pr-mono break-all text-sm text-[var(--accent-ink)]">{payUrl}</p>
+      <div className="pr-panel pr-panel--padded space-y-3">
+        <p className="pr-kicker">Public payment URL</p>
+        <p className="pr-mono break-all text-sm text-foreground">{payUrl}</p>
         <div className="flex flex-wrap gap-2">
           <Button size="sm" variant="secondary" onClick={() => void copyLink()}>
             {copied ? "Copied" : "Copy link"}
@@ -109,7 +115,7 @@ export default function RequestDetailPage({ params }: { params: Promise<{ public
         </div>
         {confirmCancel && request.status === "open" && (
           <div
-            className="space-y-3 rounded-lg border border-danger/30 bg-[var(--danger-soft)] p-3"
+            className="pr-inset pr-inset--danger space-y-3 p-3"
             role="group"
             aria-label="Confirm cancel request"
           >
@@ -143,12 +149,12 @@ export default function RequestDetailPage({ params }: { params: Promise<{ public
 
       {attempts && attempts.length > 0 && (
         <div className="space-y-2">
-          <h2 className="text-sm font-semibold text-foreground">Payment attempts</h2>
+          <h2 className="pr-section-title">Payment attempts</h2>
           <ul className="space-y-2">
             {attempts.map((a: { _id: string; depositTxnRef?: string; acrossStatus: string }) => (
               <li
                 key={a._id}
-                className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2 text-xs text-muted"
+                className="pr-inset flex items-center justify-between gap-3 px-3 py-2 text-xs text-muted"
               >
                 <span className="pr-mono min-w-0 truncate">
                   {a.depositTxnRef ? shortenAddress(a.depositTxnRef, 6) : "—"}

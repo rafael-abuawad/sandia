@@ -40,6 +40,19 @@ const SYMBOL_ORDER = [
   "MON",
 ];
 
+function acrossStatusCopy(status: string): string {
+  switch (status) {
+    case "submitted":
+      return "Submitted — waiting for the bridge.";
+    case "pending":
+      return "Bridging to Robinhood Chain…";
+    case "filled":
+      return "Payment settled on Robinhood Chain.";
+    default:
+      return `Bridge status: ${status}`;
+  }
+}
+
 async function waitForHash(hash: Hex, chainId: number) {
   const chain = appChains.find((c) => c.id === chainId);
   const client = createPublicClient({
@@ -238,7 +251,7 @@ export function usePayFlow(publicId: string) {
         }
         dispatch({
           type: "statusChanged",
-          message: `Across status: ${result.acrossStatus}`,
+          message: acrossStatusCopy(result.acrossStatus),
         });
       } catch (e) {
         if (!cancelled) {

@@ -15,14 +15,14 @@ export const SelectTrigger = React.forwardRef<
   <SelectPrimitive.Trigger
     ref={ref}
     className={cn(
-      "flex h-11 w-full items-center justify-between rounded-md border border-[var(--border-strong)] bg-[var(--panel-elevated)] px-3 py-2 text-base text-foreground focus:outline-none focus:ring-2 focus:ring-accent/55 disabled:cursor-not-allowed disabled:opacity-50 sm:h-10 sm:text-sm",
+      "flex h-11 w-full items-center justify-between rounded-md border border-border-strong bg-panel-elevated px-3 py-2 text-base text-foreground transition-[border-color] duration-[var(--duration)] ease-[var(--ease-out)] focus:outline-none focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 sm:h-10 sm:text-sm",
       className,
     )}
     {...props}
   >
     {children}
     <SelectPrimitive.Icon asChild>
-      <ChevronDown className="h-4 w-4 opacity-60" />
+      <ChevronDown className="h-4 w-4 opacity-60" strokeWidth={1.5} />
     </SelectPrimitive.Icon>
   </SelectPrimitive.Trigger>
 ));
@@ -36,7 +36,7 @@ export const SelectContent = React.forwardRef<
     <SelectPrimitive.Content
       ref={ref}
       className={cn(
-        "relative z-50 max-h-72 min-w-[8rem] overflow-hidden rounded-md border border-border bg-[var(--panel-elevated)] text-foreground shadow-md",
+        "relative z-[60] max-h-72 min-w-[8rem] overflow-hidden rounded-md border border-border bg-panel-elevated text-foreground shadow-md",
         position === "popper" && "data-[side=bottom]:translate-y-1",
         className,
       )}
@@ -66,7 +66,7 @@ export const SelectItem = React.forwardRef<
     </SelectPrimitive.ItemText>
     <span className="absolute right-2 flex h-3.5 w-3.5 items-center justify-center">
       <SelectPrimitive.ItemIndicator>
-        <Check className="h-4 w-4 text-[var(--accent-ink)]" />
+        <Check className="h-4 w-4 text-accent-ink" strokeWidth={1.5} />
       </SelectPrimitive.ItemIndicator>
     </span>
   </SelectPrimitive.Item>

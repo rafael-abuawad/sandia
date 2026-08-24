@@ -23,7 +23,7 @@ function FallbackMark({ label, className }: { label: string; className?: string 
   return (
     <span
       className={cn(
-        "flex h-full w-full items-center justify-center bg-panel text-[10px] font-semibold uppercase text-[var(--accent-ink)]",
+        "flex h-full w-full items-center justify-center bg-panel text-xs font-semibold uppercase text-accent-ink",
         className,
       )}
     >

@@ -18,7 +18,7 @@ export function formatSpreadPct(value: number | null | undefined): string {
   if (value === null || value === undefined || !Number.isFinite(value)) {
     return "—";
   }
-  return `± ${value.toLocaleString("en-US", {
+  return `±\u00A0${value.toLocaleString("en-US", {
     maximumFractionDigits: 2,
     minimumFractionDigits: 1,
   })}%`;

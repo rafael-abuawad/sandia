@@ -14,14 +14,14 @@ export function PayAttemptsList({ attempts }: { attempts: Attempt[] }) {
 
   return (
     <section className="space-y-3">
-      <h3 className="text-sm font-medium text-foreground">Attempts</h3>
+      <h3 className="pr-section-title">Attempts</h3>
       <ul className="space-y-2">
         {attempts.map((a) => (
           <li
             key={a._id}
-            className="flex items-center justify-between rounded-lg border border-border bg-panel px-3 py-2 text-xs text-muted"
+            className="pr-inset flex items-center justify-between px-3 py-2 text-xs text-muted"
           >
-            <span className="font-mono">
+            <span className="pr-mono">
               {a.depositTxnRef ? shortenAddress(a.depositTxnRef, 6) : "no tx yet"}
             </span>
             <StatusBadge status={a.acrossStatus} />
@@ -43,7 +43,7 @@ export function PayTerminalStatus({
 }) {
   if (kind === "completed") {
     return (
-      <section className="rounded-[var(--radius-xl)] border border-info/30 bg-[var(--info-soft)] p-6 text-sm text-info">
+      <section className="pr-inset pr-inset--success p-5 text-sm text-success">
         Payment completed. Stablecoin settled on Robinhood Chain.
         {depositTxnRef && (
           <p className="mt-2 pr-mono text-xs text-muted">
@@ -55,7 +55,7 @@ export function PayTerminalStatus({
   }
 
   return (
-    <section className="rounded-[var(--radius-xl)] border border-border bg-foreground/5 p-6 text-sm text-muted">
+    <section className="pr-inset pr-inset--muted p-5 text-sm text-muted">
       This request is {statusLabel} and cannot be paid.
     </section>
   );

@@ -40,7 +40,12 @@ export function PayFlow({ publicId }: PayFlowProps) {
     return <p className="text-sm text-muted">Loading payment request…</p>;
   }
   if (request === null) {
-    return <p className="text-sm text-danger">Payment request not found.</p>;
+    return (
+      <div className="space-y-2">
+        <h1 className="pr-display text-2xl">Payment request</h1>
+        <p className="text-sm text-danger">Payment request not found.</p>
+      </div>
+    );
   }
 
   const isTerminalPaid = request.status === "completed" || step === "done";

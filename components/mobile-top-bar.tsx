@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import Link from "next/link";
 import { UserRound } from "lucide-react";
 import { AccountSheet } from "@/components/account-sheet";
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 
 export function MobileTopBar() {
   const [accountOpen, setAccountOpen] = useState(false);
+  const sheetId = useId();
 
   return (
     <>
@@ -22,13 +23,15 @@ export function MobileTopBar() {
             size="icon"
             aria-label="Open account"
             aria-expanded={accountOpen}
+            aria-haspopup="dialog"
+            aria-controls={sheetId}
             onClick={() => setAccountOpen(true)}
           >
-            <UserRound className="size-5" aria-hidden />
+            <UserRound className="size-5" strokeWidth={1.5} aria-hidden />
           </Button>
         </div>
       </header>
-      <AccountSheet open={accountOpen} onOpenChange={setAccountOpen} />
+      <AccountSheet id={sheetId} open={accountOpen} onOpenChange={setAccountOpen} />
     </>
   );
 }
