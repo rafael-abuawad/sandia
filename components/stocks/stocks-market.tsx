@@ -74,9 +74,7 @@ export function StocksMarket() {
         ...asset,
         quote: quotesBySymbol[asset.symbol.toUpperCase()] ?? null,
       }))
-      .sort(
-        (a, b) => (b.quote?.dailyTradingVolume ?? -1) - (a.quote?.dailyTradingVolume ?? -1),
-      )
+      .sort((a, b) => (b.quote?.dailyTradingVolume ?? -1) - (a.quote?.dailyTradingVolume ?? -1))
       .slice(0, TOP_STOCKS);
   }, [assets, quotesBySymbol]);
 
@@ -127,9 +125,7 @@ export function StocksMarket() {
         </p>
       </div>
 
-      <p className="text-xs text-muted">
-        Ranked by underlying 1D volume. Quotes may lag.
-      </p>
+      <p className="text-xs text-muted">Ranked by underlying 1D volume. Quotes may lag.</p>
 
       {error && (
         <p className="text-sm text-danger" role="alert">
