@@ -50,13 +50,16 @@ export function usdMicrosToTokenBaseUnits(amountUsdMicros: number, tokenDecimals
 export const create = mutation({
   args: {
     amountUsdMicros: v.number(),
-    recipientAddress: v.string(),
     destinationTokenSymbol: v.string(),
     destinationTokenAddress: v.string(),
     destinationTokenDecimals: v.number(),
     description: v.optional(v.string()),
     expiresAt: v.optional(v.number()),
   },
+  returns: v.object({
+    requestId: v.id("paymentRequests"),
+    publicId: v.string(),
+  }),
   handler: async (ctx, args) => {
     const user = await getCurrentUser(ctx);
     const creatorAddress = normalizeAddress(user.address);
@@ -75,7 +78,7 @@ export const create = mutation({
       throw new Error("Expiration must be in the future");
     }
 
-    const recipientAddress = normalizeAddress(args.recipientAddress);
+    const recipientAddress = creatorAddress;
     const destinationTokenAddress = normalizeAddress(args.destinationTokenAddress);
     const outputAmountBaseUnits = usdMicrosToTokenBaseUnits(
       args.amountUsdMicros,

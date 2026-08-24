@@ -51,6 +51,7 @@ export function PayQuoteDetails({
               tokenLogoUrl={selectedToken.logoUrl}
               chainName={chainName(originChainId ?? 0)}
               chainLogoUrl={chains.find((c) => c.chainId === originChainId)?.logoUrl}
+              chainId={originChainId}
               size="sm"
             />
           )}
@@ -78,6 +79,7 @@ export function PayQuoteDetails({
                 tokenLogoUrl={ROBINHOOD_USDG.logoUrl}
                 chainName="Robinhood"
                 chainLogoUrl={ROBINHOOD_USDG.chainLogoUrl}
+                chainId={ROBINHOOD_USDG.chainId}
                 size="sm"
               />
               <span className="pr-money">

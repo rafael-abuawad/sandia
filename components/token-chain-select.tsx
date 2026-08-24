@@ -10,6 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { TokenChainIcon } from "@/components/token-chain-icon";
+import { resolveChainIcon, resolveTokenIcon } from "@/lib/asset-icons";
 import { cn } from "@/lib/utils";
 
 export type TokenChainOption = {
@@ -35,7 +36,7 @@ export type TokenOption = {
 function AssetIcon({
   label,
   logoUrl,
-  size = 36,
+  size = 24,
 }: {
   label: string;
   logoUrl?: string | null;
@@ -140,7 +141,10 @@ export function ChainSelect({
       className={className}
       renderOption={(option) => (
         <span className="flex min-w-0 items-center gap-3">
-          <AssetIcon label={option.name} logoUrl={option.logoUrl} />
+          <AssetIcon
+            label={option.name}
+            logoUrl={resolveChainIcon(Number(option.value), option.name, option.logoUrl)}
+          />
           <span className="truncate text-sm font-semibold text-foreground">{option.name}</span>
         </span>
       )}
@@ -176,7 +180,10 @@ export function TokenSelect({
       className={className}
       renderOption={(option) => (
         <span className="flex min-w-0 items-center gap-3">
-          <AssetIcon label={option.symbol} logoUrl={option.logoUrl} />
+          <AssetIcon
+            label={option.symbol}
+            logoUrl={resolveTokenIcon(option.symbol, option.logoUrl)}
+          />
           <span className="truncate text-sm font-semibold text-foreground">{option.symbol}</span>
         </span>
       )}
@@ -190,8 +197,9 @@ export function TokenChainChip({
   tokenLogoUrl,
   chainName,
   chainLogoUrl,
+  chainId,
   className,
-}: Omit<TokenChainOption, "value"> & { className?: string }) {
+}: Omit<TokenChainOption, "value"> & { chainId?: number; className?: string }) {
   return (
     <div
       className={cn(
@@ -204,6 +212,7 @@ export function TokenChainChip({
         tokenLogoUrl={tokenLogoUrl}
         chainName={chainName}
         chainLogoUrl={chainLogoUrl}
+        chainId={chainId}
         size="md"
       />
       <div className="flex min-w-0 flex-col">

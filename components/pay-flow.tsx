@@ -53,7 +53,7 @@ export function PayFlow({ publicId }: PayFlowProps) {
     request.status === "cancelled" || request.status === "expired" || request.status === "failed";
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <PayRequestSummary
         amountUsdMicros={request.amountUsdMicros}
         status={request.status}

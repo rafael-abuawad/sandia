@@ -9,6 +9,7 @@
  */
 
 import type * as across from "../across.js";
+import type * as contacts from "../contacts.js";
 import type * as crons from "../crons.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as paymentAttempts from "../paymentAttempts.js";
@@ -23,6 +24,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   across: typeof across;
+  contacts: typeof contacts;
   crons: typeof crons;
   "lib/auth": typeof lib_auth;
   paymentAttempts: typeof paymentAttempts;

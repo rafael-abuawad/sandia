@@ -120,8 +120,7 @@ export function StocksMarket() {
       <div className="space-y-2">
         <h1 className="pr-display text-2xl sm:text-3xl">Stocks</h1>
         <p className="max-w-2xl text-sm leading-relaxed text-muted">
-          The {TOP_STOCKS} most actively traded tokenized equities on Robinhood Chain. Prices track
-          the underlying stock — these are not the shares themselves.
+          The {TOP_STOCKS} most actively traded tokenized equities on Robinhood Chain.
         </p>
       </div>
 
@@ -159,7 +158,7 @@ export function StocksMarket() {
                   align="right"
                 />
                 <SortHeader
-                  label="1D Volume"
+                  label="Vol"
                   active={sortKey === "volume"}
                   dir={sortDir}
                   onClick={() => toggleSort("volume")}
@@ -338,9 +337,6 @@ function MobileRow({ row }: { row: MarketRow }) {
         <TokenCell row={row} />
         <div className="shrink-0 text-right">
           <p className="pr-mono font-semibold text-foreground">{formatUsdPrice(row.quote?.mid)}</p>
-          <p className="pr-mono text-xs text-muted">
-            Vol {formatVolume(row.quote?.dailyTradingVolume)}
-          </p>
         </div>
       </Link>
     </li>

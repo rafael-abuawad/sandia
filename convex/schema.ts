@@ -70,4 +70,14 @@ export default defineSchema({
   })
     .index("by_request", ["requestId"])
     .index("by_depositTxnRef", ["depositTxnRef"]),
+
+  contacts: defineTable({
+    userId: v.id("users"),
+    name: v.string(),
+    address: v.string(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_and_address", ["userId", "address"]),
 });

@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { useMemo, useState } from "react";
 import { LoginButton } from "@/components/login-button";
 import { useSignedInWallet } from "@/lib/use-signed-in-wallet";
@@ -10,8 +9,8 @@ import { ROBINHOOD_USDG } from "@/lib/destination";
 import { formatTokenAmount, formatTokenAmountGrouped } from "@/lib/money";
 import { TokenChainChip } from "@/components/token-chain-select";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AmountCompose, isAmountEntered } from "@/components/amount-compose";
 
 /** Placeholder vault stats until on-chain reads are wired. */
 const VAULT = {
@@ -79,6 +78,7 @@ export function LendingPanel() {
   }
 
   const yearly = projectedEarnings(amount, VAULT.netApy, 365);
+  const hasAmount = isAmountEntered(amount);
 
   return (
     <div className="pr-page">
@@ -110,22 +110,43 @@ export function LendingPanel() {
       </dl>
 
       <form
-        className="space-y-5"
+        className="space-y-3"
         onSubmit={(e) => {
           e.preventDefault();
         }}
       >
-        <div className="space-y-2">
-          <Label htmlFor="lend-amount">Amount ({ROBINHOOD_USDG.symbol})</Label>
-          <Input
-            id="lend-amount"
-            inputMode="decimal"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            placeholder="0.00"
-          />
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="pr-help">
+        <AmountCompose
+          kicker="You're depositing"
+          prefix="$"
+          suffix="USDG"
+          value={amount}
+          onChange={setAmount}
+          footer={
+            !isSignedIn ? (
+              <div className="flex flex-col items-stretch gap-3">
+                <p className="text-sm text-muted">Sign in to deposit into the vault.</p>
+                <LoginButton />
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Button
+                  type="submit"
+                  className="w-full"
+                  size="lg"
+                  disabled
+                  title="Vault deposit contract wiring coming next"
+                >
+                  {hasAmount ? "Deposit (coming soon)" : "Enter an amount"}
+                </Button>
+                <p className="text-center text-xs text-muted">
+                  Preview — deposits are not open yet.
+                </p>
+              </div>
+            )
+          }
+        >
+          <div className="flex items-center justify-between gap-2 text-xs text-muted">
+            <p>
               ≈ {formatUsdFromAmount(amount)}
               {amount.trim() ? ` · ~${yearly}/yr at ${VAULT.netApy}%` : null}
             </p>
@@ -149,54 +170,18 @@ export function LendingPanel() {
                   ? `${balanceDisplay} ${ROBINHOOD_USDG.symbol}`
                   : `0 ${ROBINHOOD_USDG.symbol}`}
           </p>
-        </div>
-
-        <div className="space-y-2">
-          <Label>Vault</Label>
-          <TokenChainChip
-            tokenSymbol={ROBINHOOD_USDG.symbol}
-            tokenLogoUrl={ROBINHOOD_USDG.logoUrl}
-            chainName={`${VAULT.curator} · ${ROBINHOOD_USDG.chainName}`}
-            chainLogoUrl={ROBINHOOD_USDG.chainLogoUrl}
-          />
-          <p className="pr-help">
-            Deposits settle as {ROBINHOOD_USDG.symbol} on {ROBINHOOD_USDG.chainName} Chain.
-          </p>
-        </div>
-
-        {!isSignedIn ? (
-          <div className="flex flex-col items-stretch gap-3">
-            <p className="text-sm text-muted">Sign in to deposit into the vault.</p>
-            <LoginButton />
-          </div>
-        ) : (
           <div className="space-y-2">
-            <Button
-              type="submit"
-              className="w-full"
-              disabled
-              title="Vault deposit contract wiring coming next"
-            >
-              Deposit (coming soon)
-            </Button>
-            <p className="text-center text-xs text-muted">Preview — deposits are not open yet.</p>
+            <Label>Vault</Label>
+            <TokenChainChip
+              tokenSymbol={ROBINHOOD_USDG.symbol}
+              tokenLogoUrl={ROBINHOOD_USDG.logoUrl}
+              chainName={`${VAULT.curator} · ${ROBINHOOD_USDG.chainName}`}
+              chainLogoUrl={ROBINHOOD_USDG.chainLogoUrl}
+              chainId={ROBINHOOD_USDG.chainId}
+            />
           </div>
-        )}
+        </AmountCompose>
       </form>
-
-      <div className="flex items-center gap-2 text-xs text-muted">
-        <Image
-          src={ROBINHOOD_USDG.logoUrl}
-          alt=""
-          width={16}
-          height={16}
-          className="size-4 rounded-full"
-          unoptimized
-        />
-        <span>
-          {VAULT.curator} · {ROBINHOOD_USDG.symbol} · {ROBINHOOD_USDG.chainName}
-        </span>
-      </div>
     </div>
   );
 }

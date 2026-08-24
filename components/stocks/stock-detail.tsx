@@ -2,14 +2,15 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { use, useCallback, useEffect, useState } from "react";
-import { ArrowLeft, ExternalLink } from "lucide-react";
+import { use, useCallback, useEffect, useMemo, useState } from "react";
+import { ArrowLeft, ChevronDown, ExternalLink } from "lucide-react";
 import type { StockQuote, StockToken } from "@/lib/rhj/client";
 import { explorerTokenUrl } from "@/lib/rhj/client";
-import { formatSpreadPct, formatUsdPrice, formatVolume } from "@/lib/rhj/format";
+import { formatUsdPrice, formatVolume } from "@/lib/rhj/format";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { shortenAddress } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 export function StockDetail({ params }: { params: Promise<{ symbol: string }> }) {
   const { symbol: rawSymbol } = use(params);
@@ -20,6 +21,9 @@ export function StockDetail({ params }: { params: Promise<{ symbol: string }> })
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [logoBroken, setLogoBroken] = useState(false);
+  const [side, setSide] = useState<"buy" | "sell">("buy");
+  const [unit, setUnit] = useState<"usd" | "shares">("usd");
+  const [ticketAmount, setTicketAmount] = useState("");
 
   const load = useCallback(async () => {
     setError(null);
@@ -61,6 +65,16 @@ export function StockDetail({ params }: { params: Promise<{ symbol: string }> })
     return () => window.clearInterval(id);
   }, [load]);
 
+  const estimate = useMemo(() => {
+    const n = Number.parseFloat(ticketAmount);
+    const mid = quote?.mid;
+    if (!Number.isFinite(n) || n <= 0 || mid == null || mid <= 0) return null;
+    if (unit === "usd") {
+      return { shares: n / mid, usd: n };
+    }
+    return { shares: n, usd: n * mid };
+  }, [ticketAmount, unit, quote?.mid]);
+
   if (loading) {
     return <p className="text-sm text-muted">Loading {symbol}…</p>;
   }
@@ -83,15 +97,16 @@ export function StockDetail({ params }: { params: Promise<{ symbol: string }> })
   if (!asset) return null;
 
   const explorerUrl = explorerTokenUrl(asset.contractAddress);
+  const halted = Boolean(quote?.isTradingHalt);
 
   return (
-    <div className="pr-page">
+    <div className="pr-page gap-6">
       <Link
         href="/stocks"
         className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-foreground"
       >
         <ArrowLeft className="size-4" strokeWidth={1.5} aria-hidden />
-        Back to stocks
+        Back
       </Link>
 
       <div className="flex items-start gap-3">
@@ -99,87 +114,161 @@ export function StockDetail({ params }: { params: Promise<{ symbol: string }> })
           <Image
             src={asset.logoUrl}
             alt=""
-            width={48}
-            height={48}
-            className="size-12 shrink-0 rounded-full ring-1 ring-border"
+            width={40}
+            height={40}
+            className="size-10 shrink-0 rounded-full ring-1 ring-border"
             unoptimized
             onError={() => setLogoBroken(true)}
           />
         ) : (
-          <span className="flex size-12 shrink-0 items-center justify-center rounded-full bg-panel text-xs font-bold uppercase text-muted ring-1 ring-border">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-panel text-xs font-bold uppercase text-muted ring-1 ring-border">
             {asset.symbol.slice(0, 2)}
           </span>
         )}
-        <div className="min-w-0 space-y-1">
-          <h1 className="pr-display pr-mono text-2xl">{asset.symbol}</h1>
-          <p className="text-sm text-muted">{asset.shortName}</p>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <h1 className="pr-display text-xl">{asset.symbol}</h1>
+            {halted ? (
+              <Badge variant="danger">Halted</Badge>
+            ) : (
+              <Badge variant="success">Open</Badge>
+            )}
+          </div>
+          <p className="truncate text-sm text-muted">{asset.shortName}</p>
         </div>
-        {quote?.isTradingHalt ? (
-          <Badge variant="danger" className="ml-auto">
-            Halted
-          </Badge>
-        ) : (
-          <Badge variant="success" className="ml-auto">
-            Open
-          </Badge>
-        )}
       </div>
 
-      <dl className="grid grid-cols-2 gap-4 border-y border-border py-4 sm:grid-cols-4">
-        <div className="space-y-1">
-          <dt className="pr-kicker">Mid</dt>
-          <dd className="pr-mono text-lg font-semibold text-foreground">
-            {formatUsdPrice(quote?.mid)}
-          </dd>
-        </div>
-        <div className="space-y-1">
+      <div>
+        <p className="pr-display pr-money text-4xl tracking-tight sm:text-5xl">
+          {formatUsdPrice(quote?.mid)}
+        </p>
+        <p className="mt-1 text-xs text-muted">Mid quote · not the underlying share</p>
+      </div>
+
+      {quote?.dailyLow != null && quote.dailyHigh != null && quote.mid != null ? (
+        <DayRangeBar low={quote.dailyLow} high={quote.dailyHigh} current={quote.mid} />
+      ) : null}
+
+      <dl className="grid grid-cols-2 gap-4 text-sm">
+        <div>
           <dt className="pr-kicker">Bid / Ask</dt>
-          <dd className="pr-mono text-sm font-semibold text-foreground">
+          <dd className="pr-mono mt-1 font-semibold">
             {formatUsdPrice(quote?.bid)} / {formatUsdPrice(quote?.ask)}
           </dd>
         </div>
-        <div className="space-y-1">
-          <dt className="pr-kicker">Spread</dt>
-          <dd className="pr-mono whitespace-nowrap text-sm font-semibold text-foreground">
-            {formatSpreadPct(quote?.spreadPct)}
-          </dd>
-        </div>
-        <div className="space-y-1">
+        <div>
           <dt className="pr-kicker">1D Volume</dt>
-          <dd className="pr-mono text-sm font-semibold text-foreground">
-            {formatVolume(quote?.dailyTradingVolume)}
-          </dd>
+          <dd className="pr-mono mt-1 font-semibold">{formatVolume(quote?.dailyTradingVolume)}</dd>
         </div>
       </dl>
 
-      {(quote?.dailyHigh != null || quote?.dailyLow != null) && (
-        <p className="pr-mono text-xs text-muted">
-          Day range {formatUsdPrice(quote.dailyLow)} – {formatUsdPrice(quote.dailyHigh)}
-        </p>
-      )}
+      <details className="group border-t border-border pt-4">
+        <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-semibold text-foreground marker:content-none [&::-webkit-details-marker]:hidden">
+          About this token
+          <ChevronDown
+            className="size-4 text-muted transition-transform duration-[var(--duration)] ease-[var(--ease-out)] group-open:rotate-180"
+            strokeWidth={1.5}
+            aria-hidden
+          />
+        </summary>
+        <div className="mt-3 space-y-2 text-sm text-muted">
+          <p>
+            This token tracks {asset.shortName} on Robinhood Chain. It is not the underlying equity.
+          </p>
+          <a
+            href={explorerUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1.5 text-foreground underline-offset-2 hover:underline"
+          >
+            View contract on explorer
+            <ExternalLink className="size-3.5" strokeWidth={1.5} aria-hidden />
+          </a>
+        </div>
+      </details>
 
-      <div className="space-y-2">
-        <p className="pr-kicker">Contract</p>
-        <p className="pr-mono break-all text-sm text-foreground">{asset.contractAddress}</p>
-        <a
-          href={explorerUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex items-center gap-1.5 text-sm font-medium text-foreground underline-offset-2 hover:underline"
-        >
-          View on explorer ({shortenAddress(asset.contractAddress, 5)})
-          <ExternalLink className="size-3.5" strokeWidth={1.5} aria-hidden />
-        </a>
+      <div className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-10 space-y-3 rounded-[var(--radius-xl)] border border-border bg-[color-mix(in_srgb,var(--panel-solid)_94%,transparent)] p-4 backdrop-blur-md md:static md:bottom-auto">
+        <div className="grid grid-cols-2 gap-2" role="group" aria-label="Order side">
+          <Button
+            type="button"
+            variant={side === "buy" ? "default" : "outline"}
+            aria-pressed={side === "buy"}
+            onClick={() => setSide("buy")}
+          >
+            Buy
+          </Button>
+          <Button
+            type="button"
+            variant={side === "sell" ? "default" : "outline"}
+            aria-pressed={side === "sell"}
+            onClick={() => setSide("sell")}
+          >
+            Sell
+          </Button>
+        </div>
+        <div className="grid grid-cols-2 gap-2" role="group" aria-label="Order unit">
+          <Button
+            type="button"
+            size="sm"
+            variant={unit === "usd" ? "secondary" : "ghost"}
+            aria-pressed={unit === "usd"}
+            onClick={() => setUnit("usd")}
+          >
+            USD
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={unit === "shares" ? "secondary" : "ghost"}
+            aria-pressed={unit === "shares"}
+            onClick={() => setUnit("shares")}
+          >
+            Shares
+          </Button>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="stock-amount">{unit === "usd" ? "Amount" : "Shares"}</Label>
+          <Input
+            id="stock-amount"
+            inputMode="decimal"
+            value={ticketAmount}
+            onChange={(e) => setTicketAmount(e.target.value)}
+            placeholder={unit === "usd" ? "0.00" : "0"}
+          />
+          <p className="text-xs text-muted">
+            {estimate
+              ? unit === "usd"
+                ? `≈ ${estimate.shares.toLocaleString("en-US", { maximumFractionDigits: 6 })} shares at mid`
+                : `≈ ${formatUsdPrice(estimate.usd)} at mid`
+              : "Enter an amount to preview the fill."}
+          </p>
+        </div>
+        <Button type="button" className="w-full" size="lg" disabled>
+          {halted
+            ? "Trading halted"
+            : `${side === "buy" ? "Buy" : "Sell"} ${asset.symbol} · coming soon`}
+        </Button>
       </div>
+    </div>
+  );
+}
 
-      <p className="text-sm leading-relaxed text-muted">
-        This token tracks {asset.shortName} on Robinhood Chain. It is not the underlying equity.
-        Trade execution via RFQ is coming soon.
-      </p>
-
-      <Button type="button" className="w-full" size="lg" disabled>
-        Trade coming soon
-      </Button>
+function DayRangeBar({ low, high, current }: { low: number; high: number; current: number }) {
+  const span = high - low;
+  const pct = span > 0 ? Math.min(100, Math.max(0, ((current - low) / span) * 100)) : 50;
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between text-xs text-muted">
+        <span className="pr-mono">{formatUsdPrice(low)}</span>
+        <span>Day range</span>
+        <span className="pr-mono">{formatUsdPrice(high)}</span>
+      </div>
+      <div className="relative h-1 rounded-full bg-border">
+        <div
+          className="absolute top-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-foreground"
+          style={{ left: `${pct}%` }}
+        />
+      </div>
     </div>
   );
 }

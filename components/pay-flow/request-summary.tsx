@@ -26,45 +26,42 @@ export function PayRequestSummary({
   description,
 }: PayRequestSummaryProps) {
   return (
-    <section className="pr-panel pr-panel--padded space-y-3">
+    <section className="pr-panel pr-panel--padded space-y-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="pr-kicker">Payment request</p>
           <h1 className="mt-1 pr-display pr-money text-3xl text-foreground">
-            ${formatUsdFromMicros(amountUsdMicros)} USD
+            ${formatUsdFromMicros(amountUsdMicros)}
           </h1>
         </div>
         <StatusBadge status={status} />
       </div>
-      <div className="pr-inset flex items-center gap-3 px-3 py-2.5">
+      <div className="flex items-center gap-2.5">
         <TokenChainIcon
           tokenSymbol={destinationTokenSymbol}
           tokenLogoUrl={ROBINHOOD_USDG.logoUrl}
           chainName="Robinhood"
           chainLogoUrl={ROBINHOOD_USDG.chainLogoUrl}
-          size="lg"
+          chainId={ROBINHOOD_USDG.chainId}
+          size="md"
         />
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0">
           <p className="pr-money text-sm font-semibold text-foreground">
             {formatTokenAmount(outputAmountBaseUnits, destinationTokenDecimals)}{" "}
             {destinationTokenSymbol}
           </p>
-          <p className="text-xs text-muted">
-            Robinhood Chain → {shortenAddress(recipientAddress, 6)}
-          </p>
+          <p className="text-xs text-muted">to {shortenAddress(recipientAddress, 4)}</p>
         </div>
       </div>
-      <dl className="grid gap-2 text-sm text-muted">
-        {description && (
-          <div className="flex justify-between gap-4">
-            <dt>Note</dt>
-            <dd className="text-right text-foreground">{description}</dd>
-          </div>
-        )}
-      </dl>
+      {description ? (
+        <p className="text-sm text-muted">
+          <span className="font-medium text-foreground">Note. </span>
+          {description}
+        </p>
+      ) : null}
       <p className="text-xs text-muted">
-        The USD amount is converted 1:1 into {destinationTokenSymbol}. Across may add a bridge fee
-        on what you send; the recipient still receives at least the requested amount.
+        The USD amount converts 1:1 into {destinationTokenSymbol}. Across may add a bridge fee on
+        what you send; the recipient still receives at least the requested amount.
       </p>
     </section>
   );

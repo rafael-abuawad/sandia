@@ -107,10 +107,10 @@ export function PayAcrossPanel({
   }
 
   return (
-    <section className="pr-panel pr-panel--padded space-y-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <section className="pr-panel pr-panel--padded space-y-4">
+      <div className="flex items-center justify-between gap-3">
         <h2 className="pr-section-title">Pay with Across</h2>
-        <div className="[&_button]:w-full sm:[&_button]:w-auto">
+        <div className="[&_button]:h-8 [&_button]:w-auto [&_button]:px-3 [&_button]:text-xs">
           <LoginButton />
         </div>
       </div>

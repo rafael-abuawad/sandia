@@ -1,16 +1,23 @@
 "use client";
 
-import { use, useId, useState } from "react";
+import { use, useEffect, useId, useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery } from "convex/react";
+import { Cuer } from "cuer";
+import { Check, Copy } from "lucide-react";
 import { LoginButton } from "@/components/login-button";
 import { useSignedInWallet } from "@/lib/use-signed-in-wallet";
 import { api } from "@/convex/_generated/api";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { FieldError } from "@/components/ui/field-error";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from "@/components/ui/input-group";
 import { formatTokenAmount, formatUsdFromMicros } from "@/lib/money";
-import { shortenAddress } from "@/lib/utils";
 
 export default function RequestDetailPage({ params }: { params: Promise<{ publicId: string }> }) {
   const { publicId } = use(params);
@@ -26,6 +33,12 @@ export default function RequestDetailPage({ params }: { params: Promise<{ public
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [payUrl, setPayUrl] = useState(`/pay/${publicId}`);
+  const payPath = `/pay/${publicId}`;
+
+  useEffect(() => {
+    setPayUrl(`${window.location.origin}${payPath}`);
+  }, [payPath]);
 
   if (!isSignedIn) {
     return (
@@ -54,11 +67,6 @@ export default function RequestDetailPage({ params }: { params: Promise<{ public
     );
   }
 
-  const payUrl =
-    typeof window !== "undefined"
-      ? `${window.location.origin}/pay/${publicId}`
-      : `/pay/${publicId}`;
-
   async function onCancel() {
     setBusy(true);
     setError(null);
@@ -75,31 +83,76 @@ export default function RequestDetailPage({ params }: { params: Promise<{ public
   async function copyLink() {
     await navigator.clipboard.writeText(payUrl);
     setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+    window.setTimeout(() => setCopied(false), 1500);
   }
+
+  const expiresLabel =
+    request.expiresAt != null
+      ? new Date(request.expiresAt).toLocaleString(undefined, {
+          dateStyle: "medium",
+          timeStyle: "short",
+        })
+      : null;
 
   return (
     <div className="pr-page pr-page--measure">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <h1 className="pr-display pr-money text-2xl">
+          <h1 className="pr-display pr-money text-3xl">
             ${formatUsdFromMicros(request.amountUsdMicros)}
           </h1>
-          <p className="mt-1 pr-money text-sm text-muted">
+          <p className="mt-1 text-sm text-muted">
             {formatTokenAmount(request.outputAmountBaseUnits, request.destinationTokenDecimals)}{" "}
-            {request.destinationTokenSymbol} → {shortenAddress(request.recipientAddress, 6)}
+            {request.destinationTokenSymbol}
           </p>
         </div>
         <StatusBadge status={request.status} />
       </div>
 
-      <div className="pr-panel pr-panel--padded space-y-3">
-        <p className="pr-kicker">Public payment URL</p>
-        <p className="pr-mono break-all text-sm text-foreground">{payUrl}</p>
+      {(request.description || expiresLabel) && (
+        <dl className="space-y-1 text-sm">
+          {request.description ? (
+            <div className="flex justify-between gap-4">
+              <dt className="text-muted">Note</dt>
+              <dd className="text-right text-foreground">{request.description}</dd>
+            </div>
+          ) : null}
+          {expiresLabel ? (
+            <div className="flex justify-between gap-4">
+              <dt className="text-muted">Expires</dt>
+              <dd className="text-right text-foreground">{expiresLabel}</dd>
+            </div>
+          ) : null}
+        </dl>
+      )}
+
+      <div className="pr-panel pr-panel--padded space-y-4">
+        <p className="pr-kicker">Payment link</p>
+        <div className="mx-auto flex size-44 items-center justify-center rounded-xl bg-panel-elevated p-2 text-foreground ring-1 ring-border">
+          <Cuer value={payUrl} size="100%" color="currentColor" arena="/assets/tokens/usdg.svg" />
+        </div>
+        <InputGroup>
+          <InputGroupInput
+            readOnly
+            value={payUrl}
+            aria-label="Public payment URL"
+            className="pr-mono"
+            onFocus={(e) => e.currentTarget.select()}
+          />
+          <InputGroupAddon>
+            <InputGroupButton
+              aria-label={copied ? "Copied" : "Copy payment link"}
+              onClick={() => void copyLink()}
+            >
+              {copied ? (
+                <Check className="size-4" strokeWidth={1.5} />
+              ) : (
+                <Copy className="size-4" strokeWidth={1.5} />
+              )}
+            </InputGroupButton>
+          </InputGroupAddon>
+        </InputGroup>
         <div className="flex flex-wrap gap-2">
-          <Button size="sm" variant="secondary" onClick={() => void copyLink()}>
-            {copied ? "Copied" : "Copy link"}
-          </Button>
           <Button asChild size="sm" variant="outline">
             <Link href={`/pay/${publicId}`}>Open pay page</Link>
           </Button>
@@ -146,8 +199,6 @@ export default function RequestDetailPage({ params }: { params: Promise<{ public
         <FieldError id={errorId} message={error} />
       </div>
 
-      {request.description && <p className="text-sm text-muted">{request.description}</p>}
-
       {attempts && attempts.length > 0 && (
         <div className="space-y-2">
           <h2 className="pr-section-title">Payment attempts</h2>
@@ -158,7 +209,7 @@ export default function RequestDetailPage({ params }: { params: Promise<{ public
                 className="pr-inset flex items-center justify-between gap-3 px-3 py-2 text-xs text-muted"
               >
                 <span className="pr-mono min-w-0 truncate">
-                  {a.depositTxnRef ? shortenAddress(a.depositTxnRef, 6) : "—"}
+                  {a.depositTxnRef ? a.depositTxnRef.slice(0, 10) + "…" : "—"}
                 </span>
                 <StatusBadge status={a.acrossStatus} />
               </li>

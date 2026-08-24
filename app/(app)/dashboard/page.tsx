@@ -8,7 +8,6 @@ import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { formatUsdFromMicros } from "@/lib/money";
 import { useSignedInWallet } from "@/lib/use-signed-in-wallet";
-import { shortenAddress } from "@/lib/utils";
 
 export default function DashboardPage() {
   const { ready, isSignedIn } = useSignedInWallet();
@@ -56,7 +55,6 @@ export default function DashboardPage() {
             publicId: string;
             amountUsdMicros: number;
             destinationTokenSymbol: string;
-            recipientAddress: string;
             status: string;
           }) => (
             <li key={r._id}>
@@ -68,9 +66,7 @@ export default function DashboardPage() {
                   <p className="pr-money font-medium text-foreground">
                     ${formatUsdFromMicros(r.amountUsdMicros)} → {r.destinationTokenSymbol}
                   </p>
-                  <p className="truncate text-xs text-muted">
-                    To {shortenAddress(r.recipientAddress, 5)} · /pay/{r.publicId}
-                  </p>
+                  <p className="truncate text-xs text-muted">/pay/{r.publicId}</p>
                 </div>
                 <StatusBadge status={r.status} />
               </Link>

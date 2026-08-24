@@ -5,42 +5,54 @@ import { useRouter } from "next/navigation";
 import { useMutation } from "convex/react";
 import { LoginButton } from "@/components/login-button";
 import { useSignedInWallet } from "@/lib/use-signed-in-wallet";
-import { isAddress } from "viem";
 import { api } from "@/convex/_generated/api";
 import { Button } from "@/components/ui/button";
 import { FieldError } from "@/components/ui/field-error";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { TokenChainChip } from "@/components/token-chain-select";
+import { Textarea } from "@/components/ui/textarea";
+import { AmountCompose, isAmountEntered } from "@/components/amount-compose";
+import {
+  ResponsiveDialog,
+  ResponsiveDialogBody,
+  ResponsiveDialogContent,
+  ResponsiveDialogDescription,
+  ResponsiveDialogFooter,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+} from "@/components/responsive-dialog";
 import { ROBINHOOD_USDG } from "@/lib/destination";
 import { parseUsdToMicros } from "@/lib/money";
 
+function detailsHint(note: string, expiresAtLocal: string): string | undefined {
+  const parts: string[] = [];
+  if (note.trim()) parts.push(note.trim());
+  if (expiresAtLocal) {
+    const parsed = new Date(expiresAtLocal);
+    if (!Number.isNaN(parsed.getTime())) {
+      parts.push(`Expires ${parsed.toLocaleString()}`);
+    }
+  }
+  return parts.length > 0 ? parts.join(" · ") : undefined;
+}
+
 export function CreateRequestForm() {
   const router = useRouter();
-  const { address, isSignedIn } = useSignedInWallet();
+  const { isSignedIn } = useSignedInWallet();
   const createRequest = useMutation(api.paymentRequests.create);
   const errorId = useId();
-  const amountRef = useRef<HTMLInputElement>(null);
-  const recipientRef = useRef<HTMLInputElement>(null);
+  const amountRefId = useId();
   const expiresRef = useRef<HTMLInputElement>(null);
 
-  const [amount, setAmount] = useState("10");
-  const [recipient, setRecipient] = useState("");
+  const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
   const [expiresAtLocal, setExpiresAtLocal] = useState("");
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [invalidField, setInvalidField] = useState<"amount" | "recipient" | "expires" | null>(null);
+  const [invalidField, setInvalidField] = useState<"amount" | "expires" | null>(null);
 
   useEffect(() => {
-    if (address) {
-      setRecipient((prev) => (prev ? prev : address));
-    }
-  }, [address]);
-
-  useEffect(() => {
-    if (invalidField === "amount") amountRef.current?.focus();
-    if (invalidField === "recipient") recipientRef.current?.focus();
     if (invalidField === "expires") expiresRef.current?.focus();
   }, [invalidField]);
 
@@ -49,11 +61,11 @@ export function CreateRequestForm() {
     setError(null);
     setInvalidField(null);
 
-    if (!isSignedIn || !address) {
+    if (!isSignedIn) {
       setError("Sign in to create a request");
       return;
     }
-    if (!amount.trim()) {
+    if (!amount.trim() || !isAmountEntered(amount)) {
       setError("Enter an amount in USD");
       setInvalidField("amount");
       return;
@@ -65,11 +77,6 @@ export function CreateRequestForm() {
       setInvalidField("amount");
       return;
     }
-    if (!isAddress(recipient)) {
-      setError("Enter a valid recipient address");
-      setInvalidField("recipient");
-      return;
-    }
 
     setSubmitting(true);
     try {
@@ -78,13 +85,13 @@ export function CreateRequestForm() {
       if (expiresAt !== undefined && Number.isNaN(expiresAt)) {
         setError("Choose a valid expiration date and time");
         setInvalidField("expires");
+        setDetailsOpen(true);
         setSubmitting(false);
         return;
       }
 
       const result = await createRequest({
         amountUsdMicros,
-        recipientAddress: recipient,
         destinationTokenSymbol: ROBINHOOD_USDG.symbol,
         destinationTokenAddress: ROBINHOOD_USDG.address,
         destinationTokenDecimals: ROBINHOOD_USDG.decimals,
@@ -99,90 +106,79 @@ export function CreateRequestForm() {
     }
   }
 
+  const hasAmount = isAmountEntered(amount);
+
   return (
-    <form onSubmit={onSubmit} className="space-y-5" noValidate>
-      <div className="space-y-2">
-        <Label htmlFor="amount">Amount (USD)</Label>
-        <Input
-          ref={amountRef}
-          id="amount"
-          inputMode="decimal"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          placeholder="10.00"
-          required
-          aria-invalid={invalidField === "amount" || undefined}
-          aria-describedby={error && invalidField === "amount" ? errorId : "amount-help"}
-        />
-        <p id="amount-help" className="pr-help">
-          Settled 1:1 as USDG on Robinhood Chain. Payers bridge from their own chain.
-        </p>
-      </div>
+    <form onSubmit={onSubmit} className="space-y-3" noValidate>
+      <AmountCompose
+        kicker="You're requesting"
+        value={amount}
+        onChange={setAmount}
+        inputId={amountRefId}
+        invalid={invalidField === "amount"}
+        detailsLabel="Details"
+        detailsHint={detailsHint(description, expiresAtLocal)}
+        onDetailsClick={() => setDetailsOpen(true)}
+        error={<FieldError id={errorId} message={error} />}
+        footer={
+          !isSignedIn ? (
+            <div className="flex flex-col items-stretch gap-3">
+              <p className="text-sm text-muted">
+                Sign in with a wallet, Google, or email to create a request.
+              </p>
+              <LoginButton />
+            </div>
+          ) : (
+            <Button type="submit" className="w-full" size="lg" disabled={submitting || !hasAmount}>
+              {submitting ? "Creating…" : hasAmount ? "Create request" : "Enter an amount"}
+            </Button>
+          )
+        }
+      />
 
-      <div className="space-y-2">
-        <Label htmlFor="recipient">Recipient wallet</Label>
-        <Input
-          ref={recipientRef}
-          id="recipient"
-          value={recipient}
-          onChange={(e) => setRecipient(e.target.value)}
-          placeholder="0x…"
-          required
-          aria-invalid={invalidField === "recipient" || undefined}
-          aria-describedby={error && invalidField === "recipient" ? errorId : undefined}
-        />
-      </div>
-
-      <div className="space-y-2">
-        <Label>Destination</Label>
-        <TokenChainChip
-          tokenSymbol={ROBINHOOD_USDG.symbol}
-          tokenLogoUrl={ROBINHOOD_USDG.logoUrl}
-          chainName={ROBINHOOD_USDG.chainName}
-          chainLogoUrl={ROBINHOOD_USDG.chainLogoUrl}
-        />
-        <p className="pr-help">Payment requests settle as USDG on Robinhood Chain.</p>
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="description">Description (optional)</Label>
-        <Input
-          id="description"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          placeholder="Invoice #1042"
-        />
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="expires">Expires (optional)</Label>
-        <Input
-          ref={expiresRef}
-          id="expires"
-          type="datetime-local"
-          value={expiresAtLocal}
-          onChange={(e) => setExpiresAtLocal(e.target.value)}
-          aria-invalid={invalidField === "expires" || undefined}
-          aria-describedby={error && invalidField === "expires" ? errorId : undefined}
-        />
-      </div>
-
-      <FieldError id={errorId} message={error} />
-
-      <div className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-10 -mx-1 bg-[color-mix(in_srgb,var(--background)_92%,transparent)] px-1 py-3 backdrop-blur-sm md:static md:bottom-auto md:bg-transparent md:p-0 md:backdrop-blur-none">
-        {!isSignedIn ? (
-          <div className="flex flex-col items-stretch gap-3">
-            <p className="text-sm text-muted">
-              Sign in with a wallet, Google, or email to create a request.
-            </p>
-            <LoginButton />
-          </div>
-        ) : (
-          <Button type="submit" className="w-full" disabled={submitting}>
-            {submitting ? "Creating…" : "Create payment request"}
-          </Button>
-        )}
-      </div>
+      <ResponsiveDialog open={detailsOpen} onOpenChange={setDetailsOpen}>
+        <ResponsiveDialogContent>
+          <ResponsiveDialogHeader>
+            <ResponsiveDialogTitle>Request details</ResponsiveDialogTitle>
+            <ResponsiveDialogDescription>
+              Optional note and expiration. Funds always settle to your connected wallet as USDG on
+              Robinhood Chain.
+            </ResponsiveDialogDescription>
+          </ResponsiveDialogHeader>
+          <ResponsiveDialogBody className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="note">Note</Label>
+              <Textarea
+                id="note"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="What's this for?"
+                rows={3}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="expires">Expires</Label>
+              <Input
+                ref={expiresRef}
+                id="expires"
+                type="datetime-local"
+                value={expiresAtLocal}
+                onChange={(e) => setExpiresAtLocal(e.target.value)}
+                aria-invalid={invalidField === "expires" || undefined}
+              />
+            </div>
+          </ResponsiveDialogBody>
+          <ResponsiveDialogFooter>
+            <Button
+              type="button"
+              className="w-full sm:w-auto"
+              onClick={() => setDetailsOpen(false)}
+            >
+              Done
+            </Button>
+          </ResponsiveDialogFooter>
+        </ResponsiveDialogContent>
+      </ResponsiveDialog>
     </form>
   );
 }
