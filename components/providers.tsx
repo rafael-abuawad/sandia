@@ -6,6 +6,7 @@ import { WagmiProvider } from "@privy-io/wagmi";
 import { ConvexProviderWithAuth, ConvexReactClient } from "convex/react";
 import { useState } from "react";
 import { EnsureConvexUser } from "@/components/ensure-convex-user";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { useConvexPrivyAuth } from "@/lib/convex-privy-auth";
 import { privyConfig } from "@/lib/privy-config";
 import { wagmiConfig } from "@/lib/wagmi-config";
@@ -60,8 +61,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
       <QueryClientProvider client={queryClient}>
         <WagmiProvider config={wagmiConfig}>
           <ConvexProviderWithAuth client={convex} useAuth={useConvexPrivyAuth}>
-            <EnsureConvexUser />
-            {children}
+            <TooltipProvider delayDuration={200}>
+              <EnsureConvexUser />
+              {children}
+            </TooltipProvider>
           </ConvexProviderWithAuth>
         </WagmiProvider>
       </QueryClientProvider>

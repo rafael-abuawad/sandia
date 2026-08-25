@@ -14,6 +14,10 @@ export default function Loading() {
         <Skeleton className="ml-auto h-5 w-14 rounded-sm" />
       </div>
 
+      <Skeleton className="h-12 w-40" />
+      <Skeleton className="h-[420px] w-full rounded-[var(--radius-lg)]" />
+      <Skeleton className="h-6 w-full" />
+
       <dl className="grid grid-cols-2 gap-4 border-y border-border py-4 sm:grid-cols-4">
         <div className="space-y-1">
           <Skeleton className="h-3 w-8" />

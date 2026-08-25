@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { use, useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, ChevronDown, ExternalLink } from "lucide-react";
+import { ArrowLeft, ChevronDown, ExternalLink, Info } from "lucide-react";
 import type { StockQuote, StockToken } from "@/lib/rhj/client";
 import { explorerTokenUrl } from "@/lib/rhj/client";
 import { formatUsdPrice, formatVolume } from "@/lib/rhj/format";
@@ -11,6 +11,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { PriceChart } from "@/components/stocks/price-chart";
 
 export function StockDetail({ params }: { params: Promise<{ symbol: string }> }) {
   const { symbol: rawSymbol } = use(params);
@@ -145,6 +148,8 @@ export function StockDetail({ params }: { params: Promise<{ symbol: string }> })
         <p className="mt-1 text-xs text-muted">Mid quote · not the underlying share</p>
       </div>
 
+      <PriceChart address={asset.contractAddress} symbol={asset.symbol} />
+
       {quote?.dailyLow != null && quote.dailyHigh != null && quote.mid != null ? (
         <DayRangeBar low={quote.dailyLow} high={quote.dailyHigh} current={quote.mid} />
       ) : null}
@@ -191,43 +196,57 @@ export function StockDetail({ params }: { params: Promise<{ symbol: string }> })
         <div className="grid grid-cols-2 gap-2" role="group" aria-label="Order side">
           <Button
             type="button"
-            variant={side === "buy" ? "default" : "outline"}
+            variant="outline"
             aria-pressed={side === "buy"}
             onClick={() => setSide("buy")}
+            className={
+              side === "buy"
+                ? "border-green-600 bg-green-600 text-white hover:bg-green-700 hover:text-white"
+                : "border-green-600/40 text-green-700 hover:bg-green-50 hover:text-green-800"
+            }
           >
             Buy
           </Button>
           <Button
             type="button"
-            variant={side === "sell" ? "default" : "outline"}
+            variant="outline"
             aria-pressed={side === "sell"}
             onClick={() => setSide("sell")}
+            className={
+              side === "sell"
+                ? "border-red-600 bg-red-600 text-white hover:bg-red-700 hover:text-white"
+                : "border-red-600/40 text-red-700 hover:bg-red-50 hover:text-red-800"
+            }
           >
             Sell
           </Button>
         </div>
-        <div className="grid grid-cols-2 gap-2" role="group" aria-label="Order unit">
-          <Button
-            type="button"
-            size="sm"
-            variant={unit === "usd" ? "secondary" : "ghost"}
-            aria-pressed={unit === "usd"}
-            onClick={() => setUnit("usd")}
-          >
-            USD
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant={unit === "shares" ? "secondary" : "ghost"}
-            aria-pressed={unit === "shares"}
-            onClick={() => setUnit("shares")}
-          >
-            Shares
-          </Button>
+        <div className="flex items-center gap-2">
+          <Switch
+            id="amount-in-shares"
+            checked={unit === "shares"}
+            onCheckedChange={(checked) => setUnit(checked ? "shares" : "usd")}
+            aria-label="Amount in shares"
+          />
+          <Label htmlFor="amount-in-shares" className="font-medium">
+            Amount in shares
+          </Label>
+          <Tooltip>
+            <TooltipTrigger
+              type="button"
+              className="inline-flex size-6 items-center justify-center rounded-md text-muted hover:bg-foreground/5 hover:text-foreground"
+              aria-label="About amount unit"
+            >
+              <Info className="size-3.5" strokeWidth={1.5} aria-hidden />
+            </TooltipTrigger>
+            <TooltipContent side="top" className="max-w-xs">
+              Off: enter a USD amount. On: enter a share quantity. The preview uses the current mid
+              quote.
+            </TooltipContent>
+          </Tooltip>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="stock-amount">{unit === "usd" ? "Amount" : "Shares"}</Label>
+          <Label htmlFor="stock-amount">{unit === "usd" ? "Amount in USD" : "Shares"}</Label>
           <Input
             id="stock-amount"
             inputMode="decimal"
