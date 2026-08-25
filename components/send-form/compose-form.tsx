@@ -46,6 +46,7 @@ export function SendComposeForm({
   const [bookOpen, setBookOpen] = useState(false);
   const [bookRowId, setBookRowId] = useState<string | null>(null);
   const [bookDraft, setBookDraft] = useState("");
+  const [bookStartOnSave, setBookStartOnSave] = useState(false);
 
   useEffect(() => {
     if (!error) return;
@@ -56,9 +57,10 @@ export function SendComposeForm({
     firstRowRef.current?.focus();
   }, [error, mode]);
 
-  function openBook(draft: string, rowId: string | null = null) {
+  function openBook(draft: string, rowId: string | null = null, startOnSave = false) {
     setBookDraft(draft);
     setBookRowId(rowId);
+    setBookStartOnSave(startOnSave);
     setBookOpen(true);
   }
 
@@ -139,7 +141,10 @@ export function SendComposeForm({
                 className="pr-mono"
               />
               <InputGroupAddon>
-                <AddressBookButton onClick={() => openBook(singleAddress)} />
+                <AddressBookButton
+                  address={singleAddress}
+                  onClick={(intent) => openBook(singleAddress, null, intent === "save")}
+                />
               </InputGroupAddon>
             </InputGroup>
           </div>
@@ -201,7 +206,10 @@ export function SendComposeForm({
                         />
                         <InputGroupAddon>
                           <AddressBookButton
-                            onClick={() => openBook(row.address, row.id)}
+                            address={row.address}
+                            onClick={(intent) =>
+                              openBook(row.address, row.id, intent === "save")
+                            }
                             label={`Address book for recipient ${index + 1}`}
                           />
                         </InputGroupAddon>
@@ -294,9 +302,13 @@ export function SendComposeForm({
 
       <ContactPicker
         open={bookOpen}
-        onOpenChange={setBookOpen}
+        onOpenChange={(open) => {
+          setBookOpen(open);
+          if (!open) setBookStartOnSave(false);
+        }}
         onSelect={onPickAddress}
         draftAddress={bookDraft}
+        startOnSave={bookStartOnSave}
       />
     </form>
   );

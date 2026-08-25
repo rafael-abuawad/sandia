@@ -10,7 +10,7 @@ export function InputGroup({ className, ...props }: React.ComponentProps<"div">)
       data-slot="input-group"
       role="group"
       className={cn(
-        "flex h-11 w-full items-stretch overflow-hidden rounded-md border border-border-strong bg-panel-elevated",
+        "flex h-11 w-full items-stretch overflow-hidden rounded-md border border-border-strong bg-panel-elevated sm:h-10",
         className,
       )}
       {...props}

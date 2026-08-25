@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useId, useRef } from "react";
-import { X } from "lucide-react";
+import Link from "next/link";
+import { BookUser, X } from "lucide-react";
 import { AccountPanel } from "@/components/account-panel";
 import { Button } from "@/components/ui/button";
 
@@ -50,6 +51,14 @@ export function AccountSheet({ open, onOpenChange, id }: AccountSheetProps) {
         </Button>
       </div>
       <div className="px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4">
+        <Link
+          href="/address-book"
+          className="pr-nav-item mb-3 w-full justify-start"
+          onClick={() => onOpenChange(false)}
+        >
+          <BookUser className="size-4 shrink-0" strokeWidth={1.5} aria-hidden />
+          Address book
+        </Link>
         <AccountPanel onAfterLogout={() => onOpenChange(false)} />
       </div>
     </dialog>

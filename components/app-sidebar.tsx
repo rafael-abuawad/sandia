@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { BookUser } from "lucide-react";
 import { AccountPanel } from "@/components/account-panel";
+import { AppBrand } from "@/components/app-brand";
 import { appNavItems } from "@/components/app-nav";
 import { cn } from "@/lib/utils";
 
@@ -12,9 +14,7 @@ export function AppSidebar() {
   return (
     <aside className="pr-sidebar hidden w-56 shrink-0 flex-col border-r md:sticky md:top-0 md:flex md:h-svh md:self-start md:overflow-y-auto">
       <div className="flex h-16 items-center px-4">
-        <Link href="/" className="pr-brand">
-          Payrequest
-        </Link>
+        <AppBrand />
       </div>
 
       <nav aria-label="Primary" className="flex flex-1 flex-col gap-1 px-3 pb-4">
@@ -32,6 +32,14 @@ export function AppSidebar() {
             </Link>
           );
         })}
+        <Link
+          href="/address-book"
+          data-active={pathname.startsWith("/address-book") ? "true" : undefined}
+          className={cn("pr-nav-item justify-start")}
+        >
+          <BookUser className="size-4 shrink-0" strokeWidth={1.5} aria-hidden />
+          <span>Address book</span>
+        </Link>
       </nav>
 
       <div className="mt-auto px-3 pb-3 pt-1">

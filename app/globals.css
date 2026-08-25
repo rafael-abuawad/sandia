@@ -23,6 +23,7 @@
   --accent-hover: #b4f08c;
   --accent-ink: #0e1512;
   --accent-soft: rgba(159, 232, 112, 0.18);
+  --logo-cyan: #8dfcf3;
 
   /* Lines & focus */
   --border: #d2dbd4;
@@ -80,6 +81,7 @@
   --color-accent-hover: var(--accent-hover);
   --color-accent-ink: var(--accent-ink);
   --color-accent-soft: var(--accent-soft);
+  --color-logo-cyan: var(--logo-cyan);
   --color-border: var(--border);
   --color-border-strong: var(--border-strong);
   --color-danger: var(--danger);

@@ -1,9 +1,9 @@
 "use client";
 
 import { useId, useState } from "react";
-import Link from "next/link";
 import { UserRound } from "lucide-react";
 import { AccountSheet } from "@/components/account-sheet";
+import { AppBrand } from "@/components/app-brand";
 import { Button } from "@/components/ui/button";
 
 export function MobileTopBar() {
@@ -14,9 +14,7 @@ export function MobileTopBar() {
     <>
       <header className="pr-mobile-top sticky top-0 z-40 flex min-h-14 items-center justify-between border-b border-border bg-[color-mix(in_srgb,var(--panel-solid)_90%,transparent)] px-4 pb-0 pt-[env(safe-area-inset-top)] backdrop-blur-md md:hidden">
         <div className="flex h-14 w-full items-center justify-between">
-          <Link href="/" className="pr-brand">
-            Payrequest
-          </Link>
+          <AppBrand />
           <Button
             type="button"
             variant="ghost"
