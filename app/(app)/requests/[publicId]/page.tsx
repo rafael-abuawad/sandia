@@ -3,8 +3,8 @@
 import { use, useEffect, useId, useState } from "react";
 import Link from "next/link";
 import { useMutation, useQuery } from "convex/react";
-import { Cuer } from "cuer";
 import { Check, Copy } from "lucide-react";
+import { PaymentQr } from "@/components/payment-qr";
 import { LoginButton } from "@/components/login-button";
 import { useSignedInWallet } from "@/lib/use-signed-in-wallet";
 import { api } from "@/convex/_generated/api";
@@ -128,9 +128,7 @@ export default function RequestDetailPage({ params }: { params: Promise<{ public
 
       <div className="pr-panel pr-panel--padded space-y-4">
         <p className="pr-kicker">Payment link</p>
-        <div className="mx-auto flex size-44 items-center justify-center rounded-xl bg-panel-elevated p-2 text-foreground ring-1 ring-border">
-          <Cuer value={payUrl} size="100%" color="currentColor" arena="/assets/tokens/usdg.svg" />
-        </div>
+        <PaymentQr value={payUrl} />
         <InputGroup>
           <InputGroupInput
             readOnly
