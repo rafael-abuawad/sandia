@@ -2,7 +2,8 @@
 
 import { useId, type ReactNode } from "react";
 import { ChevronRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
 
 const DEFAULT_PRESETS = [100, 300, 1000] as const;
@@ -37,9 +38,11 @@ function sanitizeAmount(raw: string): string {
   return `${whole}.${frac}`;
 }
 
-function displayAmount(value: string): string {
-  if (!value || value === ".") return "0";
-  return value;
+function selectedPreset(value: string, presets: readonly number[]): string {
+  const n = Number.parseFloat(value);
+  if (!Number.isFinite(n)) return "";
+  const match = presets.find((preset) => preset === n);
+  return match !== undefined ? String(match) : "";
 }
 
 export function AmountCompose({
@@ -61,57 +64,64 @@ export function AmountCompose({
 }: AmountComposeProps) {
   const generatedId = useId();
   const id = inputId ?? generatedId;
-  const shown = displayAmount(value);
-  const inputWidthCh = Math.max(shown.length, 1) + 0.5;
+  const selected = selectedPreset(value, presets);
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="pr-panel px-4 pt-4 pb-4 sm:px-5 sm:pt-5 sm:pb-4">
-        <p className="pr-kicker">{kicker}</p>
-        <div className="mt-3 flex justify-center px-2">
-          <label htmlFor={id} className="flex max-w-full cursor-text items-baseline justify-center">
-            {prefix ? (
-              <span className="pr-display pr-money text-[2.75rem] leading-none text-foreground sm:text-5xl">
-                {prefix}
-              </span>
-            ) : null}
-            <input
-              id={id}
-              inputMode="decimal"
-              autoComplete="off"
-              value={shown}
-              onChange={(e) => onChange(sanitizeAmount(e.target.value))}
-              onFocus={(e) => e.currentTarget.select()}
-              aria-invalid={invalid || undefined}
-              className="pr-display pr-money bg-transparent p-0 text-center text-[2.75rem] leading-none text-foreground outline-none sm:text-5xl"
-              style={{ width: `${inputWidthCh}ch` }}
-            />
-            {suffix ? (
-              <span className="pr-display ms-1.5 text-lg leading-none text-muted sm:text-xl">
-                {suffix}
-              </span>
-            ) : null}
-          </label>
-        </div>
-        <div className="mt-5 flex flex-wrap justify-center gap-2">
+      <div className="pr-panel space-y-3 px-4 py-4 sm:px-5">
+        <label htmlFor={id} className="pr-kicker">
+          {kicker}
+        </label>
+        <InputGroup className={cn(invalid && "border-danger")}>
+          {prefix ? (
+            <InputGroupAddon
+              align="inline-start"
+              className="pointer-events-none px-3 text-sm text-muted"
+            >
+              {prefix}
+            </InputGroupAddon>
+          ) : null}
+          <InputGroupInput
+            id={id}
+            inputMode="decimal"
+            autoComplete="off"
+            placeholder="0.00"
+            value={value}
+            onChange={(e) => onChange(sanitizeAmount(e.target.value))}
+            aria-invalid={invalid || undefined}
+            className={cn("pr-money", prefix && "pl-0")}
+          />
+          {suffix ? (
+            <InputGroupAddon className="pointer-events-none px-3 text-xs font-semibold text-muted">
+              {suffix}
+            </InputGroupAddon>
+          ) : null}
+        </InputGroup>
+        <ToggleGroup
+          type="single"
+          variant="outline"
+          size="sm"
+          spacing={2}
+          value={selected}
+          onValueChange={(next) => {
+            if (next) onChange(next);
+          }}
+          aria-label="Suggested amounts"
+          className="flex w-full flex-wrap gap-2"
+        >
           {presets.map((preset) => {
             const label = presetFormat ? presetFormat(preset) : `${prefix}${preset}`;
-            const selected = value === String(preset) || value === `${preset}.00`;
             return (
-              <Button
+              <ToggleGroupItem
                 key={preset}
-                type="button"
-                variant="outline"
-                size="sm"
-                aria-pressed={selected}
-                className={cn("min-w-[4.5rem] rounded-full", selected && "border-foreground")}
-                onClick={() => onChange(String(preset))}
+                value={String(preset)}
+                className="min-w-[4.5rem] flex-1"
               >
                 {label}
-              </Button>
+              </ToggleGroupItem>
             );
           })}
-        </div>
+        </ToggleGroup>
       </div>
 
       {onDetailsClick ? (

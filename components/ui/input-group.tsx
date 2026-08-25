@@ -24,7 +24,7 @@ export const InputGroupInput = React.forwardRef<HTMLInputElement, React.Componen
       ref={ref}
       data-slot="input-group-control"
       className={cn(
-        "min-w-0 flex-1 bg-transparent px-3 text-sm text-foreground placeholder:text-subtle outline-none disabled:cursor-not-allowed disabled:opacity-50",
+        "min-w-0 flex-1 bg-transparent px-3 text-sm text-foreground placeholder:text-subtle outline-none shadow-none focus-visible:outline-none focus-visible:shadow-none disabled:cursor-not-allowed disabled:opacity-50",
         className,
       )}
       {...props}
