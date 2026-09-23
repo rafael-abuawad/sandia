@@ -1,17 +1,21 @@
 "use client";
 
-import { useAccount, useConnect, useDisconnect } from "wagmi";
+import { useAccount, useConnect } from "wagmi";
 import { useLoginPasskey, useRegisterPasskey } from "@zerodev/wallet-react";
 import { Button } from "@/components/ui/button";
-import { shortenAddress } from "@/lib/utils";
+import { FieldError } from "@/components/ui/field-error";
+import { useAppAuth } from "@/lib/auth-bridge";
 import { passkeyRpId } from "@/lib/sandia-auth";
+import { useSandiaSession } from "@/lib/sandia-session";
+import { shortenAddress } from "@/lib/utils";
 
 const projectId = process.env.NEXT_PUBLIC_ZERODEV_PROJECT_ID;
 
 export function SandiaLoginControls() {
   const { address, isConnected } = useAccount();
-  const { disconnect } = useDisconnect();
+  const { logout } = useAppAuth();
   const { connect, connectors } = useConnect();
+  const session = useSandiaSession();
   const registerPasskey = useRegisterPasskey();
   const loginPasskey = useLoginPasskey();
   const kernel = connectors.find((connector) => connector.id.toLowerCase().includes("zero"));
@@ -35,7 +39,16 @@ export function SandiaLoginControls() {
           This Kernel is a new wallet on Robinhood Chain. Funds on an older address stay there.
           Passkey relying party: {passkeyRpId()}.
         </p>
-        <Button type="button" variant="ghost" className="w-full" onClick={() => disconnect()}>
+        {session.linking ? (
+          <p className="text-xs text-muted">Linking this Kernel to your Sandia account…</p>
+        ) : null}
+        <FieldError id="sandia-link-error" message={session.linkError} />
+        {session.linkError ? (
+          <Button type="button" variant="outline" className="w-full" onClick={() => session.retry()}>
+            Try linking again
+          </Button>
+        ) : null}
+        <Button type="button" variant="ghost" className="w-full" onClick={() => void logout()}>
           Log out
         </Button>
       </div>

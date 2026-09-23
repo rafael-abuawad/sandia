@@ -1,7 +1,7 @@
 "use client";
 
 import { useId } from "react";
-import { LoginButton } from "@/components/login-button";
+import { PayConnectButton } from "@/components/providers-connectkit";
 import { Button } from "@/components/ui/button";
 import { FieldError } from "@/components/ui/field-error";
 import { Label } from "@/components/ui/label";
@@ -116,9 +116,7 @@ export function PayAcrossPanel({
     <section className="pr-panel pr-panel--padded space-y-4">
       <div className="flex items-center justify-between gap-3">
         <h2 className="pr-section-title">Pay with Across</h2>
-        <div className="[&_button]:h-8 [&_button]:w-auto [&_button]:px-3 [&_button]:text-xs">
-          <LoginButton />
-        </div>
+        <PayConnectButton />
       </div>
 
       {!isConnected ? (

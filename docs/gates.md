@@ -21,7 +21,9 @@ No firm quote was returned, so buy and sell stay unavailable. A configured `ZERO
 
 ## ConnectKit
 
-`connectkit@1.9.2` is installed with a pnpm peer override for React 19 and wagmi 3. It is mounted only when `NEXT_PUBLIC_SANDIA_AUTH=zerodev`. The React 19 smoke test (open modal, connect an injected wallet, switch chain, disconnect) has not been run, so guest pay through that modal is not treated as accepted.
+`connectkit@1.9.2` is the payer wallet on `/pay/[publicId]`, on its own wagmi config. It injects styles from its package, so there is no `connectkit/styles.css` import. Sandia accounts use a ZeroDev Kernel and are not a ConnectKit connector.
+
+Checked against a local dev server: the app shell renders “Create wallet with passkey” and “Sign in with passkey”, and `/pay/demo` renders without a server error. Opening the modal, connecting an injected wallet, switching chain, and disconnecting still needs a browser with a wallet extension and a live Convex request.
 
 ## ZeroDev sponsorship
 

@@ -1,18 +1,6 @@
 import { AuthConfig } from "convex/server";
 
-// Set on the Convex backend: npx convex env set PRIVY_APP_ID <app-id>
-// Distinct from NEXT_PUBLIC_PRIVY_APP_ID, which the Next.js client reads.
-const privyAppId = process.env.PRIVY_APP_ID ?? "";
-
-const providers: AuthConfig["providers"] = [
-  {
-    type: "customJwt",
-    issuer: "privy.io",
-    jwks: `https://auth.privy.io/api/v1/apps/${privyAppId}/jwks.json`,
-    algorithm: "ES256",
-    applicationID: privyAppId,
-  },
-];
+const providers: AuthConfig["providers"] = [];
 
 const sandiaIssuer = process.env.SANDIA_JWT_ISS;
 const sandiaJwks = process.env.SANDIA_JWKS_URL;

@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { createPublicClient, hashMessage, http, type Hex } from "viem";
+import { createPublicClient, hashMessage, http, isAddress, type Hex } from "viem";
+import { isKernelAuthSubject, sandiaLinkMessage } from "@/convex/lib/kernelSubject";
+import { assertClaimNonce } from "@/convex/lib/walletClaim";
 import { signRs256Jwt } from "@/lib/sandia-jwt";
 
 const ERC1271_MAGIC = "0x1626ba7e";
@@ -8,7 +10,8 @@ export async function POST(request: Request) {
   const privateKey = process.env.SANDIA_JWT_PRIVATE_KEY;
   const issuer = process.env.SANDIA_JWT_ISS;
   const audience = process.env.SANDIA_JWT_AUD;
-  if (!privateKey || !issuer || !audience) {
+  const secret = process.env.SANDIA_NONCE_SECRET;
+  if (!privateKey || !issuer || !audience || !secret) {
     return NextResponse.json({ error: "Sandia JWT signing is not configured" }, { status: 503 });
   }
 
@@ -24,8 +27,23 @@ export async function POST(request: Request) {
   if (/^0x[a-fA-F0-9]{40}$/.test(body.authSubject)) {
     return NextResponse.json({ error: "Subject cannot be only an address" }, { status: 400 });
   }
-  if (!body.smartAccountAddress || !body.nonce || !body.signature) {
+  if (!body.smartAccountAddress || !isAddress(body.smartAccountAddress) || !body.nonce || !body.signature) {
     return NextResponse.json({ error: "Kernel signature is required" }, { status: 400 });
+  }
+  if (!isKernelAuthSubject(body.authSubject, body.smartAccountAddress)) {
+    return NextResponse.json({ error: "Sign-in subject does not match this Kernel" }, { status: 400 });
+  }
+
+  try {
+    await assertClaimNonce(body.authSubject, body.nonce, secret, Date.now());
+  } catch (error) {
+    console.error("sandia_nonce_rejected", {
+      message: error instanceof Error ? error.message : "Unknown error",
+    });
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Sign-in nonce was rejected" },
+      { status: 401 },
+    );
   }
 
   const client = createPublicClient({
@@ -47,7 +65,7 @@ export async function POST(request: Request) {
         },
       ] as const,
       functionName: "isValidSignature",
-      args: [hashMessage(`Sandia link\n${body.nonce}`), body.signature as Hex],
+      args: [hashMessage(sandiaLinkMessage(body.nonce)), body.signature as Hex],
     });
     if (magic.toLowerCase() !== ERC1271_MAGIC) {
       return NextResponse.json({ error: "Smart account did not sign this link" }, { status: 401 });

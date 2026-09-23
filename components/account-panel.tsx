@@ -2,9 +2,7 @@
 
 import { LogOut } from "lucide-react";
 import { LoginButton } from "@/components/login-button";
-import { ClaimWalletButton } from "@/components/claim-wallet-button";
 import { useAppAuth } from "@/lib/auth-bridge";
-import { sandiaAuthMode } from "@/lib/sandia-auth";
 import { UsdgBalanceCard } from "@/components/usdg-balance-card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -32,7 +30,6 @@ export function AccountPanel({ className, onAfterLogout }: AccountPanelProps) {
         <div className="flex justify-center md:justify-start">
           <LoginButton />
         </div>
-        {sandiaAuthMode() === "privy" ? <ClaimWalletButton /> : null}
         {ready && authenticated ? (
           <Button
             type="button"

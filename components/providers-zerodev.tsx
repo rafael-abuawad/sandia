@@ -1,95 +1,71 @@
 "use client";
 
-import { useState } from "react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { ConnectKitProvider } from "connectkit";
-import { ConvexProviderWithAuth, ConvexReactClient } from "convex/react";
 import { createConfig, http, useAccount, useDisconnect, WagmiProvider } from "wagmi";
-import { injected } from "wagmi/connectors";
 import { zeroDevWallet } from "@zerodev/wallet-react";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { appChains, robinhoodChain } from "@/lib/chains";
-import { passkeyRpId } from "@/lib/sandia-auth";
+import { EnsureKernelSession } from "@/components/ensure-kernel-session";
+import { robinhoodChain } from "@/lib/chains";
 import { AuthBridgeProvider } from "@/lib/auth-bridge";
+import { passkeyRpId } from "@/lib/sandia-auth";
+import { useSandiaSession } from "@/lib/sandia-session";
 
-const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
 const zeroDevProjectId = process.env.NEXT_PUBLIC_ZERODEV_PROJECT_ID;
 
-const cutoverConfig = createConfig({
-  chains: appChains,
-  connectors: [
-    ...(zeroDevProjectId
-      ? [
-          zeroDevWallet({
-            projectId: zeroDevProjectId,
-            chains: [robinhoodChain],
-            mode: "4337",
-            rpId: passkeyRpId(),
-          }),
-        ]
-      : []),
-    injected(),
-  ],
-  transports: Object.fromEntries(appChains.map((chain) => [chain.id, http()])) as Record<
-    (typeof appChains)[number]["id"],
-    ReturnType<typeof http>
-  >,
+const kernelConfig = createConfig({
+  chains: [robinhoodChain],
+  connectors: zeroDevProjectId
+    ? [
+        zeroDevWallet({
+          projectId: zeroDevProjectId,
+          chains: [robinhoodChain],
+          mode: "4337",
+          rpId: passkeyRpId(),
+        }),
+      ]
+    : [],
+  transports: {
+    [robinhoodChain.id]: http(robinhoodChain.rpcUrls.default.http[0]),
+  },
   ssr: true,
+  multiInjectedProviderDiscovery: false,
 });
 
-function ZerodevBridge({ children }: { children: React.ReactNode }) {
+function KernelBridge({ children }: { children: React.ReactNode }) {
   const { isConnected } = useAccount();
   const { disconnectAsync } = useDisconnect();
+  const session = useSandiaSession();
+
+  async function logout() {
+    session.pause();
+    session.clear();
+    try {
+      await disconnectAsync();
+    } catch (error) {
+      console.error("kernel_logout_failed", {
+        message: error instanceof Error ? error.message : "Could not disconnect",
+      });
+      session.resume();
+    }
+  }
+
   return (
     <AuthBridgeProvider
       value={{
-        ready: true,
-        authenticated: isConnected,
+        ready: !session.linking,
+        authenticated: isConnected && session.linked,
         login: () => undefined,
-        logout: async () => {
-          await disconnectAsync();
-        },
+        logout,
       }}
     >
+      <EnsureKernelSession />
       {children}
     </AuthBridgeProvider>
   );
 }
 
-function useCutoverAuth() {
-  return {
-    isLoading: false,
-    isAuthenticated: false,
-    fetchAccessToken: async () => null,
-  };
-}
-
 export function ZerodevProviders({ children }: { children: React.ReactNode }) {
-  const [queryClient] = useState(() => new QueryClient());
-  const [convex] = useState(() => (convexUrl ? new ConvexReactClient(convexUrl) : null));
-
-  if (!convex) {
-    return (
-      <div className="flex min-h-screen items-center justify-center px-6 text-center">
-        <p className="text-sm text-muted">Set NEXT_PUBLIC_CONVEX_URL before using Sandia auth.</p>
-      </div>
-    );
-  }
-
   return (
-    <QueryClientProvider client={queryClient}>
-      <WagmiProvider config={cutoverConfig}>
-        <ConnectKitProvider
-          mode="light"
-          options={{ enforceSupportedChains: false, initialChainId: robinhoodChain.id }}
-        >
-          <ConvexProviderWithAuth client={convex} useAuth={useCutoverAuth}>
-            <TooltipProvider delayDuration={200}>
-              <ZerodevBridge>{children}</ZerodevBridge>
-            </TooltipProvider>
-          </ConvexProviderWithAuth>
-        </ConnectKitProvider>
-      </WagmiProvider>
-    </QueryClientProvider>
+    <WagmiProvider config={kernelConfig}>
+      <KernelBridge>{children}</KernelBridge>
+    </WagmiProvider>
   );
 }

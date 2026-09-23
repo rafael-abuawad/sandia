@@ -7,17 +7,11 @@ async function userForIdentity(
   ctx: AuthCtx,
   identity: { subject: string; issuer: string },
 ): Promise<Doc<"users"> | null> {
-  const linked = await ctx.db
+  return await ctx.db
     .query("users")
     .withIndex("by_auth", (q) =>
       q.eq("authIssuer", identity.issuer).eq("authSubject", identity.subject),
     )
-    .unique();
-  if (linked) return linked;
-
-  return await ctx.db
-    .query("users")
-    .withIndex("by_privyDid", (q) => q.eq("privyDid", identity.subject))
     .unique();
 }
 

@@ -78,7 +78,7 @@ export function isPayerTokenAllowed(symbol: string, address: string): boolean {
   return true;
 }
 
-/** EVM chains we expose in Privy / wagmi. */
+/** EVM chains exposed to payer wallets. */
 export const appChains = [
   mainnet,
   optimism,
