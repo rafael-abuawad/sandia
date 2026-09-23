@@ -1,20 +1,26 @@
-import { mutation, query, internalMutation, internalQuery } from "./_generated/server";
+import { query, internalMutation, internalQuery } from "./_generated/server";
+import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
 import { acrossAttemptStatus } from "./schema";
 import type { Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
+import {
+  decideAttemptAcceptance,
+  evaluateFill,
+  isReconciliationStuck,
+  type FillEvidence,
+} from "./lib/fillProof";
 
-const ROBINHOOD_CHAIN_ID = 4663;
-
-async function reopenIfNeeded(ctx: MutationCtx, requestId: Id<"paymentRequests">) {
+async function reopenAfterTerminalAttempt(ctx: MutationCtx, requestId: Id<"paymentRequests">) {
   const request = await ctx.db.get(requestId);
-  if (!request || request.status !== "pending") return;
+  if (!request || request.status !== "pending") return request?.status;
   const now = Date.now();
   if (request.expiresAt !== undefined && request.expiresAt <= now) {
     await ctx.db.patch(requestId, { status: "expired", updatedAt: now });
-    return;
+    return "expired" as const;
   }
   await ctx.db.patch(requestId, { status: "open", updatedAt: now });
+  return "open" as const;
 }
 
 function normalizeAddress(address: string): string {
@@ -25,24 +31,64 @@ function normalizeAddress(address: string): string {
   return lower;
 }
 
+const attemptValidator = v.object({
+  _id: v.id("paymentAttempts"),
+  _creationTime: v.number(),
+  requestId: v.id("paymentRequests"),
+  payerAddress: v.string(),
+  originChainId: v.number(),
+  inputToken: v.string(),
+  quotedInputAmount: v.string(),
+  expectedOutputAmount: v.string(),
+  minOutputAmount: v.string(),
+  feesJson: v.string(),
+  quoteId: v.optional(v.string()),
+  depositTxnRef: v.optional(v.string()),
+  fillTxnRef: v.optional(v.string()),
+  acrossStatus: acrossAttemptStatus,
+  settlementKind: v.optional(v.union(v.literal("across"), v.literal("direct"))),
+  failureReason: v.optional(v.string()),
+  createdAt: v.number(),
+  updatedAt: v.number(),
+});
+
 export const listByRequest = query({
-  args: { publicId: v.string() },
+  args: {
+    publicId: v.string(),
+    paginationOpts: paginationOptsValidator,
+  },
+  returns: v.object({
+    page: v.array(attemptValidator),
+    isDone: v.boolean(),
+    continueCursor: v.string(),
+    splitCursor: v.optional(v.union(v.string(), v.null())),
+    pageStatus: v.optional(v.union(v.string(), v.null())),
+  }),
   handler: async (ctx, args) => {
     const request = await ctx.db
       .query("paymentRequests")
       .withIndex("by_publicId", (q) => q.eq("publicId", args.publicId))
       .unique();
-    if (!request) return [];
+    if (!request) {
+      return {
+        page: [],
+        isDone: true,
+        continueCursor: "",
+        splitCursor: null,
+        pageStatus: null,
+      };
+    }
     return await ctx.db
       .query("paymentAttempts")
       .withIndex("by_request", (q) => q.eq("requestId", request._id))
       .order("desc")
-      .collect();
+      .paginate(args.paginationOpts);
   },
 });
 
 export const getByDepositTxnRef = internalQuery({
   args: { depositTxnRef: v.string() },
+  returns: v.union(attemptValidator, v.null()),
   handler: async (ctx, args) => {
     return await ctx.db
       .query("paymentAttempts")
@@ -51,7 +97,61 @@ export const getByDepositTxnRef = internalQuery({
   },
 });
 
-export const createAttempt = mutation({
+export const listForReconciliation = internalQuery({
+  args: { limit: v.number() },
+  returns: v.array(
+    v.object({
+      attemptId: v.id("paymentAttempts"),
+      requestId: v.id("paymentRequests"),
+      publicId: v.string(),
+      depositTxnRef: v.string(),
+      acrossStatus: acrossAttemptStatus,
+      settlementKind: v.union(v.literal("across"), v.literal("direct")),
+      createdAt: v.number(),
+      destinationChainId: v.number(),
+      destinationTokenAddress: v.string(),
+      recipientAddress: v.string(),
+      outputAmountBaseUnits: v.string(),
+      requestStatus: v.string(),
+    }),
+  ),
+  handler: async (ctx, args) => {
+    const limit = Math.min(Math.max(args.limit, 1), 25);
+    const submitted = await ctx.db
+      .query("paymentAttempts")
+      .withIndex("by_acrossStatus", (q) => q.eq("acrossStatus", "submitted"))
+      .take(limit);
+    const pending = await ctx.db
+      .query("paymentAttempts")
+      .withIndex("by_acrossStatus", (q) => q.eq("acrossStatus", "pending"))
+      .take(limit);
+
+    const rows = [];
+    for (const attempt of [...submitted, ...pending].slice(0, limit)) {
+      if (!attempt.depositTxnRef) continue;
+      const request = await ctx.db.get(attempt.requestId);
+      if (!request) continue;
+      const kind = attempt.settlementKind ?? "across";
+      rows.push({
+        attemptId: attempt._id,
+        requestId: attempt.requestId,
+        publicId: request.publicId,
+        depositTxnRef: attempt.depositTxnRef,
+        acrossStatus: attempt.acrossStatus,
+        settlementKind: kind,
+        createdAt: attempt.createdAt,
+        destinationChainId: request.destinationChainId,
+        destinationTokenAddress: request.destinationTokenAddress,
+        recipientAddress: request.recipientAddress,
+        outputAmountBaseUnits: request.outputAmountBaseUnits,
+        requestStatus: request.status,
+      });
+    }
+    return rows;
+  },
+});
+
+export const acceptVerifiedDeposit = internalMutation({
   args: {
     publicId: v.string(),
     payerAddress: v.string(),
@@ -63,7 +163,13 @@ export const createAttempt = mutation({
     feesJson: v.string(),
     quoteId: v.optional(v.string()),
     depositTxnRef: v.string(),
+    settlementKind: v.union(v.literal("across"), v.literal("direct")),
   },
+  returns: v.object({
+    attemptId: v.optional(v.id("paymentAttempts")),
+    duplicate: v.boolean(),
+    expired: v.boolean(),
+  }),
   handler: async (ctx, args) => {
     const request = await ctx.db
       .query("paymentRequests")
@@ -71,21 +177,15 @@ export const createAttempt = mutation({
       .unique();
     if (!request) throw new Error("Payment request not found");
 
-    if (request.status === "completed") {
-      throw new Error("Payment request already completed");
-    }
-    if (request.status === "cancelled") {
-      throw new Error("Payment request is cancelled");
-    }
-    if (request.status === "expired") {
-      throw new Error("Payment request is expired");
-    }
-    if (request.expiresAt !== undefined && request.expiresAt <= Date.now()) {
-      await ctx.db.patch(request._id, {
-        status: "expired",
-        updatedAt: Date.now(),
-      });
-      throw new Error("Payment request is expired");
+    const now = Date.now();
+    if (
+      request.status === "open" &&
+      request.expiresAt !== undefined &&
+      request.expiresAt <= now
+    ) {
+      await ctx.db.patch(request._id, { status: "expired", updatedAt: now });
+      console.log("payment_request_expired", { publicId: request.publicId });
+      return { expired: true, duplicate: false };
     }
 
     const depositTxnRef = args.depositTxnRef.toLowerCase();
@@ -97,11 +197,30 @@ export const createAttempt = mutation({
       .query("paymentAttempts")
       .withIndex("by_depositTxnRef", (q) => q.eq("depositTxnRef", depositTxnRef))
       .unique();
-    if (existing) {
-      return { attemptId: existing._id, duplicate: true as const };
+
+    const prior = await ctx.db
+      .query("paymentAttempts")
+      .withIndex("by_request", (q) => q.eq("requestId", request._id))
+      .take(9);
+
+    const decision = decideAttemptAcceptance({
+      requestStatus: request.status,
+      existingDepositTxnRef: existing?.depositTxnRef,
+      incomingDepositTxnRef: depositTxnRef,
+      attemptCount: prior.length,
+    });
+    if (!decision.ok) {
+      console.log("payment_attempt_rejected", {
+        publicId: request.publicId,
+        depositTxnRef,
+        reason: decision.reason,
+      });
+      throw new Error(decision.reason);
+    }
+    if (decision.duplicate && existing) {
+      return { attemptId: existing._id, duplicate: true, expired: false };
     }
 
-    const now = Date.now();
     const attemptId = await ctx.db.insert("paymentAttempts", {
       requestId: request._id,
       payerAddress: normalizeAddress(args.payerAddress),
@@ -114,29 +233,37 @@ export const createAttempt = mutation({
       quoteId: args.quoteId,
       depositTxnRef,
       acrossStatus: "submitted",
+      settlementKind: args.settlementKind,
       createdAt: now,
       updatedAt: now,
     });
 
-    await ctx.db.patch(request._id, {
-      status: "pending",
-      updatedAt: now,
+    await ctx.db.patch(request._id, { status: "pending", updatedAt: now });
+    console.log("payment_attempt_accepted", {
+      publicId: request.publicId,
+      depositTxnRef,
+      settlementKind: args.settlementKind,
     });
-
-    return { attemptId, duplicate: false as const };
+    return { attemptId, duplicate: false, expired: false };
   },
 });
 
 export const applyAcrossStatus = internalMutation({
   args: {
     depositTxnRef: v.string(),
-    acrossStatus: acrossAttemptStatus,
+    acrossStatus: v.string(),
     fillTxnRef: v.optional(v.string()),
     destinationChainId: v.optional(v.number()),
     outputToken: v.optional(v.string()),
     recipient: v.optional(v.string()),
     outputAmount: v.optional(v.string()),
+    transportError: v.optional(v.boolean()),
   },
+  returns: v.object({
+    requestStatus: v.string(),
+    attemptStatus: v.string(),
+    reason: v.optional(v.string()),
+  }),
   handler: async (ctx, args) => {
     const depositTxnRef = args.depositTxnRef.toLowerCase();
     const attempt = await ctx.db
@@ -148,99 +275,131 @@ export const applyAcrossStatus = internalMutation({
       throw new Error("Payment attempt not found");
     }
 
-    // Idempotent: already filled
-    if (attempt.acrossStatus === "filled") {
-      return { requestStatus: "completed" as const, attemptStatus: "filled" as const };
-    }
-
     const request = await ctx.db.get(attempt.requestId);
     if (!request) throw new Error("Payment request not found");
-
     const now = Date.now();
 
-    if (args.acrossStatus === "filled") {
-      // Destination chain is required from Across indexer when marking paid.
-      if (args.destinationChainId === undefined) {
-        throw new Error("Across fill missing destinationChainId — retry shortly");
-      }
-      if (args.destinationChainId !== ROBINHOOD_CHAIN_ID) {
-        await ctx.db.patch(attempt._id, {
-          acrossStatus: "failed",
-          updatedAt: now,
+    if (args.transportError) {
+      if (isReconciliationStuck(attempt.createdAt, now)) {
+        console.error("payment_reconciliation_stuck", {
+          publicId: request.publicId,
+          depositTxnRef,
+          acrossStatus: attempt.acrossStatus,
+          ageMs: now - attempt.createdAt,
         });
-        await reopenIfNeeded(ctx, request._id);
-        throw new Error("Fill destination chain mismatch");
-      }
-
-      // Validate optional settlement fields when the indexer provides them.
-      if (args.outputToken && args.outputToken.toLowerCase() !== request.destinationTokenAddress) {
-        await ctx.db.patch(attempt._id, {
-          acrossStatus: "failed",
-          updatedAt: now,
-        });
-        await reopenIfNeeded(ctx, request._id);
-        throw new Error("Fill output token mismatch");
-      }
-
-      if (args.recipient && args.recipient.toLowerCase() !== request.recipientAddress) {
-        await ctx.db.patch(attempt._id, {
-          acrossStatus: "failed",
-          updatedAt: now,
-        });
-        await reopenIfNeeded(ctx, request._id);
-        throw new Error("Fill recipient mismatch");
-      }
-
-      if (args.outputAmount !== undefined) {
-        const filled = BigInt(args.outputAmount);
-        const required = BigInt(request.outputAmountBaseUnits);
-        if (filled < required) {
-          await ctx.db.patch(attempt._id, {
-            acrossStatus: "failed",
-            updatedAt: now,
-          });
-          await reopenIfNeeded(ctx, request._id);
-          throw new Error("Filled amount below requested amount");
-        }
-      }
-
-      await ctx.db.patch(attempt._id, {
-        acrossStatus: "filled",
-        fillTxnRef: args.fillTxnRef?.toLowerCase(),
-        updatedAt: now,
-      });
-      await ctx.db.patch(request._id, {
-        status: "completed",
-        updatedAt: now,
-      });
-      return { requestStatus: "completed" as const, attemptStatus: "filled" as const };
-    }
-
-    if (args.acrossStatus === "expired" || args.acrossStatus === "refunded") {
-      await ctx.db.patch(attempt._id, {
-        acrossStatus: args.acrossStatus,
-        fillTxnRef: args.fillTxnRef?.toLowerCase(),
-        updatedAt: now,
-      });
-      if (request.status === "pending") {
-        if (request.expiresAt !== undefined && request.expiresAt <= now) {
-          await ctx.db.patch(request._id, { status: "expired", updatedAt: now });
-        } else {
-          await ctx.db.patch(request._id, { status: "open", updatedAt: now });
-        }
       }
       return {
-        requestStatus: request.status === "pending" ? ("open" as const) : request.status,
-        attemptStatus: args.acrossStatus,
+        requestStatus: request.status,
+        attemptStatus: attempt.acrossStatus,
+        reason: "Across status is temporarily unavailable",
       };
     }
 
-    await ctx.db.patch(attempt._id, {
-      acrossStatus: args.acrossStatus,
-      fillTxnRef: args.fillTxnRef?.toLowerCase(),
-      updatedAt: now,
+    if (attempt.acrossStatus === "filled") {
+      return { requestStatus: request.status, attemptStatus: "filled" };
+    }
+
+    const evidence: FillEvidence = {
+      status: args.acrossStatus,
+      destinationChainId: args.destinationChainId,
+      outputToken: args.outputToken,
+      recipient: args.recipient,
+      outputAmount: args.outputAmount,
+      fillTxnRef: args.fillTxnRef,
+    };
+    const decision = evaluateFill(evidence, {
+      destinationChainId: request.destinationChainId,
+      destinationTokenAddress: request.destinationTokenAddress,
+      recipientAddress: request.recipientAddress,
+      outputAmountBaseUnits: request.outputAmountBaseUnits,
     });
 
-    return { requestStatus: request.status, attemptStatus: args.acrossStatus };
+    if (decision.outcome === "pending" || decision.outcome === "incomplete") {
+      await ctx.db.patch(attempt._id, {
+        acrossStatus: "pending",
+        updatedAt: now,
+        failureReason: decision.outcome === "incomplete" ? decision.reason : undefined,
+      });
+      if (decision.outcome === "incomplete") {
+        console.log("payment_fill_incomplete", {
+          publicId: request.publicId,
+          depositTxnRef,
+          reason: decision.reason,
+        });
+      }
+      if (isReconciliationStuck(attempt.createdAt, now)) {
+        console.error("payment_reconciliation_stuck", {
+          publicId: request.publicId,
+          depositTxnRef,
+          acrossStatus: "pending",
+          reason: decision.outcome === "incomplete" ? decision.reason : "still pending",
+          ageMs: now - attempt.createdAt,
+        });
+      }
+      return {
+        requestStatus: request.status,
+        attemptStatus: "pending",
+        reason: decision.outcome === "incomplete" ? decision.reason : undefined,
+      };
+    }
+
+    if (decision.outcome === "mismatch") {
+      await ctx.db.patch(attempt._id, {
+        acrossStatus: "failed",
+        failureReason: decision.reason,
+        updatedAt: now,
+      });
+      const requestStatus = (await reopenAfterTerminalAttempt(ctx, request._id)) ?? request.status;
+      console.error("payment_fill_mismatch", {
+        publicId: request.publicId,
+        depositTxnRef,
+        reason: decision.reason,
+      });
+      return { requestStatus, attemptStatus: "failed", reason: decision.reason };
+    }
+
+    if (decision.outcome === "expired" || decision.outcome === "refunded") {
+      await ctx.db.patch(attempt._id, {
+        acrossStatus: decision.outcome,
+        fillTxnRef: args.fillTxnRef?.toLowerCase(),
+        updatedAt: now,
+      });
+      const requestStatus =
+        (await reopenAfterTerminalAttempt(ctx, request._id)) ?? request.status;
+      console.log("payment_attempt_terminal", {
+        publicId: request.publicId,
+        depositTxnRef,
+        acrossStatus: decision.outcome,
+      });
+      return { requestStatus, attemptStatus: decision.outcome };
+    }
+
+    if (request.status === "completed") {
+      await ctx.db.patch(attempt._id, {
+        acrossStatus: "ignored_duplicate",
+        fillTxnRef: args.fillTxnRef?.toLowerCase(),
+        failureReason: "Request was already paid by another attempt",
+        updatedAt: now,
+      });
+      console.log("payment_fill_ignored_duplicate", {
+        publicId: request.publicId,
+        depositTxnRef,
+      });
+      return { requestStatus: "completed", attemptStatus: "ignored_duplicate" };
+    }
+
+    await ctx.db.patch(attempt._id, {
+      acrossStatus: "filled",
+      fillTxnRef: args.fillTxnRef?.toLowerCase(),
+      failureReason: undefined,
+      updatedAt: now,
+    });
+    await ctx.db.patch(request._id, { status: "completed", updatedAt: now });
+    console.log("payment_completed", {
+      publicId: request.publicId,
+      depositTxnRef,
+      fillTxnRef: args.fillTxnRef?.toLowerCase(),
+    });
+    return { requestStatus: "completed", attemptStatus: "filled" };
   },
 });

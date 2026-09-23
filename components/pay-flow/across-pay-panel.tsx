@@ -34,6 +34,9 @@ type PayAcrossPanelProps = {
   destinationTokenDecimals: number;
   outputAmountBaseUnits: string;
   canPay: boolean;
+  payerAddress?: string;
+  paymentInProgress?: boolean;
+  expiresAt?: number;
   statusMsg: string | null;
   pendingTx: Hex | undefined;
   txSuccess: boolean;
@@ -82,6 +85,9 @@ export function PayAcrossPanel({
   destinationTokenDecimals,
   outputAmountBaseUnits,
   canPay,
+  payerAddress,
+  paymentInProgress,
+  expiresAt,
   statusMsg,
   pendingTx,
   txSuccess,
@@ -117,10 +123,27 @@ export function PayAcrossPanel({
 
       {!isConnected ? (
         <p className="text-sm text-muted">
-          Sign in with a wallet, Google, or email to see available routes and pay.
+          Connect a wallet to pay. Paying does not create a Payrequest account.
         </p>
       ) : (
         <>
+          {payerAddress ? (
+            <p className="text-sm text-muted">
+              Paying from <span className="pr-mono text-foreground">{shortenAddress(payerAddress, 4)}</span>
+            </p>
+          ) : null}
+          {paymentInProgress ? (
+            <p className="text-sm text-muted" role="status">
+              A payment is already in progress for this request. A second deposit will not be
+              accepted here.
+            </p>
+          ) : null}
+          {expiresAt ? (
+            <p className="text-xs text-muted">
+              Expires {new Date(expiresAt).toLocaleString()}. The request stays open until the
+              server marks it expired.
+            </p>
+          ) : null}
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor={chainId}>Chain</Label>

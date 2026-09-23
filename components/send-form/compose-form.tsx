@@ -236,13 +236,15 @@ export function SendComposeForm({
                 </li>
               ))}
             </ul>
+            <label htmlFor="send-recipients-csv" className="sr-only">
+              Recipient CSV file
+            </label>
             <input
+              id="send-recipients-csv"
               ref={csvInputRef}
               type="file"
               accept=".csv,text/csv"
               className="sr-only"
-              aria-hidden
-              tabIndex={-1}
               onChange={async (e) => {
                 const file = e.target.files?.[0];
                 e.target.value = "";

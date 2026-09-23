@@ -1,20 +1,40 @@
 "use client";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { PrivyProvider } from "@privy-io/react-auth";
+import { PrivyProvider, usePrivy } from "@privy-io/react-auth";
 import { WagmiProvider } from "@privy-io/wagmi";
 import { ConvexProviderWithAuth, ConvexReactClient } from "convex/react";
 import { useState } from "react";
 import { EnsureConvexUser } from "@/components/ensure-convex-user";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useConvexPrivyAuth } from "@/lib/convex-privy-auth";
+import { AuthBridgeProvider } from "@/lib/auth-bridge";
 import { privyConfig } from "@/lib/privy-config";
 import { wagmiConfig } from "@/lib/wagmi-config";
+import { sandiaAuthMode } from "@/lib/sandia-auth";
+import { ZerodevProviders } from "@/components/providers-zerodev";
 
 const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
 const privyAppId = process.env.NEXT_PUBLIC_PRIVY_APP_ID;
 
-export function Providers({ children }: { children: React.ReactNode }) {
+function PrivyBridge({ children }: { children: React.ReactNode }) {
+  const { ready, authenticated, login, logout, user } = usePrivy();
+  return (
+    <AuthBridgeProvider
+      value={{
+        ready,
+        authenticated,
+        login,
+        logout,
+        email: user?.email?.address ?? user?.google?.email,
+      }}
+    >
+      {children}
+    </AuthBridgeProvider>
+  );
+}
+
+function PrivyProviders({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(() => new QueryClient());
   const [convex] = useState(() => (convexUrl ? new ConvexReactClient(convexUrl) : null));
 
@@ -62,12 +82,21 @@ export function Providers({ children }: { children: React.ReactNode }) {
         <WagmiProvider config={wagmiConfig}>
           <ConvexProviderWithAuth client={convex} useAuth={useConvexPrivyAuth}>
             <TooltipProvider delayDuration={200}>
-              <EnsureConvexUser />
-              {children}
+              <PrivyBridge>
+                <EnsureConvexUser />
+                {children}
+              </PrivyBridge>
             </TooltipProvider>
           </ConvexProviderWithAuth>
         </WagmiProvider>
       </QueryClientProvider>
     </PrivyProvider>
   );
+}
+
+export function Providers({ children }: { children: React.ReactNode }) {
+  if (sandiaAuthMode() === "zerodev") {
+    return <ZerodevProviders>{children}</ZerodevProviders>;
+  }
+  return <PrivyProviders>{children}</PrivyProviders>;
 }

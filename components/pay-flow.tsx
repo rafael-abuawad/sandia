@@ -25,6 +25,8 @@ export function PayFlow({ publicId }: PayFlowProps) {
     selectedToken,
     chains,
     canPay,
+    paymentInProgress,
+    payerAddress,
     statusMsg,
     pendingTx,
     txSuccess,
@@ -85,6 +87,9 @@ export function PayFlow({ publicId }: PayFlowProps) {
           destinationTokenDecimals={request.destinationTokenDecimals}
           outputAmountBaseUnits={request.outputAmountBaseUnits}
           canPay={canPay}
+          payerAddress={payerAddress}
+          paymentInProgress={Boolean(paymentInProgress)}
+          expiresAt={request.expiresAt}
           statusMsg={statusMsg}
           pendingTx={pendingTx}
           txSuccess={txSuccess}

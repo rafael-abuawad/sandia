@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BookUser } from "lucide-react";
+import { BookUser, History } from "lucide-react";
 import { AccountPanel } from "@/components/account-panel";
 import { AppBrand } from "@/components/app-brand";
 import { appNavItems } from "@/components/app-nav";
@@ -39,6 +39,14 @@ export function AppSidebar() {
         >
           <BookUser className="size-4 shrink-0" strokeWidth={1.5} aria-hidden />
           <span>Address book</span>
+        </Link>
+        <Link
+          href="/activity"
+          data-active={pathname.startsWith("/activity") ? "true" : undefined}
+          className={cn("pr-nav-item justify-start")}
+        >
+          <History className="size-4 shrink-0" strokeWidth={1.5} aria-hidden />
+          <span>Activity</span>
         </Link>
       </nav>
 

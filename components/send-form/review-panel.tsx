@@ -11,12 +11,14 @@ export function SendReviewPanel({
   review,
   error,
   confirming,
+  canConfirm,
   onBack,
   onConfirm,
 }: {
   review: ReviewPayload;
   error: string | null;
   confirming: boolean;
+  canConfirm: boolean;
   onBack: () => void;
   onConfirm: () => void;
 }) {
@@ -27,7 +29,11 @@ export function SendReviewPanel({
       <section className="pr-panel pr-panel--padded space-y-4">
         <div>
           <h2 className="pr-section-title">Review send</h2>
-          <p className="mt-1 text-sm text-muted">Confirm details before the demo mock completes.</p>
+          <p className="mt-1 text-sm text-muted">
+            Robinhood Chain · USDG. This batch reverts together. Gas is sponsored only if ZeroDev
+            has a Robinhood policy; otherwise the account needs ETH. Sponsorship is unconfirmed
+            until a UserOperation is sent.
+          </p>
         </div>
 
         <dl className="space-y-2 text-sm">
@@ -74,8 +80,13 @@ export function SendReviewPanel({
         >
           Back
         </Button>
-        <Button type="button" className="flex-1" disabled={confirming} onClick={onConfirm}>
-          {confirming ? "Sending…" : "Confirm (demo)"}
+        <Button
+          type="button"
+          className="flex-1"
+          disabled={confirming || !canConfirm}
+          onClick={onConfirm}
+        >
+          {confirming ? "Sending…" : "Confirm send"}
         </Button>
       </div>
     </div>

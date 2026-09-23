@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef } from "react";
 import Link from "next/link";
-import { BookUser, X } from "lucide-react";
+import { BookUser, History, List, X } from "lucide-react";
 import { AccountPanel } from "@/components/account-panel";
 import { Button } from "@/components/ui/button";
 
@@ -53,11 +53,27 @@ export function AccountSheet({ open, onOpenChange, id }: AccountSheetProps) {
       <div className="px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4">
         <Link
           href="/address-book"
-          className="pr-nav-item mb-3 w-full justify-start"
+          className="pr-nav-item mb-2 w-full justify-start"
           onClick={() => onOpenChange(false)}
         >
           <BookUser className="size-4 shrink-0" strokeWidth={1.5} aria-hidden />
           Address book
+        </Link>
+        <Link
+          href="/dashboard"
+          className="pr-nav-item mb-2 w-full justify-start"
+          onClick={() => onOpenChange(false)}
+        >
+          <List className="size-4 shrink-0" strokeWidth={1.5} aria-hidden />
+          Your requests
+        </Link>
+        <Link
+          href="/activity"
+          className="pr-nav-item mb-3 w-full justify-start"
+          onClick={() => onOpenChange(false)}
+        >
+          <History className="size-4 shrink-0" strokeWidth={1.5} aria-hidden />
+          Activity
         </Link>
         <AccountPanel onAfterLogout={() => onOpenChange(false)} />
       </div>

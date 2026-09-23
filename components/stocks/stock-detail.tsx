@@ -3,6 +3,9 @@
 import Image from "next/image";
 import Link from "next/link";
 import { use, useCallback, useEffect, useMemo, useState } from "react";
+import { useAction } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import { ROBINHOOD_USDG } from "@/lib/destination";
 import { ArrowLeft, ChevronDown, ExternalLink, Info } from "lucide-react";
 import type { StockQuote, StockToken } from "@/lib/rhj/client";
 import { explorerTokenUrl } from "@/lib/rhj/client";
@@ -27,6 +30,10 @@ export function StockDetail({ params }: { params: Promise<{ symbol: string }> })
   const [side, setSide] = useState<"buy" | "sell">("buy");
   const [unit, setUnit] = useState<"usd" | "shares">("usd");
   const [ticketAmount, setTicketAmount] = useState("");
+  const probeQuote = useAction(api.zerox.probeQuote);
+  const [tradeReason, setTradeReason] = useState<string | null>(
+    "Checking whether 0x can execute this token.",
+  );
 
   const load = useCallback(async () => {
     setError(null);
@@ -48,6 +55,23 @@ export function StockDetail({ params }: { params: Promise<{ symbol: string }> })
         return;
       }
       setAsset(found);
+      try {
+        const probe = await probeQuote({
+          sellToken: ROBINHOOD_USDG.address,
+          buyToken: found.contractAddress,
+          sellAmount: "1000000",
+          taker: "0x0000000000000000000000000000000000000001",
+        });
+        setTradeReason(
+          probe.ok && probe.liquidityAvailable
+            ? null
+            : (probe.reason ?? "0x did not return executable liquidity"),
+        );
+      } catch (probeError) {
+        setTradeReason(
+          probeError instanceof Error ? probeError.message : "0x quote could not be loaded",
+        );
+      }
 
       if (quoteRes.ok) {
         const quoteJson = (await quoteRes.json()) as { quote: StockQuote };
@@ -60,7 +84,7 @@ export function StockDetail({ params }: { params: Promise<{ symbol: string }> })
     } finally {
       setLoading(false);
     }
-  }, [symbol]);
+  }, [symbol, probeQuote]);
 
   useEffect(() => {
     void load();
@@ -263,10 +287,12 @@ export function StockDetail({ params }: { params: Promise<{ symbol: string }> })
           </p>
         </div>
         <Button type="button" className="w-full" size="lg" disabled>
-          {halted
-            ? "Trading halted"
-            : `${side === "buy" ? "Buy" : "Sell"} ${asset.symbol} · coming soon`}
+          {halted ? "Trading halted" : (tradeReason ?? `${side === "buy" ? "Buy" : "Sell"} ${asset.symbol}`)}
         </Button>
+        <p className="text-xs text-muted">
+          The execution price is a 0x quote, not the Robinhood mid. The mid is a reference only.
+          Buy and sell stay off until a firm quote reports liquidity.
+        </p>
       </div>
     </div>
   );

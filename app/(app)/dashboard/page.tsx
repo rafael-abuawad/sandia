@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useQuery } from "convex/react";
+import { usePaginatedQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { LoginButton } from "@/components/login-button";
 import { StatusBadge } from "@/components/status-badge";
@@ -11,7 +11,11 @@ import { useSignedInWallet } from "@/lib/use-signed-in-wallet";
 
 export default function DashboardPage() {
   const { ready, isSignedIn } = useSignedInWallet();
-  const requests = useQuery(api.paymentRequests.listMine, isSignedIn ? {} : "skip");
+  const { results: requests, status, loadMore } = usePaginatedQuery(
+    api.paymentRequests.listMine,
+    isSignedIn ? {} : "skip",
+    { initialNumItems: 20 },
+  );
 
   if (!ready || !isSignedIn) {
     return (
@@ -34,9 +38,9 @@ export default function DashboardPage() {
         </Button>
       </div>
 
-      {requests === undefined && <p className="text-sm text-muted">Loading…</p>}
+      {status === "LoadingFirstPage" && <p className="text-sm text-muted">Loading…</p>}
 
-      {requests && requests.length === 0 && (
+      {status !== "LoadingFirstPage" && requests.length === 0 && (
         <div className="pr-panel pr-panel--padded space-y-3 text-center sm:text-left">
           <p className="font-medium text-foreground">No payment requests yet</p>
           <p className="text-sm text-muted">
@@ -49,7 +53,7 @@ export default function DashboardPage() {
       )}
 
       <ul className="space-y-3">
-        {requests?.map(
+        {requests.map(
           (r: {
             _id: string;
             publicId: string;
@@ -74,6 +78,11 @@ export default function DashboardPage() {
           ),
         )}
       </ul>
+      {status === "CanLoadMore" ? (
+        <Button type="button" variant="secondary" onClick={() => loadMore(20)}>
+          Load more
+        </Button>
+      ) : null}
     </div>
   );
 }

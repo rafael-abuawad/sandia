@@ -7,14 +7,14 @@ import {
   useSwitchChain,
   useWaitForTransactionReceipt,
 } from "wagmi";
-import { useAction, useMutation, useQuery } from "convex/react";
+import { useAction, usePaginatedQuery, useQuery } from "convex/react";
 import { type Hex, type Address, createPublicClient, http } from "viem";
 import { api } from "@/convex/_generated/api";
 import type { ChainOption, TokenOption } from "@/components/token-chain-select";
 import {
   fetchAcrossChains,
   fetchAcrossTokens,
-  quoteExactOutputWithFallback,
+  type AcrossSwapQuote,
 } from "@/lib/across/client";
 import { appChains, PAYER_CHAIN_IDS, isPayerTokenAllowed, displayTokenSymbol } from "@/lib/chains";
 import { initialPayFlowState, payFlowReducer } from "@/components/pay-flow/state";
@@ -65,8 +65,13 @@ async function waitForHash(hash: Hex, chainId: number) {
 
 export function usePayFlow(publicId: string) {
   const request = useQuery(api.paymentRequests.getByPublicId, { publicId });
-  const attempts = useQuery(api.paymentAttempts.listByRequest, { publicId });
-  const createAttempt = useMutation(api.paymentAttempts.createAttempt);
+  const { results: attempts } = usePaginatedQuery(
+    api.paymentAttempts.listByRequest,
+    { publicId },
+    { initialNumItems: 20 },
+  );
+  const quoteSwap = useAction(api.across.quoteSwap);
+  const submitDeposit = useAction(api.across.submitDeposit);
   const syncStatus = useAction(api.across.syncDepositStatus);
 
   const { address, chainId, isConnected } = useAccount();
@@ -192,18 +197,32 @@ export function usePayFlow(publicId: string) {
 
     dispatch({ type: "quoteStarted" });
     try {
-      const { quote: q, tradeType: tt } = await quoteExactOutputWithFallback({
-        amount: request.outputAmountBaseUnits,
-        inputToken,
-        outputToken: request.destinationTokenAddress,
-        originChainId,
-        destinationChainId: request.destinationChainId,
-        depositor: address,
-        recipient: request.recipientAddress,
-        integratorId: process.env.NEXT_PUBLIC_ACROSS_INTEGRATOR_ID,
-      });
+      let raw;
+      let tt: "exactOutput" | "minOutput" = "exactOutput";
+      try {
+        raw = await quoteSwap({
+          publicId,
+          inputToken,
+          originChainId,
+          depositor: address,
+          tradeType: "exactOutput",
+        });
+      } catch {
+        tt = "minOutput";
+        raw = await quoteSwap({
+          publicId,
+          inputToken,
+          originChainId,
+          depositor: address,
+          tradeType: "minOutput",
+        });
+      }
+      const q = raw as AcrossSwapQuote;
       if (q.quoteExpiryTimestamp && q.quoteExpiryTimestamp * 1000 < Date.now()) {
         throw new Error("Quote expired before display — try again");
+      }
+      if (q.swapTx?.simulationSuccess === false) {
+        throw new Error("Route simulation failed. Refresh the quote or pick another token.");
       }
       dispatch({ type: "quoteSucceeded", quote: q, tradeType: tt });
     } catch (e) {
@@ -212,7 +231,7 @@ export function usePayFlow(publicId: string) {
         error: e instanceof Error ? e.message : "No valid route",
       });
     }
-  }, [request, address, originChainId, inputToken]);
+  }, [request, address, originChainId, inputToken, publicId, quoteSwap]);
 
   useEffect(() => {
     if (!isConnected || !address || !request) return;
@@ -235,10 +254,17 @@ export function usePayFlow(publicId: string) {
       try {
         const result = await syncStatus({ depositTxnRef });
         if (cancelled) return;
-        if (result.acrossStatus === "filled") {
+        if (result.acrossStatus === "filled" || result.requestStatus === "completed") {
           dispatch({
             type: "paymentDone",
             message: "Payment settled on Robinhood Chain.",
+          });
+          return;
+        }
+        if (result.attemptStatus === "failed") {
+          dispatch({
+            type: "paymentFailed",
+            message: result.reason ?? "The fill did not match this request.",
           });
           return;
         }
@@ -272,28 +298,11 @@ export function usePayFlow(publicId: string) {
   }, [depositTxnRef, request, syncStatus]);
 
   useEffect(() => {
-    if (!attempts || attempts.length === 0 || depositTxnRef) return;
-    const inflight = attempts.find(
-      (a: { depositTxnRef?: string; acrossStatus: string }) =>
-        a.depositTxnRef && (a.acrossStatus === "submitted" || a.acrossStatus === "pending"),
-    );
-    if (inflight?.depositTxnRef) {
-      dispatch({
-        type: "depositTracked",
-        depositTxnRef: inflight.depositTxnRef,
-      });
+    const saved = window.sessionStorage.getItem(`sandia-deposit:${publicId}`);
+    if (saved) {
+      dispatch({ type: "depositTracked", depositTxnRef: saved });
     }
-    const filled = attempts.find(
-      (a: { depositTxnRef?: string; acrossStatus: string }) => a.acrossStatus === "filled",
-    );
-    if (filled?.depositTxnRef) {
-      dispatch({
-        type: "depositTracked",
-        depositTxnRef: filled.depositTxnRef,
-      });
-      dispatch({ type: "paymentDone" });
-    }
-  }, [attempts, depositTxnRef]);
+  }, [publicId]);
 
   const selectedToken = useMemo(
     () =>
@@ -354,7 +363,8 @@ export function usePayFlow(publicId: string) {
       dispatch({ type: "pendingTxSet", hash });
       await waitForHash(hash, swap.chainId);
 
-      await createAttempt({
+      const tracked = hash.toLowerCase();
+      await submitDeposit({
         publicId,
         payerAddress: address,
         originChainId,
@@ -364,12 +374,13 @@ export function usePayFlow(publicId: string) {
         minOutputAmount: quote.minOutputAmount ?? request.outputAmountBaseUnits,
         feesJson: JSON.stringify(quote.fees ?? {}),
         quoteId: quote.id,
-        depositTxnRef: hash,
+        depositTxnRef: tracked,
       });
+      window.sessionStorage.setItem(`sandia-deposit:${publicId}`, tracked);
 
       dispatch({
         type: "depositTracked",
-        depositTxnRef: hash.toLowerCase(),
+        depositTxnRef: tracked,
         message: "Deposit submitted. Waiting for Across fill…",
       });
     } catch (e) {
@@ -380,10 +391,15 @@ export function usePayFlow(publicId: string) {
     }
   }
 
+  const paymentInProgress = request?.status === "pending" && !depositTxnRef;
+  const simulationFailed = quote?.swapTx?.simulationSuccess === false;
+
   const canPay =
     !!request &&
-    (request.status === "open" || request.status === "pending") &&
+    request.status === "open" &&
+    !paymentInProgress &&
     !!quote?.swapTx &&
+    !simulationFailed &&
     !quoteError &&
     step !== "approving" &&
     step !== "paying" &&
@@ -405,6 +421,8 @@ export function usePayFlow(publicId: string) {
     selectedToken,
     chains,
     canPay,
+    paymentInProgress,
+    payerAddress: address,
     statusMsg,
     pendingTx,
     txSuccess,

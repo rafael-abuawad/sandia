@@ -1,7 +1,6 @@
 import {
   ArrowDownLeft,
   ArrowUpRight,
-  Handshake,
   Landmark,
   LineChart,
   type LucideIcon,
@@ -26,12 +25,6 @@ export const appNavItems: AppNavItem[] = [
     href: "/send",
     icon: ArrowUpRight,
     match: (pathname) => pathname.startsWith("/send"),
-  },
-  {
-    label: "OTC",
-    href: "/otc",
-    icon: Handshake,
-    match: (pathname) => pathname.startsWith("/otc"),
   },
   {
     label: "Lending",

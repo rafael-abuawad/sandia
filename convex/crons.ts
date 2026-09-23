@@ -4,9 +4,9 @@ import { internal } from "./_generated/api";
 const crons = cronJobs();
 
 crons.interval(
-  "expire payment requests",
+  "expire and reconcile payments",
   { minutes: 1 },
-  internal.paymentRequests.expireDueRequests,
+  internal.across.reconcilePending,
 );
 
 export default crons;

@@ -11,8 +11,7 @@ export default function HomePage() {
             Request dollars. Receive stablecoins on Robinhood Chain.
           </h1>
           <p className="pr-lede pr-animate-in pr-animate-in-delay-2">
-            Create a payment link, send funds, or settle OTC. Switch modes from the navigation to
-            get started.
+            Create a payment link or send USDG. Switch modes from the navigation to get started.
           </p>
           <div className="pr-animate-in pr-animate-in-delay-3 flex flex-wrap gap-3 pt-2">
             <Button asChild size="lg">
@@ -22,7 +21,7 @@ export default function HomePage() {
               <Link href="/send">Send USDG</Link>
             </Button>
             <Button asChild size="lg" variant="outline">
-              <Link href="/otc">View OTC</Link>
+              <Link href="/dashboard">Your requests</Link>
             </Button>
           </div>
         </div>
@@ -39,8 +38,8 @@ export default function HomePage() {
             body: "Push USDG to one recipient or a batch, with a review step before anything is sent.",
           },
           {
-            title: "OTC",
-            body: "Negotiate and settle larger transfers off the public request flow.",
+            title: "Stocks and lending",
+            body: "Stock trades and vault deposits appear only after a live quote or vault call says they are open.",
           },
         ].map((item) => (
           <div key={item.title} className="pr-feature">

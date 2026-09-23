@@ -80,6 +80,9 @@ export function buildReviewPayload(
   if (rows.length < 2) {
     throw new Error("Massive send needs at least two recipients");
   }
+  if (rows.length > 20) {
+    throw new Error("A batch can include at most 20 recipients");
+  }
 
   const recipients: ReviewRecipient[] = [];
   const seen = new Set<string>();

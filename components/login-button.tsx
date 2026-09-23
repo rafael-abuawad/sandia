@@ -1,12 +1,14 @@
 "use client";
 
-import { usePrivy } from "@privy-io/react-auth";
 import { useAccount } from "wagmi";
 import { Button } from "@/components/ui/button";
 import { shortenAddress } from "@/lib/utils";
+import { sandiaAuthMode } from "@/lib/sandia-auth";
+import { useAppAuth } from "@/lib/auth-bridge";
+import { SandiaLoginControls } from "@/components/sandia-login";
 
-export function LoginButton() {
-  const { ready, authenticated, login } = usePrivy();
+function PrivyLoginButton() {
+  const { ready, authenticated, login } = useAppAuth();
   const { address } = useAccount();
 
   if (!ready) {
@@ -38,4 +40,9 @@ export function LoginButton() {
       Sign in
     </Button>
   );
+}
+
+export function LoginButton() {
+  if (sandiaAuthMode() === "zerodev") return <SandiaLoginControls />;
+  return <PrivyLoginButton />;
 }

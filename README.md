@@ -48,14 +48,18 @@ Open [http://localhost:3000](http://localhost:3000).
 ## Product flow
 
 1. Creator signs in with a wallet (MetaMask, Rabby, etc.), Google, or email. Email/Google users get an embedded wallet automatically.
-2. Create a request: USD amount, recipient, destination stablecoin (API-driven from Across on Robinhood Chain — currently **USDG**), optional description/expiry.
+2. Create a request: USD amount, optional description and expiry. The recipient is the creator's confirmed wallet, or their Sandia Kernel once that account is linked. The destination token is USDG on Robinhood Chain.
 3. Share the public `/pay/{id}` URL.
 4. Payer signs in, selects an Across-supported source chain/token, reviews quote (input, fees, min received, ETA), approves if needed, and pays.
-5. The request is marked **completed** only after Across reports `filled` and server-side checks pass (destination chain, token, recipient, amount).
+5. The request is marked **completed** only after a deposit receipt matches the request and Across `/deposit` reports `filled` with destination chain 4663, the request token, the snapshotted recipient, an output amount at least as large as the request, and a fill transaction. `/deposit/status` is not used as proof. A minute cron keeps checking if the payer closes the tab.
 
 ## Notes
 
 - Monetary values are stored as integer base units / USD micros — no floating-point arithmetic.
 - Destination tokens are discovered live from `GET /swap/tokens?chainId=4663` filtered to `USDC|USDT|USDG`.
-- Deposit status is polled every 10 seconds via Across `GET /deposit/status`.
-- Register an Across integrator id before production and set `NEXT_PUBLIC_ACROSS_INTEGRATOR_ID`.
+- The payer's browser also polls every 10 seconds. The server calls Across `GET /deposit` (or `/deposits`) with `ACROSS_API_KEY` on Convex, not a public env var.
+- Register an Across integrator id and set Convex `ACROSS_INTEGRATOR_ID`.
+- `/otc` redirects to `/requests/new`.
+- `NEXT_PUBLIC_SANDIA_AUTH=zerodev` switches the app to one wagmi config with a ZeroDev Kernel (`mode: 4337`) and ConnectKit. Leave it unset to keep Privy. Do not remove Privy in that same release.
+- ConnectKit 1.9.2 does not peer React 19. Guest pay through its modal stays off until a smoke test opens the modal, connects an injected wallet, switches chain, and disconnects.
+- Stock trading stays unavailable until a 0x quote for a real RHJ token returns `liquidityAvailable: true`. Vault deposits stay unavailable while `maxDeposit` is 0. See `docs/gates.md`.

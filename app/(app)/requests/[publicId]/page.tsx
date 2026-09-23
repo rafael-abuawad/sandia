@@ -2,7 +2,7 @@
 
 import { use, useEffect, useId, useState } from "react";
 import Link from "next/link";
-import { useMutation, useQuery } from "convex/react";
+import { useMutation, usePaginatedQuery, useQuery } from "convex/react";
 import { Check, Copy } from "lucide-react";
 import { PaymentQr } from "@/components/payment-qr";
 import { LoginButton } from "@/components/login-button";
@@ -21,12 +21,16 @@ import { formatTokenAmount, formatUsdFromMicros } from "@/lib/money";
 
 export default function RequestDetailPage({ params }: { params: Promise<{ publicId: string }> }) {
   const { publicId } = use(params);
-  const { isSignedIn } = useSignedInWallet();
+  const { ready, isSignedIn } = useSignedInWallet();
   const request = useQuery(
     api.paymentRequests.getMineByPublicId,
     isSignedIn ? { publicId } : "skip",
   );
-  const attempts = useQuery(api.paymentAttempts.listByRequest, { publicId });
+  const { results: attempts } = usePaginatedQuery(
+    api.paymentAttempts.listByRequest,
+    { publicId },
+    { initialNumItems: 20 },
+  );
   const cancel = useMutation(api.paymentRequests.cancel);
   const errorId = useId();
   const [busy, setBusy] = useState(false);
@@ -39,6 +43,10 @@ export default function RequestDetailPage({ params }: { params: Promise<{ public
   useEffect(() => {
     setPayUrl(`${window.location.origin}${payPath}`);
   }, [payPath]);
+
+  if (!ready) {
+    return <p className="text-sm text-muted">Loading…</p>;
+  }
 
   if (!isSignedIn) {
     return (
@@ -81,9 +89,13 @@ export default function RequestDetailPage({ params }: { params: Promise<{ public
   }
 
   async function copyLink() {
-    await navigator.clipboard.writeText(payUrl);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1500);
+    try {
+      await navigator.clipboard.writeText(payUrl);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      setError("Could not copy the link. Select it and copy it manually.");
+    }
   }
 
   const expiresLabel =
@@ -123,6 +135,10 @@ export default function RequestDetailPage({ params }: { params: Promise<{ public
               <dd className="text-right text-foreground">{expiresLabel}</dd>
             </div>
           ) : null}
+          <div className="flex justify-between gap-4">
+            <dt className="text-muted">Paid to</dt>
+            <dd className="pr-mono text-right text-foreground">{request.recipientAddress}</dd>
+          </div>
         </dl>
       )}
 
@@ -197,7 +213,12 @@ export default function RequestDetailPage({ params }: { params: Promise<{ public
         <FieldError id={errorId} message={error} />
       </div>
 
-      {attempts && attempts.length > 0 && (
+      <p className="text-xs text-muted">
+        Settlement is checked on the server about once a minute. This page does not mark the
+        request paid by itself. The address above is the one saved when the request was created.
+      </p>
+
+      {attempts.length > 0 && (
         <div className="space-y-2">
           <h2 className="pr-section-title">Payment attempts</h2>
           <ul className="space-y-2">

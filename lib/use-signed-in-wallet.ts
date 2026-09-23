@@ -1,17 +1,19 @@
 "use client";
 
-import { usePrivy } from "@privy-io/react-auth";
 import { useAccount } from "wagmi";
+import { useAppAuth } from "@/lib/auth-bridge";
 
-/** Privy session plus the active wagmi wallet used for payments. */
+/** Session plus the active wagmi wallet used for payments. */
 export function useSignedInWallet() {
-  const { ready, authenticated } = usePrivy();
-  const { address, isConnected } = useAccount();
+  const { ready, authenticated } = useAppAuth();
+  const { address, isConnected, chainId, connector } = useAccount();
 
   return {
     ready,
     authenticated,
     address,
+    chainId,
+    connectorId: connector?.id,
     isConnected,
     isSignedIn: Boolean(ready && authenticated && address),
   };

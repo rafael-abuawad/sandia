@@ -4,18 +4,29 @@ import { AuthConfig } from "convex/server";
 // Distinct from NEXT_PUBLIC_PRIVY_APP_ID, which the Next.js client reads.
 const privyAppId = process.env.PRIVY_APP_ID ?? "";
 
-// Privy access tokens use the bare string `privy.io` as the `iss` claim and
-// publish JWKS at a non-standard path, so we use Convex's customJwt provider.
-const authConfig: AuthConfig = {
-  providers: [
-    {
-      type: "customJwt",
-      issuer: "privy.io",
-      jwks: `https://auth.privy.io/api/v1/apps/${privyAppId}/jwks.json`,
-      algorithm: "ES256",
-      applicationID: privyAppId,
-    },
-  ],
-};
+const providers: AuthConfig["providers"] = [
+  {
+    type: "customJwt",
+    issuer: "privy.io",
+    jwks: `https://auth.privy.io/api/v1/apps/${privyAppId}/jwks.json`,
+    algorithm: "ES256",
+    applicationID: privyAppId,
+  },
+];
+
+const sandiaIssuer = process.env.SANDIA_JWT_ISS;
+const sandiaJwks = process.env.SANDIA_JWKS_URL;
+const sandiaAud = process.env.SANDIA_JWT_AUD;
+if (sandiaIssuer && sandiaJwks && sandiaAud) {
+  providers.push({
+    type: "customJwt",
+    issuer: sandiaIssuer,
+    jwks: sandiaJwks,
+    algorithm: "RS256",
+    applicationID: sandiaAud,
+  });
+}
+
+const authConfig: AuthConfig = { providers };
 
 export default authConfig;

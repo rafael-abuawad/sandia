@@ -1,6 +1,8 @@
-import { mutation, query, internalMutation } from "./_generated/server";
+import { mutation, query, internalMutation, internalQuery } from "./_generated/server";
+import { paginationOptsValidator } from "convex/server";
 import { v } from "convex/values";
-import { getCurrentUser, getCurrentUserOrNull } from "./lib/auth";
+import { getCurrentUser, getCurrentUserOrNull, payoutAddress } from "./lib/auth";
+import { paymentRequestStatus } from "./schema";
 
 const ROBINHOOD_CHAIN_ID = 4663;
 const ALLOWED_DEST_SYMBOLS = new Set(["USDC", "USDT", "USDG"]);
@@ -63,6 +65,7 @@ export const create = mutation({
   handler: async (ctx, args) => {
     const user = await getCurrentUser(ctx);
     const creatorAddress = normalizeAddress(user.address);
+    const recipientAddress = normalizeAddress(payoutAddress(user));
 
     const symbol = args.destinationTokenSymbol.toUpperCase();
     if (!ALLOWED_DEST_SYMBOLS.has(symbol)) {
@@ -78,7 +81,6 @@ export const create = mutation({
       throw new Error("Expiration must be in the future");
     }
 
-    const recipientAddress = creatorAddress;
     const destinationTokenAddress = normalizeAddress(args.destinationTokenAddress);
     const outputAmountBaseUnits = usdMicrosToTokenBaseUnits(
       args.amountUsdMicros,
@@ -116,42 +118,80 @@ export const create = mutation({
   },
 });
 
+const paymentRequestValidator = v.object({
+  _id: v.id("paymentRequests"),
+  _creationTime: v.number(),
+  publicId: v.string(),
+  creatorId: v.id("users"),
+  creatorAddress: v.string(),
+  amountUsdMicros: v.number(),
+  recipientAddress: v.string(),
+  destinationChainId: v.number(),
+  destinationTokenSymbol: v.string(),
+  destinationTokenAddress: v.string(),
+  destinationTokenDecimals: v.number(),
+  outputAmountBaseUnits: v.string(),
+  description: v.optional(v.string()),
+  expiresAt: v.optional(v.number()),
+  status: paymentRequestStatus,
+  createdAt: v.number(),
+  updatedAt: v.number(),
+});
+
 export const listMine = query({
-  args: {},
-  handler: async (ctx) => {
+  args: { paginationOpts: paginationOptsValidator },
+  returns: v.object({
+    page: v.array(paymentRequestValidator),
+    isDone: v.boolean(),
+    continueCursor: v.string(),
+    splitCursor: v.optional(v.union(v.string(), v.null())),
+    pageStatus: v.optional(v.union(v.string(), v.null())),
+  }),
+  handler: async (ctx, args) => {
     const user = await getCurrentUserOrNull(ctx);
-    if (!user) return [];
+    if (!user) {
+      return {
+        page: [],
+        isDone: true,
+        continueCursor: "",
+        splitCursor: null,
+        pageStatus: null,
+      };
+    }
     return await ctx.db
       .query("paymentRequests")
       .withIndex("by_creator", (q) => q.eq("creatorId", user._id))
       .order("desc")
-      .collect();
+      .paginate(args.paginationOpts);
   },
 });
 
 export const getByPublicId = query({
   args: { publicId: v.string() },
+  returns: v.union(paymentRequestValidator, v.null()),
   handler: async (ctx, args) => {
-    const request = await ctx.db
+    // Expiry is written by the cron. This query stays deterministic.
+    return await ctx.db
       .query("paymentRequests")
       .withIndex("by_publicId", (q) => q.eq("publicId", args.publicId))
       .unique();
-    if (!request) return null;
+  },
+});
 
-    if (
-      request.status === "open" &&
-      request.expiresAt !== undefined &&
-      request.expiresAt <= Date.now()
-    ) {
-      return { ...request, status: "expired" as const };
-    }
-
-    return request;
+export const getInternalByPublicId = internalQuery({
+  args: { publicId: v.string() },
+  returns: v.union(paymentRequestValidator, v.null()),
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("paymentRequests")
+      .withIndex("by_publicId", (q) => q.eq("publicId", args.publicId))
+      .unique();
   },
 });
 
 export const getMineByPublicId = query({
   args: { publicId: v.string() },
+  returns: v.union(paymentRequestValidator, v.null()),
   handler: async (ctx, args) => {
     const user = await getCurrentUserOrNull(ctx);
     if (!user) return null;
@@ -166,6 +206,7 @@ export const getMineByPublicId = query({
 
 export const cancel = mutation({
   args: { publicId: v.string() },
+  returns: v.object({ ok: v.literal(true) }),
   handler: async (ctx, args) => {
     const user = await getCurrentUser(ctx);
     const request = await ctx.db
@@ -182,26 +223,27 @@ export const cancel = mutation({
       updatedAt: Date.now(),
     });
     console.log("Cancelled payment request", { publicId: args.publicId, userId: user._id });
-    return { ok: true };
+    return { ok: true as const };
   },
 });
 
 export const expireDueRequests = internalMutation({
   args: {},
+  returns: v.object({ expired: v.number() }),
   handler: async (ctx) => {
     const now = Date.now();
-    const open = await ctx.db
+    const due = await ctx.db
       .query("paymentRequests")
-      .withIndex("by_status", (q) => q.eq("status", "open"))
-      .collect();
+      .withIndex("by_status_and_expiresAt", (q) => q.eq("status", "open").lte("expiresAt", now))
+      .take(100);
 
-    let expired = 0;
-    const due = open.filter((req) => req.expiresAt !== undefined && req.expiresAt <= now);
     await Promise.all(
       due.map((req) => ctx.db.patch(req._id, { status: "expired", updatedAt: now })),
     );
-    expired = due.length;
-    return { expired };
+    if (due.length > 0) {
+      console.log("payment_requests_expired", { count: due.length });
+    }
+    return { expired: due.length };
   },
 });
 
