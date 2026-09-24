@@ -117,19 +117,28 @@ export const listForReconciliation = internalQuery({
   ),
   handler: async (ctx, args) => {
     const limit = Math.min(Math.max(args.limit, 1), 25);
-    const submitted = await ctx.db
-      .query("paymentAttempts")
-      .withIndex("by_acrossStatus", (q) => q.eq("acrossStatus", "submitted"))
-      .take(limit);
-    const pending = await ctx.db
-      .query("paymentAttempts")
-      .withIndex("by_acrossStatus", (q) => q.eq("acrossStatus", "pending"))
-      .take(limit);
+    const [submitted, pending] = await Promise.all([
+      ctx.db
+        .query("paymentAttempts")
+        .withIndex("by_acrossStatus", (q) => q.eq("acrossStatus", "submitted"))
+        .take(limit),
+      ctx.db
+        .query("paymentAttempts")
+        .withIndex("by_acrossStatus", (q) => q.eq("acrossStatus", "pending"))
+        .take(limit),
+    ]);
+
+    const candidates = [...submitted, ...pending]
+      .slice(0, limit)
+      .filter((attempt): attempt is typeof attempt & { depositTxnRef: string } =>
+        Boolean(attempt.depositTxnRef),
+      );
+    const requests = await Promise.all(candidates.map((attempt) => ctx.db.get(attempt.requestId)));
 
     const rows = [];
-    for (const attempt of [...submitted, ...pending].slice(0, limit)) {
-      if (!attempt.depositTxnRef) continue;
-      const request = await ctx.db.get(attempt.requestId);
+    for (let i = 0; i < candidates.length; i++) {
+      const attempt = candidates[i];
+      const request = requests[i];
       if (!request) continue;
       const kind = attempt.settlementKind ?? "across";
       rows.push({
@@ -178,11 +187,7 @@ export const acceptVerifiedDeposit = internalMutation({
     if (!request) throw new Error("Payment request not found");
 
     const now = Date.now();
-    if (
-      request.status === "open" &&
-      request.expiresAt !== undefined &&
-      request.expiresAt <= now
-    ) {
+    if (request.status === "open" && request.expiresAt !== undefined && request.expiresAt <= now) {
       await ctx.db.patch(request._id, { status: "expired", updatedAt: now });
       console.log("payment_request_expired", { publicId: request.publicId });
       return { expired: true, duplicate: false };
@@ -193,15 +198,16 @@ export const acceptVerifiedDeposit = internalMutation({
       throw new Error("Invalid deposit transaction hash");
     }
 
-    const existing = await ctx.db
-      .query("paymentAttempts")
-      .withIndex("by_depositTxnRef", (q) => q.eq("depositTxnRef", depositTxnRef))
-      .unique();
-
-    const prior = await ctx.db
-      .query("paymentAttempts")
-      .withIndex("by_request", (q) => q.eq("requestId", request._id))
-      .take(9);
+    const [existing, prior] = await Promise.all([
+      ctx.db
+        .query("paymentAttempts")
+        .withIndex("by_depositTxnRef", (q) => q.eq("depositTxnRef", depositTxnRef))
+        .unique(),
+      ctx.db
+        .query("paymentAttempts")
+        .withIndex("by_request", (q) => q.eq("requestId", request._id))
+        .take(9),
+    ]);
 
     const decision = decideAttemptAcceptance({
       requestStatus: request.status,
@@ -364,8 +370,7 @@ export const applyAcrossStatus = internalMutation({
         fillTxnRef: args.fillTxnRef?.toLowerCase(),
         updatedAt: now,
       });
-      const requestStatus =
-        (await reopenAfterTerminalAttempt(ctx, request._id)) ?? request.status;
+      const requestStatus = (await reopenAfterTerminalAttempt(ctx, request._id)) ?? request.status;
       console.log("payment_attempt_terminal", {
         publicId: request.publicId,
         depositTxnRef,

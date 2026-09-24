@@ -9,7 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { TokenChainChip } from "@/components/token-chain-select";
-import { AmountCompose, isAmountEntered } from "@/components/amount-compose";
+import { AmountCompose } from "@/components/amount-compose";
+import { isAmountEntered } from "@/lib/amount-entered";
 import { AddressBookButton, ContactPicker } from "@/components/address-book/contact-picker";
 import { ROBINHOOD_USDG } from "@/lib/destination";
 import { cn } from "@/lib/utils";
@@ -44,7 +45,7 @@ export function SendComposeForm({
   const firstRowRef = useRef<HTMLInputElement>(null);
   const errorId = useId();
   const [bookOpen, setBookOpen] = useState(false);
-  const [bookRowId, setBookRowId] = useState<string | null>(null);
+  const bookRowIdRef = useRef<string | null>(null);
   const [bookDraft, setBookDraft] = useState("");
   const [bookStartOnSave, setBookStartOnSave] = useState(false);
 
@@ -59,14 +60,14 @@ export function SendComposeForm({
 
   function openBook(draft: string, rowId: string | null = null, startOnSave = false) {
     setBookDraft(draft);
-    setBookRowId(rowId);
+    bookRowIdRef.current = rowId;
     setBookStartOnSave(startOnSave);
     setBookOpen(true);
   }
 
   function onPickAddress(address: string) {
-    if (bookRowId) {
-      dispatch({ type: "updateRow", id: bookRowId, patch: { address } });
+    if (bookRowIdRef.current) {
+      dispatch({ type: "updateRow", id: bookRowIdRef.current, patch: { address } });
       return;
     }
     dispatch({ type: "setSingleAddress", address });
@@ -207,9 +208,7 @@ export function SendComposeForm({
                         <InputGroupAddon>
                           <AddressBookButton
                             address={row.address}
-                            onClick={(intent) =>
-                              openBook(row.address, row.id, intent === "save")
-                            }
+                            onClick={(intent) => openBook(row.address, row.id, intent === "save")}
                             label={`Address book for recipient ${index + 1}`}
                           />
                         </InputGroupAddon>

@@ -8,6 +8,7 @@ import { PaymentQr } from "@/components/payment-qr";
 import { LoginButton } from "@/components/login-button";
 import { useSignedInWallet } from "@/lib/use-signed-in-wallet";
 import { api } from "@/convex/_generated/api";
+import type { Doc } from "@/convex/_generated/dataModel";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { FieldError } from "@/components/ui/field-error";
@@ -17,10 +18,15 @@ import {
   InputGroupButton,
   InputGroupInput,
 } from "@/components/ui/input-group";
+import { formatDisplayDateTime } from "@/lib/format-datetime";
 import { formatTokenAmount, formatUsdFromMicros } from "@/lib/money";
 
 export default function RequestDetailPage({ params }: { params: Promise<{ publicId: string }> }) {
   const { publicId } = use(params);
+  return <RequestDetail publicId={publicId} />;
+}
+
+function RequestDetail({ publicId }: { publicId: string }) {
   const { ready, isSignedIn } = useSignedInWallet();
   const request = useQuery(
     api.paymentRequests.getMineByPublicId,
@@ -31,6 +37,58 @@ export default function RequestDetailPage({ params }: { params: Promise<{ public
     { publicId },
     { initialNumItems: 20 },
   );
+
+  if (!ready) {
+    return <p className="text-sm text-muted">Loading…</p>;
+  }
+
+  if (!isSignedIn) {
+    return <RequestSignedOut />;
+  }
+
+  if (request === undefined) {
+    return <p className="text-sm text-muted">Loading…</p>;
+  }
+
+  if (request === null) {
+    return <RequestMissing />;
+  }
+
+  return <RequestDetailLoaded publicId={publicId} request={request} attempts={attempts} />;
+}
+
+function RequestSignedOut() {
+  return (
+    <div className="pr-page pr-page--narrow text-center">
+      <h1 className="pr-display text-2xl">Payment request</h1>
+      <p className="text-sm text-muted">Sign in with the creator account to manage this request.</p>
+      <div className="flex justify-center">
+        <LoginButton />
+      </div>
+    </div>
+  );
+}
+
+function RequestMissing() {
+  return (
+    <div className="pr-page pr-page--narrow">
+      <h1 className="pr-display text-2xl">Request not found</h1>
+      <p className="text-sm text-danger">This request is not available for this account.</p>
+    </div>
+  );
+}
+
+type AttemptRow = { _id: string; depositTxnRef?: string; acrossStatus: string };
+
+function RequestDetailLoaded({
+  publicId,
+  request,
+  attempts,
+}: {
+  publicId: string;
+  request: Doc<"paymentRequests">;
+  attempts: AttemptRow[];
+}) {
   const cancel = useMutation(api.paymentRequests.cancel);
   const errorId = useId();
   const [busy, setBusy] = useState(false);
@@ -39,41 +97,11 @@ export default function RequestDetailPage({ params }: { params: Promise<{ public
   const [copied, setCopied] = useState(false);
   const [payUrl, setPayUrl] = useState(`/pay/${publicId}`);
   const payPath = `/pay/${publicId}`;
+  const expiresLabel = request.expiresAt != null ? formatDisplayDateTime(request.expiresAt) : null;
 
   useEffect(() => {
     setPayUrl(`${window.location.origin}${payPath}`);
   }, [payPath]);
-
-  if (!ready) {
-    return <p className="text-sm text-muted">Loading…</p>;
-  }
-
-  if (!isSignedIn) {
-    return (
-      <div className="pr-page pr-page--narrow text-center">
-        <h1 className="pr-display text-2xl">Payment request</h1>
-        <p className="text-sm text-muted">
-          Sign in with the creator account to manage this request.
-        </p>
-        <div className="flex justify-center">
-          <LoginButton />
-        </div>
-      </div>
-    );
-  }
-
-  if (request === undefined) {
-    return <p className="text-sm text-muted">Loading…</p>;
-  }
-
-  if (request === null) {
-    return (
-      <div className="pr-page pr-page--narrow">
-        <h1 className="pr-display text-2xl">Request not found</h1>
-        <p className="text-sm text-danger">This request is not available for this account.</p>
-      </div>
-    );
-  }
 
   async function onCancel() {
     setBusy(true);
@@ -97,14 +125,6 @@ export default function RequestDetailPage({ params }: { params: Promise<{ public
       setError("Could not copy the link. Select it and copy it manually.");
     }
   }
-
-  const expiresLabel =
-    request.expiresAt != null
-      ? new Date(request.expiresAt).toLocaleString(undefined, {
-          dateStyle: "medium",
-          timeStyle: "short",
-        })
-      : null;
 
   return (
     <div className="pr-page pr-page--measure">
@@ -214,15 +234,15 @@ export default function RequestDetailPage({ params }: { params: Promise<{ public
       </div>
 
       <p className="text-xs text-muted">
-        Settlement is checked on the server about once a minute. This page does not mark the
-        request paid by itself. The address above is the one saved when the request was created.
+        Settlement is checked on the server about once a minute. This page does not mark the request
+        paid by itself. The address above is the one saved when the request was created.
       </p>
 
       {attempts.length > 0 && (
         <div className="space-y-2">
           <h2 className="pr-section-title">Payment attempts</h2>
           <ul className="space-y-2">
-            {attempts.map((a: { _id: string; depositTxnRef?: string; acrossStatus: string }) => (
+            {attempts.map((a) => (
               <li
                 key={a._id}
                 className="pr-inset flex items-center justify-between gap-3 px-3 py-2 text-xs text-muted"

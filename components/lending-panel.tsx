@@ -13,7 +13,8 @@ import { formatTokenAmount, formatTokenAmountGrouped } from "@/lib/money";
 import { TokenChainChip } from "@/components/token-chain-select";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { AmountCompose, isAmountEntered } from "@/components/amount-compose";
+import { AmountCompose } from "@/components/amount-compose";
+import { isAmountEntered } from "@/lib/amount-entered";
 
 const VAULT = {
   name: "Steakhouse USDG",
@@ -21,6 +22,14 @@ const VAULT = {
   description:
     "Lend USDG on Robinhood Chain through the Steakhouse Morpho vault. The curator is not a custodian, and liquidity can delay an exit.",
 } as const;
+
+type VaultStats = {
+  totalAssets?: string;
+  maxDeposit?: string;
+  shares?: string;
+  assets?: string;
+  assetIsUsdg: boolean;
+};
 
 function formatUsdFromAmount(amount: string): string {
   const n = Number.parseFloat(amount.replace(/,/g, ""));
@@ -38,18 +47,10 @@ function formatBaseUnits(value: string | undefined, decimals: number): string {
   return formatTokenAmountGrouped(value, decimals);
 }
 
-export function LendingPanel() {
-  const { address, isSignedIn } = useSignedInWallet();
+function useVaultPosition(address: string | undefined) {
   const readVault = useAction(api.vault.readPosition);
-  const [amount, setAmount] = useState("");
   const [vaultError, setVaultError] = useState<string | null>(null);
-  const [vaultStats, setVaultStats] = useState<{
-    totalAssets?: string;
-    maxDeposit?: string;
-    shares?: string;
-    assets?: string;
-    assetIsUsdg: boolean;
-  } | null>(null);
+  const [vaultStats, setVaultStats] = useState<VaultStats | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -73,6 +74,14 @@ export function LendingPanel() {
       cancelled = true;
     };
   }, [address, readVault]);
+
+  return { vaultError, vaultStats };
+}
+
+export function LendingPanel() {
+  const { address, isSignedIn } = useSignedInWallet();
+  const { vaultError, vaultStats } = useVaultPosition(address);
+  const [amount, setAmount] = useState("");
 
   const depositGate = vaultStats
     ? vaultDepositGate({
@@ -108,8 +117,6 @@ export function LendingPanel() {
     setAmount(balanceExact);
   }
 
-  const hasAmount = isAmountEntered(amount);
-
   return (
     <div className="pr-page">
       <div className="space-y-2">
@@ -122,26 +129,7 @@ export function LendingPanel() {
         <p className="text-sm leading-relaxed text-muted">{VAULT.description}</p>
       </div>
 
-      <dl className="grid grid-cols-1 gap-4 border-y border-border py-4 sm:grid-cols-3 sm:gap-3">
-        <div className="flex items-baseline justify-between gap-3 sm:block sm:space-y-1">
-          <dt className="pr-kicker">Deposits</dt>
-          <dd className="pr-mono text-sm font-semibold text-foreground">
-            {vaultError ? "Unavailable" : `${formatBaseUnits(vaultStats?.totalAssets, 6)} USDG`}
-          </dd>
-        </div>
-        <div className="flex items-baseline justify-between gap-3 sm:block sm:space-y-1">
-          <dt className="pr-kicker">Your shares</dt>
-          <dd className="pr-mono text-sm font-semibold text-foreground">
-            {formatBaseUnits(vaultStats?.shares, 18)}
-          </dd>
-        </div>
-        <div className="flex items-baseline justify-between gap-3 sm:block sm:space-y-1">
-          <dt className="pr-kicker">maxDeposit</dt>
-          <dd className="pr-mono text-sm font-semibold text-foreground">
-            {formatBaseUnits(vaultStats?.maxDeposit, 6)}
-          </dd>
-        </div>
-      </dl>
+      <LendingStats vaultError={vaultError} vaultStats={vaultStats} />
 
       <form
         className="space-y-3"
@@ -156,42 +144,17 @@ export function LendingPanel() {
           value={amount}
           onChange={setAmount}
           footer={
-            !isSignedIn ? (
-              <div className="flex flex-col items-stretch gap-3">
-                <p className="text-sm text-muted">Sign in to deposit into the vault.</p>
-                <LoginButton />
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <Button type="submit" className="w-full" size="lg" disabled>
-                  {depositGate.depositEnabled
-                    ? hasAmount
-                      ? "Deposit"
-                      : "Enter an amount"
-                    : "Deposit unavailable"}
-                </Button>
-                <p className="text-center text-xs text-muted">
-                  {vaultError ??
-                    depositGate.reason ??
-                    "Deposit stays disabled until maxDeposit is above zero."}{" "}
-                  Withdraw and redeem stay closed until a Sandia account receipt can be checked.
-                </p>
-                <p className="text-center text-xs text-muted">
-                  <a
-                    className="underline underline-offset-2"
-                    href="https://www.steakhouse.financial/docs/documents/disclaimers/vaults"
-                  >
-                    Vault disclaimers
-                  </a>
-                </p>
-              </div>
-            )
+            <LendingDepositFooter
+              isSignedIn={isSignedIn}
+              depositEnabled={depositGate.depositEnabled}
+              hasAmount={isAmountEntered(amount)}
+              vaultError={vaultError}
+              depositReason={depositGate.reason}
+            />
           }
         >
           <div className="flex items-center justify-between gap-2 text-xs text-muted">
-            <p>
-              ≈ {formatUsdFromAmount(amount)}
-            </p>
+            <p>≈ {formatUsdFromAmount(amount)}</p>
             <Button
               type="button"
               variant="ghost"
@@ -202,16 +165,11 @@ export function LendingPanel() {
               Max
             </Button>
           </div>
-          <p className="pr-mono text-xs text-muted">
-            Available:{" "}
-            {!isSignedIn
-              ? "—"
-              : balanceLoading
-                ? "…"
-                : balanceDisplay
-                  ? `${balanceDisplay} ${ROBINHOOD_USDG.symbol}`
-                  : `0 ${ROBINHOOD_USDG.symbol}`}
-          </p>
+          <AvailableBalance
+            isSignedIn={isSignedIn}
+            balanceLoading={balanceLoading}
+            balanceDisplay={balanceDisplay}
+          />
           <div className="space-y-2">
             <Label>Vault</Label>
             <TokenChainChip
@@ -226,4 +184,104 @@ export function LendingPanel() {
       </form>
     </div>
   );
+}
+
+function LendingStats({
+  vaultError,
+  vaultStats,
+}: {
+  vaultError: string | null;
+  vaultStats: VaultStats | null;
+}) {
+  return (
+    <dl className="grid grid-cols-1 gap-4 border-y border-border py-4 sm:grid-cols-3 sm:gap-3">
+      <div className="flex items-baseline justify-between gap-3 sm:block sm:space-y-1">
+        <dt className="pr-kicker">Deposits</dt>
+        <dd className="pr-mono text-sm font-semibold text-foreground">
+          {vaultError ? "Unavailable" : `${formatBaseUnits(vaultStats?.totalAssets, 6)} USDG`}
+        </dd>
+      </div>
+      <div className="flex items-baseline justify-between gap-3 sm:block sm:space-y-1">
+        <dt className="pr-kicker">Your shares</dt>
+        <dd className="pr-mono text-sm font-semibold text-foreground">
+          {formatBaseUnits(vaultStats?.shares, 18)}
+        </dd>
+      </div>
+      <div className="flex items-baseline justify-between gap-3 sm:block sm:space-y-1">
+        <dt className="pr-kicker">maxDeposit</dt>
+        <dd className="pr-mono text-sm font-semibold text-foreground">
+          {formatBaseUnits(vaultStats?.maxDeposit, 6)}
+        </dd>
+      </div>
+    </dl>
+  );
+}
+
+function LendingDepositFooter({
+  isSignedIn,
+  depositEnabled,
+  hasAmount,
+  vaultError,
+  depositReason,
+}: {
+  isSignedIn: boolean;
+  depositEnabled: boolean;
+  hasAmount: boolean;
+  vaultError: string | null;
+  depositReason?: string;
+}) {
+  if (!isSignedIn) {
+    return (
+      <div className="flex flex-col items-stretch gap-3">
+        <p className="text-sm text-muted">Sign in to deposit into the vault.</p>
+        <LoginButton />
+      </div>
+    );
+  }
+
+  const actionLabel = depositEnabled
+    ? hasAmount
+      ? "Deposit"
+      : "Enter an amount"
+    : "Deposit unavailable";
+
+  return (
+    <div className="space-y-2">
+      <Button type="submit" className="w-full" size="lg" disabled>
+        {actionLabel}
+      </Button>
+      <p className="text-center text-xs text-muted">
+        {vaultError ?? depositReason ?? "Deposit stays disabled until maxDeposit is above zero."}{" "}
+        Withdraw and redeem stay closed until a Sandia account receipt can be checked.
+      </p>
+      <p className="text-center text-xs text-muted">
+        <a
+          className="underline underline-offset-2"
+          href="https://www.steakhouse.financial/docs/documents/disclaimers/vaults"
+        >
+          Vault disclaimers
+        </a>
+      </p>
+    </div>
+  );
+}
+
+function AvailableBalance({
+  isSignedIn,
+  balanceLoading,
+  balanceDisplay,
+}: {
+  isSignedIn: boolean;
+  balanceLoading: boolean;
+  balanceDisplay: string | null;
+}) {
+  const label = !isSignedIn
+    ? "—"
+    : balanceLoading
+      ? "…"
+      : balanceDisplay
+        ? `${balanceDisplay} ${ROBINHOOD_USDG.symbol}`
+        : `0 ${ROBINHOOD_USDG.symbol}`;
+
+  return <p className="pr-mono text-xs text-muted">Available: {label}</p>;
 }

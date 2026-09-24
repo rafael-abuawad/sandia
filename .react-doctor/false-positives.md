@@ -19,3 +19,16 @@ component is added; editing `_generated` is incorrect.
 Across `approvalTxns` must run **in order**: each approval changes wallet nonce and
 token allowance that the next tx depends on. `Promise.all` would race and break payment.
 Sequential `await` here is required correctness, not a missed optimization.
+
+## react-doctor/async-await-in-loop · `components/send-form.tsx`
+
+USDG batch transfers must run **in order**: each `writeContractAsync` consumes the
+wallet nonce and the next popup/receipt depends on the previous hash confirming.
+`Promise.all` would race nonces and ask the wallet to sign overlapping transfers.
+
+## react-doctor/async-await-in-loop · `convex/outboundActions.ts`
+
+`reconcile` walks submitted sends one at a time on purpose. Each row hits Robinhood
+RPC for receipts, then writes a Convex mutation. Parallelizing the loop would stampede
+the RPC and race mark-result writes without a concurrency budget. Sequential `await`
+is a resource cap, not a missed optimization.

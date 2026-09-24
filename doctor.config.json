@@ -10,6 +10,14 @@
       {
         "files": ["components/pay-flow/use-pay-flow.ts"],
         "rules": ["react-doctor/async-await-in-loop"]
+      },
+      {
+        "files": ["components/send-form.tsx"],
+        "rules": ["react-doctor/async-await-in-loop"]
+      },
+      {
+        "files": ["convex/outboundActions.ts"],
+        "rules": ["react-doctor/async-await-in-loop"]
       }
     ]
   }

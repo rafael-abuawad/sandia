@@ -5,6 +5,15 @@ import { v } from "convex/values";
 
 const ZEROX = "https://api.0x.org/swap/allowance-holder/price";
 
+type ZeroXPriceBody = {
+  liquidityAvailable?: boolean;
+  buyAmount?: string;
+  minBuyAmount?: string;
+  name?: string;
+  message?: string;
+  code?: string;
+};
+
 export const probeQuote = action({
   args: {
     sellToken: v.string(),
@@ -44,19 +53,14 @@ export const probeQuote = action({
       },
       signal: AbortSignal.timeout(8_000),
     });
-    const body = (await res.json().catch(() => ({}))) as {
-      liquidityAvailable?: boolean;
-      buyAmount?: string;
-      minBuyAmount?: string;
-      name?: string;
-      message?: string;
-      code?: string;
-    };
     if (!res.ok) {
-      const reason = body.name || body.code || body.message || `0x quote failed (${res.status})`;
+      const errorBody = (await res.json().catch(() => ({}))) as ZeroXPriceBody;
+      const reason =
+        errorBody.name || errorBody.code || errorBody.message || `0x quote failed (${res.status})`;
       console.error("zerox_quote_unauthorized", { status: res.status, reason });
       return { ok: false, status: res.status, reason };
     }
+    const body = (await res.json().catch(() => ({}))) as ZeroXPriceBody;
     if (body.liquidityAvailable !== true) {
       return {
         ok: false,

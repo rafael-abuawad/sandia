@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { FieldError } from "@/components/ui/field-error";
 import { formatUsdFromMicros } from "@/lib/money";
 import { truncateAddress } from "@/components/send-form/helpers";
+import { SendSummaryDetails } from "@/components/send-form/summary-details";
 import type { ReviewPayload } from "@/components/send-form/state";
 
 export function SendReviewPanel({
@@ -35,22 +36,7 @@ export function SendReviewPanel({
           </p>
         </div>
 
-        <dl className="space-y-2 text-sm">
-          <div className="flex justify-between gap-4">
-            <dt className="text-muted">Mode</dt>
-            <dd className="font-medium capitalize">{review.mode}</dd>
-          </div>
-          <div className="flex justify-between gap-4">
-            <dt className="text-muted">Recipients</dt>
-            <dd className="font-medium">{review.recipients.length}</dd>
-          </div>
-          <div className="flex justify-between gap-4">
-            <dt className="text-muted">Total</dt>
-            <dd className="pr-mono font-medium">
-              {formatUsdFromMicros(review.totalUsdMicros)} USDG
-            </dd>
-          </div>
-        </dl>
+        <SendSummaryDetails review={review} />
 
         <ul className="space-y-2 border-t border-border pt-3">
           {review.recipients.map((r) => (

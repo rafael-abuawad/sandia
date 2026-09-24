@@ -11,7 +11,8 @@ import { FieldError } from "@/components/ui/field-error";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { AmountCompose, isAmountEntered } from "@/components/amount-compose";
+import { AmountCompose } from "@/components/amount-compose";
+import { isAmountEntered } from "@/lib/amount-entered";
 import {
   ResponsiveDialog,
   ResponsiveDialogBody,
