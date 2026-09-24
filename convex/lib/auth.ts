@@ -35,5 +35,5 @@ export async function getCurrentUser(ctx: AuthCtx): Promise<Doc<"users">> {
 }
 
 export function payoutAddress(user: Doc<"users">): string {
-  return (user.smartAccountAddress ?? user.address).toLowerCase();
+  return user.address.toLowerCase();
 }

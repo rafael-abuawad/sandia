@@ -1,10 +1,10 @@
 import { AppChrome } from "@/components/app-chrome";
-import { ZerodevProviders } from "@/components/providers-zerodev";
+import { PrivyAppProviders } from "@/components/providers-privy";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
-    <ZerodevProviders>
+    <PrivyAppProviders>
       <AppChrome>{children}</AppChrome>
-    </ZerodevProviders>
+    </PrivyAppProviders>
   );
 }

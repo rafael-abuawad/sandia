@@ -21,10 +21,10 @@ No firm quote was returned, so buy and sell stay unavailable. A configured `ZERO
 
 ## ConnectKit
 
-`connectkit@1.9.2` is the payer wallet on `/pay/[publicId]`, on its own wagmi config. It injects styles from its package, so there is no `connectkit/styles.css` import. Sandia accounts use a ZeroDev Kernel and are not a ConnectKit connector.
+`connectkit@1.9.2` is the payer wallet on `/pay/[publicId]`, on its own wagmi config. It injects styles from its package, so there is no `connectkit/styles.css` import. Sandia accounts use Privy and are not a ConnectKit connector.
 
-Checked against a local dev server: the app shell renders “Create wallet with passkey” and “Sign in with passkey”, and `/pay/demo` renders without a server error. Opening the modal, connecting an injected wallet, switching chain, and disconnecting still needs a browser with a wallet extension and a live Convex request.
+Checked against a local dev server: the app shell renders Privy sign-in, and `/pay/demo` renders without a server error. Opening the modal, connecting an injected wallet, switching chain, and disconnecting still needs a browser with a wallet extension and a live Convex request.
 
-## ZeroDev sponsorship
+## Privy outbound send
 
-No UserOperation was submitted. Gas sponsorship on Robinhood Chain is unverified. The send review says the account needs ETH unless a policy sponsors the batch.
+Outbound USDG sends are ordinary ERC-20 transfers from the signed-in EOA. The wallet needs ETH on Robinhood Chain for gas. There is no paymaster.

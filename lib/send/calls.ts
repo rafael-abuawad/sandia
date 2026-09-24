@@ -18,7 +18,7 @@ export function usdMicrosToUsdgBaseUnits(amountUsdMicros: number): bigint {
   return BigInt(amountUsdMicros);
 }
 
-/** One ERC-20 transfer per recipient. The Kernel submits them as one atomic batch. */
+/** One ERC-20 transfer per recipient. Each transfer is its own transaction. */
 export function buildUsdgTransferCalls(
   recipients: Array<{ address: string; amountUsdMicros: number }>,
 ): TransferCall[] {

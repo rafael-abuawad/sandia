@@ -15,23 +15,49 @@ const robinhood = {
   rpcUrls: { default: { http: ["https://rpc.mainnet.chain.robinhood.com"] } },
 } as const;
 
-async function verifyBundle(bundleTxHash: string, callsJson: string) {
+function parseStoredTxHashes(raw: string | undefined): string[] {
+  if (!raw) return [];
+  const trimmed = raw.trim();
+  if (trimmed.startsWith("[")) {
+    try {
+      const parsed = JSON.parse(trimmed) as unknown;
+      if (Array.isArray(parsed)) {
+        return parsed.filter(
+          (item): item is string => typeof item === "string" && item.startsWith("0x"),
+        );
+      }
+    } catch {
+      // fall through to a single hash
+    }
+  }
+  if (trimmed.startsWith("0x")) return [trimmed];
+  return [];
+}
+
+async function verifyTransfers(txHashes: string[], callsJson: string) {
+  if (txHashes.length === 0) {
+    return { ok: false as const, reason: "Send has no transaction hash" };
+  }
   const client = createPublicClient({
     chain: robinhood,
     transport: http(robinhood.rpcUrls.default.http[0]),
   });
-  const receipt = await client.getTransactionReceipt({ hash: bundleTxHash as Hex });
-  if (receipt.status !== "success") {
-    return { ok: false as const, reason: "Bundle transaction reverted" };
+  const transfers = [];
+  for (const hash of txHashes) {
+    const receipt = await client.getTransactionReceipt({ hash: hash as Hex });
+    if (receipt.status !== "success") {
+      return { ok: false as const, reason: "A transfer transaction reverted" };
+    }
+    transfers.push(...parseTransferLogs(receipt.logs));
   }
   const calls = JSON.parse(callsJson) as ExpectedSend[];
-  return matchBatchTransfers(parseTransferLogs(receipt.logs), USDG, calls);
+  return matchBatchTransfers(transfers, USDG, calls);
 }
 
 export const attachBundle = action({
   args: {
     userOpHash: v.string(),
-    bundleTxHash: v.string(),
+    txHashes: v.array(v.string()),
   },
   returns: v.object({
     status: v.union(v.literal("submitted"), v.literal("filled"), v.literal("failed")),
@@ -42,12 +68,16 @@ export const attachBundle = action({
     if (!identity) throw new Error("Not authenticated");
     const row = await ctx.runQuery(internal.outbound.getByUserOp, { userOpHash: args.userOpHash });
     if (!row) throw new Error("Send was not recorded");
+    const txHashes = args.txHashes
+      .map((hash) => hash.toLowerCase())
+      .filter((hash) => hash.startsWith("0x"));
+    const stored = JSON.stringify(txHashes);
     try {
-      const result = await verifyBundle(args.bundleTxHash, row.callsJson);
+      const result = await verifyTransfers(txHashes, row.callsJson);
       if (!result.ok) {
         await ctx.runMutation(internal.outbound.markResultInternal, {
           id: row.id,
-          bundleTxHash: args.bundleTxHash.toLowerCase(),
+          bundleTxHash: stored,
           status: "failed",
           failureReason: result.reason,
         });
@@ -55,12 +85,12 @@ export const attachBundle = action({
       }
       await ctx.runMutation(internal.outbound.markResultInternal, {
         id: row.id,
-        bundleTxHash: args.bundleTxHash.toLowerCase(),
+        bundleTxHash: stored,
         status: "filled",
       });
       console.log("outbound_filled", {
         userOpHash: args.userOpHash,
-        bundleTxHash: args.bundleTxHash.toLowerCase(),
+        txHashes,
       });
       return { status: "filled" as const };
     } catch (error) {
@@ -81,20 +111,21 @@ export const reconcile = internalAction({
     let checked = 0;
     for (const row of rows) {
       checked += 1;
-      if (!row.bundleTxHash) {
+      const txHashes = parseStoredTxHashes(row.bundleTxHash);
+      if (txHashes.length === 0) {
         if (isReconciliationStuck(row.createdAt, Date.now())) {
           console.error("payment_reconciliation_stuck", {
             userOpHash: row.userOpHash,
-            reason: "Send has no bundle transaction yet",
+            reason: "Send has no transfer transaction yet",
           });
         }
         continue;
       }
       try {
-        const result = await verifyBundle(row.bundleTxHash, row.callsJson);
+        const result = await verifyTransfers(txHashes, row.callsJson);
         await ctx.runMutation(internal.outbound.markResultInternal, {
           id: row.id,
-          bundleTxHash: row.bundleTxHash,
+          bundleTxHash: JSON.stringify(txHashes),
           status: result.ok ? "filled" : "failed",
           failureReason: result.ok ? undefined : result.reason,
         });

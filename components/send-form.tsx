@@ -2,7 +2,7 @@
 
 import { useMemo, useReducer } from "react";
 import { erc20Abi, type Address } from "viem";
-import { useReadContract, useSendCalls } from "wagmi";
+import { usePublicClient, useReadContract, useWriteContract } from "wagmi";
 import { useAction, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { formatUsdFromMicros, parseUsdToMicros } from "@/lib/money";
@@ -16,8 +16,9 @@ import { SendSuccessPanel } from "@/components/send-form/success-panel";
 import { createInitialSendFormState, sendFormReducer } from "@/components/send-form/state";
 
 export function SendForm() {
-  const { isSignedIn, address, chainId, connectorId } = useSignedInWallet();
-  const { sendCallsAsync } = useSendCalls();
+  const { isSignedIn, address, chainId } = useSignedInWallet();
+  const { writeContractAsync } = useWriteContract();
+  const publicClient = usePublicClient({ chainId: ROBINHOOD_USDG.chainId });
   const recordSend = useMutation(api.outbound.record);
   const attachBundle = useAction(api.outboundActions.attachBundle);
   const { data: balance } = useReadContract({
@@ -69,22 +70,19 @@ export function SendForm() {
     }
   }
 
-  const kernelReady =
-    chainId === ROBINHOOD_USDG.chainId && (connectorId ?? "").toLowerCase().includes("zero");
+  const onRobinhood = chainId === ROBINHOOD_USDG.chainId;
   const enoughBalance =
     review !== null && balance !== undefined && balance >= BigInt(review.totalUsdMicros);
   const withinCap = (review?.recipients.length ?? 0) <= MAX_SEND_RECIPIENTS;
-  const canConfirm = Boolean(review && kernelReady && enoughBalance && withinCap && !confirming);
+  const canConfirm = Boolean(review && onRobinhood && enoughBalance && withinCap && !confirming);
 
   async function onConfirm() {
     if (!review) return;
     dispatch({ type: "confirmStarted" });
     dispatch({ type: "setError", error: null });
     try {
-      if (!kernelReady) {
-        throw new Error(
-          "USDG batch send runs from a Sandia account on Robinhood Chain. Nothing was sent.",
-        );
+      if (!onRobinhood) {
+        throw new Error("Switch to Robinhood Chain to send USDG. Nothing was sent.");
       }
       if (!enoughBalance) {
         throw new Error("USDG balance is below the batch total. Nothing was sent.");
@@ -95,10 +93,24 @@ export function SendForm() {
           amountUsdMicros: row.amountUsdMicros,
         })),
       );
-      const sent = await sendCallsAsync({
-        calls: calls.map((call) => ({ to: call.to, data: call.data, value: call.value })),
-      });
-      const userOpHash = typeof sent.id === "string" ? sent.id : "";
+      const txHashes: string[] = [];
+      for (const call of calls) {
+        const hash = await writeContractAsync({
+          address: ROBINHOOD_USDG.address as Address,
+          abi: erc20Abi,
+          functionName: "transfer",
+          args: [call.recipient, call.amount],
+          chainId: ROBINHOOD_USDG.chainId,
+        });
+        if (publicClient) {
+          await publicClient.waitForTransactionReceipt({ hash });
+        }
+        txHashes.push(hash);
+      }
+      const userOpHash = txHashes[0];
+      if (!userOpHash || !userOpHash.startsWith("0x") || userOpHash.length !== 66) {
+        throw new Error("The transfer was submitted, but no transaction hash was returned.");
+      }
       await recordSend({
         userOpHash,
         calls: calls.map((call) => ({
@@ -106,12 +118,7 @@ export function SendForm() {
           amount: call.amount.toString(),
         })),
       });
-      if (!userOpHash.startsWith("0x") || userOpHash.length !== 66) {
-        throw new Error(
-          "The batch was submitted, but success waits for a Robinhood transaction receipt.",
-        );
-      }
-      const verified = await attachBundle({ userOpHash, bundleTxHash: userOpHash });
+      const verified = await attachBundle({ userOpHash, txHashes });
       if (verified.status !== "filled") {
         throw new Error(verified.reason ?? "The receipt did not pay every recipient.");
       }

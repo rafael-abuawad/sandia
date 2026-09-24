@@ -33,7 +33,7 @@ export const record = mutation({
     if (!user) throw new Error("Not authenticated");
     const userOpHash = args.userOpHash.trim();
     if (userOpHash.length < 8 || userOpHash.length > 200) {
-      throw new Error("Missing UserOperation id");
+      throw new Error("Missing send transaction hash");
     }
     const existing = await ctx.db
       .query("outboundTransfers")

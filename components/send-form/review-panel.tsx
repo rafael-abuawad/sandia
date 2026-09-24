@@ -30,9 +30,8 @@ export function SendReviewPanel({
         <div>
           <h2 className="pr-section-title">Review send</h2>
           <p className="mt-1 text-sm text-muted">
-            Robinhood Chain · USDG. This batch reverts together. Gas is sponsored only if ZeroDev
-            has a Robinhood policy; otherwise the account needs ETH. Sponsorship is unconfirmed
-            until a UserOperation is sent.
+            Robinhood Chain · USDG. Each recipient is a separate transfer. Your wallet needs ETH on
+            Robinhood Chain for gas.
           </p>
         </div>
 
