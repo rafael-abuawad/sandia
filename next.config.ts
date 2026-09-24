@@ -10,6 +10,11 @@ const nextConfig: NextConfig = {
         destination: "/requests/new",
         permanent: true,
       },
+      {
+        source: "/lending",
+        destination: "/earn",
+        permanent: true,
+      },
     ];
   },
   images: {

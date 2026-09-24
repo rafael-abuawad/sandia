@@ -38,7 +38,7 @@ export default function HomePage() {
             body: "Push USDG to one recipient or a batch, with a review step before anything is sent.",
           },
           {
-            title: "Stocks and lending",
+            title: "Stocks and earn",
             body: "Stock trades and vault deposits appear only after a live quote or vault call says they are open.",
           },
         ].map((item) => (

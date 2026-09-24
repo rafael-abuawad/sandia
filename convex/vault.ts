@@ -1,94 +1,72 @@
-"use node";
-
 import { action } from "./_generated/server";
 import { v } from "convex/values";
-import { createPublicClient, http, parseAbi, type Address } from "viem";
+import {
+  MORPHO_GRAPHQL_URL,
+  STEAKHOUSE_VAULT_QUERY,
+  parseMorphoVaultSnapshot,
+} from "../lib/morpho-vault";
 
-const VAULT = "0xBeEff033F34C046626B8D0A041844C5d1A5409dd";
-const USDG = "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168";
+const exposureValidator = v.object({
+  symbol: v.string(),
+  usd: v.number(),
+  logoUrl: v.union(v.string(), v.null()),
+});
 
-const abi = parseAbi([
-  "function asset() view returns (address)",
-  "function totalAssets() view returns (uint256)",
-  "function totalSupply() view returns (uint256)",
-  "function maxDeposit(address) view returns (uint256)",
-  "function balanceOf(address) view returns (uint256)",
-  "function convertToAssets(uint256) view returns (uint256)",
-]);
+const snapshotReturns = v.object({
+  ok: v.boolean(),
+  netApy: v.union(v.number(), v.null()),
+  totalAssetsUsd: v.union(v.number(), v.null()),
+  liquidityUsd: v.union(v.number(), v.null()),
+  exposure: v.array(exposureValidator),
+  reason: v.optional(v.string()),
+});
 
-const robinhood = {
-  id: 4663,
-  name: "Robinhood Chain",
-  nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
-  rpcUrls: { default: { http: ["https://rpc.mainnet.chain.robinhood.com"] } },
-} as const;
+function failedSnapshot(reason: string) {
+  return {
+    ok: false as const,
+    netApy: null,
+    totalAssetsUsd: null,
+    liquidityUsd: null,
+    exposure: [] as { symbol: string; usd: number; logoUrl: string | null }[],
+    reason,
+  };
+}
 
-export const readPosition = action({
-  args: { account: v.optional(v.string()) },
-  returns: v.object({
-    ok: v.boolean(),
-    asset: v.optional(v.string()),
-    assetIsUsdg: v.boolean(),
-    totalAssets: v.optional(v.string()),
-    totalSupply: v.optional(v.string()),
-    maxDeposit: v.optional(v.string()),
-    shares: v.optional(v.string()),
-    assets: v.optional(v.string()),
-    reason: v.optional(v.string()),
-  }),
-  handler: async (_ctx, args) => {
-    const client = createPublicClient({
-      chain: robinhood,
-      transport: http(robinhood.rpcUrls.default.http[0]),
-    });
+export const readSnapshot = action({
+  args: {},
+  returns: snapshotReturns,
+  handler: async () => {
     try {
-      const asset = await client.readContract({
-        address: VAULT,
-        abi,
-        functionName: "asset",
+      const response = await fetch(MORPHO_GRAPHQL_URL, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          accept: "application/json",
+        },
+        body: JSON.stringify({ query: STEAKHOUSE_VAULT_QUERY }),
+        signal: AbortSignal.timeout(20_000),
       });
-      const assetIsUsdg = asset.toLowerCase() === USDG;
-      const [totalAssets, totalSupply, maxDeposit] = await Promise.all([
-        client.readContract({ address: VAULT, abi, functionName: "totalAssets" }),
-        client.readContract({ address: VAULT, abi, functionName: "totalSupply" }),
-        client.readContract({
-          address: VAULT,
-          abi,
-          functionName: "maxDeposit",
-          args: [(args.account ?? "0x0000000000000000000000000000000000000001") as Address],
-        }),
-      ]);
-      let shares: bigint | undefined;
-      let assets: bigint | undefined;
-      if (args.account) {
-        shares = await client.readContract({
-          address: VAULT,
-          abi,
-          functionName: "balanceOf",
-          args: [args.account as Address],
-        });
-        assets = await client.readContract({
-          address: VAULT,
-          abi,
-          functionName: "convertToAssets",
-          args: [shares],
-        });
+      if (!response.ok) {
+        const reason = `Morpho returned ${response.status}`;
+        console.error("vault_snapshot_failed", { status: response.status, reason });
+        return failedSnapshot(reason);
       }
-      return {
-        ok: assetIsUsdg,
-        asset,
-        assetIsUsdg,
-        totalAssets: totalAssets.toString(),
-        totalSupply: totalSupply.toString(),
-        maxDeposit: maxDeposit.toString(),
-        shares: shares?.toString(),
-        assets: assets?.toString(),
-        reason: assetIsUsdg ? undefined : "Vault asset is not USDG",
-      };
+      const payload: unknown = await response.json();
+      const parsed = parseMorphoVaultSnapshot(payload);
+      if (!parsed.ok) {
+        console.error("vault_snapshot_failed", { reason: parsed.reason });
+        return failedSnapshot(parsed.reason);
+      }
+      console.info("vault_snapshot_ok", {
+        netApy: parsed.snapshot.netApy,
+        totalAssetsUsd: parsed.snapshot.totalAssetsUsd,
+        exposure: parsed.snapshot.exposure.length,
+      });
+      return { ok: true as const, ...parsed.snapshot };
     } catch (error) {
-      const reason = error instanceof Error ? error.message : "Vault read failed";
-      console.error("vault_read_failed", { reason });
-      return { ok: false, assetIsUsdg: false, reason };
+      const reason = error instanceof Error ? error.message : "Vault snapshot failed";
+      console.error("vault_snapshot_failed", { reason });
+      return failedSnapshot(reason);
     }
   },
 });
