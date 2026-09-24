@@ -6,7 +6,11 @@ const recipient = "0x1111111111111111111111111111111111111111";
 const outputToken = "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168";
 const depositor = "0x2222222222222222222222222222222222222222";
 
-function depositLog(overrides?: { recipient?: `0x${string}`; chainId?: bigint; amount?: bigint }): Log {
+function depositLog(overrides?: {
+  recipient?: `0x${string}`;
+  chainId?: bigint;
+  amount?: bigint;
+}): Log {
   const topics = encodeEventTopics({
     abi: [v3FundsDeposited],
     eventName: "V3FundsDeposited",
@@ -66,9 +70,7 @@ describe("deposit logs", () => {
     expect(matchDepositToRequest([], expected).ok).toBe(false);
     expect(
       matchDepositToRequest(
-        parseDepositLogs([
-          depositLog({ recipient: "0x3333333333333333333333333333333333333333" }),
-        ]),
+        parseDepositLogs([depositLog({ recipient: "0x3333333333333333333333333333333333333333" })]),
         expected,
       ).ok,
     ).toBe(false);

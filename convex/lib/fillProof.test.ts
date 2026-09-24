@@ -1,6 +1,11 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { decideAttemptAcceptance, evaluateFill, isReconciliationStuck, STUCK_AFTER_MS } from "./fillProof";
+import {
+  decideAttemptAcceptance,
+  evaluateFill,
+  isReconciliationStuck,
+  STUCK_AFTER_MS,
+} from "./fillProof";
 
 const expected = {
   destinationChainId: 4663,
@@ -26,12 +31,16 @@ describe("evaluateFill", () => {
   it("keeps a filled status incomplete when any proof field is missing", () => {
     expect(evaluateFill({ ...filled, recipient: undefined }, expected).outcome).toBe("incomplete");
     expect(evaluateFill({ ...filled, outputToken: "" }, expected).outcome).toBe("incomplete");
-    expect(evaluateFill({ ...filled, outputAmount: undefined }, expected).outcome).toBe("incomplete");
+    expect(evaluateFill({ ...filled, outputAmount: undefined }, expected).outcome).toBe(
+      "incomplete",
+    );
     expect(evaluateFill({ ...filled, fillTxnRef: undefined }, expected).outcome).toBe("incomplete");
   });
 
   it("rejects the wrong chain, token, recipient, or short amount", () => {
-    expect(evaluateFill({ ...filled, destinationChainId: 8453 }, expected).outcome).toBe("mismatch");
+    expect(evaluateFill({ ...filled, destinationChainId: 8453 }, expected).outcome).toBe(
+      "mismatch",
+    );
     expect(
       evaluateFill(
         { ...filled, outputToken: "0x0000000000000000000000000000000000000002" },
@@ -39,10 +48,8 @@ describe("evaluateFill", () => {
       ).outcome,
     ).toBe("mismatch");
     expect(
-      evaluateFill(
-        { ...filled, recipient: "0x2222222222222222222222222222222222222222" },
-        expected,
-      ).outcome,
+      evaluateFill({ ...filled, recipient: "0x2222222222222222222222222222222222222222" }, expected)
+        .outcome,
     ).toBe("mismatch");
     expect(evaluateFill({ ...filled, outputAmount: "1" }, expected).outcome).toBe("mismatch");
   });

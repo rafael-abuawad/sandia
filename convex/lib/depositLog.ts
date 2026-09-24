@@ -1,8 +1,4 @@
-import {
-  decodeEventLog,
-  type Hex,
-  type Log,
-} from "viem";
+import { decodeEventLog, type Hex, type Log } from "viem";
 
 export type ParsedDeposit = {
   outputToken: `0x${string}`;
@@ -12,9 +8,7 @@ export type ParsedDeposit = {
   depositor: `0x${string}`;
 };
 
-export type DepositMatch =
-  | { ok: true; deposit: ParsedDeposit }
-  | { ok: false; reason: string };
+export type DepositMatch = { ok: true; deposit: ParsedDeposit } | { ok: false; reason: string };
 
 export const v3FundsDeposited = {
   type: "event",

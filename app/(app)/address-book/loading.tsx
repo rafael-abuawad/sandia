@@ -10,7 +10,10 @@ export default function Loading() {
       </div>
       <div className="overflow-hidden rounded-md border border-border">
         {["a", "b", "c"].map((row) => (
-          <div key={row} className="flex items-center gap-3 border-b border-border px-3 py-3 last:border-b-0">
+          <div
+            key={row}
+            className="flex items-center gap-3 border-b border-border px-3 py-3 last:border-b-0"
+          >
             <div className="min-w-0 flex-1 space-y-2">
               <Skeleton className="h-4 w-28" />
               <Skeleton className="h-3 w-40" />

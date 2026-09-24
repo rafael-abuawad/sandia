@@ -101,9 +101,7 @@ export function decideAttemptAcceptance(input: {
   existingDepositTxnRef?: string;
   incomingDepositTxnRef: string;
   attemptCount: number;
-}):
-  | { ok: true; duplicate: boolean }
-  | { ok: false; reason: string } {
+}): { ok: true; duplicate: boolean } | { ok: false; reason: string } {
   if (input.attemptCount >= MAX_ATTEMPTS_PER_REQUEST && !input.existingDepositTxnRef) {
     return { ok: false, reason: "Too many payment attempts for this request" };
   }

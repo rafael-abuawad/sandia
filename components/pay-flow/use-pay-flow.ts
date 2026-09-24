@@ -11,11 +11,7 @@ import { useAction, usePaginatedQuery, useQuery } from "convex/react";
 import { type Hex, type Address, createPublicClient, http } from "viem";
 import { api } from "@/convex/_generated/api";
 import type { ChainOption, TokenOption } from "@/components/token-chain-select";
-import {
-  fetchAcrossChains,
-  fetchAcrossTokens,
-  type AcrossSwapQuote,
-} from "@/lib/across/client";
+import { fetchAcrossChains, fetchAcrossTokens, type AcrossSwapQuote } from "@/lib/across/client";
 import { appChains, PAYER_CHAIN_IDS, isPayerTokenAllowed, displayTokenSymbol } from "@/lib/chains";
 import { initialPayFlowState, payFlowReducer } from "@/components/pay-flow/state";
 

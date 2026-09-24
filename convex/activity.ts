@@ -4,12 +4,7 @@ import { getCurrentUserOrNull } from "./lib/auth";
 
 const itemValidator = v.object({
   id: v.string(),
-  kind: v.union(
-    v.literal("request"),
-    v.literal("send"),
-    v.literal("swap"),
-    v.literal("vault"),
-  ),
+  kind: v.union(v.literal("request"), v.literal("send"), v.literal("swap"), v.literal("vault")),
   title: v.string(),
   status: v.string(),
   createdAt: v.number(),

@@ -17,7 +17,9 @@ export default function ActivityPage() {
     return (
       <div className="pr-page pr-page--narrow space-y-3 text-center">
         <h1 className="pr-display text-2xl">Activity</h1>
-        <p className="text-sm text-muted">Sign in to see requests, sends, swaps, and vault activity.</p>
+        <p className="text-sm text-muted">
+          Sign in to see requests, sends, swaps, and vault activity.
+        </p>
         <div className="flex justify-center">
           <LoginButton />
         </div>

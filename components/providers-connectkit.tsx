@@ -61,7 +61,12 @@ export function PayConnectButton() {
   return (
     <ConnectKitButton.Custom>
       {({ isConnected, show, truncatedAddress, ensName }) => (
-        <Button type="button" size="sm" variant={isConnected ? "secondary" : "default"} onClick={show}>
+        <Button
+          type="button"
+          size="sm"
+          variant={isConnected ? "secondary" : "default"}
+          onClick={show}
+        >
           {isConnected ? (ensName ?? truncatedAddress ?? "Connected") : "Connect wallet"}
         </Button>
       )}

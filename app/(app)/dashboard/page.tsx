@@ -11,11 +11,13 @@ import { useSignedInWallet } from "@/lib/use-signed-in-wallet";
 
 export default function DashboardPage() {
   const { ready, isSignedIn } = useSignedInWallet();
-  const { results: requests, status, loadMore } = usePaginatedQuery(
-    api.paymentRequests.listMine,
-    isSignedIn ? {} : "skip",
-    { initialNumItems: 20 },
-  );
+  const {
+    results: requests,
+    status,
+    loadMore,
+  } = usePaginatedQuery(api.paymentRequests.listMine, isSignedIn ? {} : "skip", {
+    initialNumItems: 20,
+  });
 
   if (!ready || !isSignedIn) {
     return (

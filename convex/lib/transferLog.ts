@@ -55,7 +55,10 @@ export function matchTransferToPayment(
     );
   });
   if (!match) {
-    return { ok: false, reason: "Receipt has no USDG transfer to the recipient for the requested amount" };
+    return {
+      ok: false,
+      reason: "Receipt has no USDG transfer to the recipient for the requested amount",
+    };
   }
   return { ok: true, amount: match.amount };
 }

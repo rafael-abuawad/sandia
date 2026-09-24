@@ -4,16 +4,7 @@ import { action, internalAction } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { createPublicClient, http, type Hex } from "viem";
-import {
-  arbitrum,
-  avalanche,
-  base,
-  bsc,
-  mainnet,
-  monad,
-  optimism,
-  polygon,
-} from "viem/chains";
+import { arbitrum, avalanche, base, bsc, mainnet, monad, optimism, polygon } from "viem/chains";
 import { matchDepositToRequest, parseDepositLogs } from "./lib/depositLog";
 import { RECONCILE_BATCH } from "./lib/fillProof";
 import { matchTransferToPayment, parseTransferLogs } from "./lib/transferLog";
@@ -28,11 +19,13 @@ const robinhoodChain = {
   rpcUrls: { default: { http: ["https://rpc.mainnet.chain.robinhood.com"] } },
 } as const;
 
-const chainsById = new Map<number, { id: number; name: string; rpcUrls: { default: { http: readonly string[] } } }>(
-  [mainnet, optimism, bsc, polygon, monad, base, arbitrum, avalanche, robinhoodChain].map((chain) => [
-    chain.id,
-    chain,
-  ]),
+const chainsById = new Map<
+  number,
+  { id: number; name: string; rpcUrls: { default: { http: readonly string[] } } }
+>(
+  [mainnet, optimism, bsc, polygon, monad, base, arbitrum, avalanche, robinhoodChain].map(
+    (chain) => [chain.id, chain],
+  ),
 );
 
 type AcrossDepositRecord = {
@@ -231,7 +224,8 @@ export const quoteSwap = action({
       recipient: request.recipientAddress,
       slippage: "auto",
     };
-    const integratorId = process.env.ACROSS_INTEGRATOR_ID ?? process.env.NEXT_PUBLIC_ACROSS_INTEGRATOR_ID;
+    const integratorId =
+      process.env.ACROSS_INTEGRATOR_ID ?? process.env.NEXT_PUBLIC_ACROSS_INTEGRATOR_ID;
     if (integratorId) params.integratorId = integratorId;
 
     const quote = (await acrossGet("/swap/approval", params)) as {
@@ -249,7 +243,11 @@ export const quoteSwap = action({
   },
 });
 
-function proofArgs(depositTxnRef: string, record: AcrossDepositRecord | null, transportError: boolean) {
+function proofArgs(
+  depositTxnRef: string,
+  record: AcrossDepositRecord | null,
+  transportError: boolean,
+) {
   return {
     depositTxnRef,
     acrossStatus: (record?.status ?? "pending").toLowerCase(),
