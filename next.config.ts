@@ -3,6 +3,11 @@ import imageLoader from "./lib/image-loader";
 
 const nextConfig: NextConfig = {
   transpilePackages: ["@privy-io/react-auth", "@privy-io/wagmi"],
+  logging: {
+    incomingRequests: {
+      ignore: [/\/json(\/|$)/],
+    },
+  },
   async redirects() {
     return [
       {
