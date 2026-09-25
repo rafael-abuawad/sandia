@@ -12,7 +12,12 @@ import { erc20Abi, parseAbi, type Address } from "viem";
 import { useReadContract } from "wagmi";
 import { ROBINHOOD_USDG } from "@/lib/destination";
 import { formatTokenAmount, formatTokenAmountGrouped } from "@/lib/money";
-import { formatCompactUsd, formatNetApy, type ExposureRow } from "@/lib/morpho-vault";
+import {
+  formatCompactUsd,
+  formatNetApy,
+  type ExposureRow,
+  type VaultSnapshot,
+} from "@/lib/morpho-vault";
 import { resolveTokenIcon } from "@/lib/asset-icons";
 import { TokenChainChip } from "@/components/token-chain-select";
 import { Button } from "@/components/ui/button";
@@ -36,6 +41,11 @@ const vaultAbi = parseAbi([
 
 const VAULT_ADDRESS = STEAKHOUSE_USDG_VAULT as Address;
 
+type VaultSnapshotResult = VaultSnapshot & {
+  ok: boolean;
+  reason?: string;
+};
+
 function formatUsdFromAmount(amount: string): string {
   const n = Number.parseFloat(amount.replace(/,/g, ""));
   if (!Number.isFinite(n) || n <= 0) return "$0.00";
@@ -45,6 +55,59 @@ function formatUsdFromAmount(amount: string): string {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+}
+
+function readSnapshotView(input: {
+  isError: boolean;
+  data: VaultSnapshotResult | undefined;
+}): { snapshot: VaultSnapshot | null; error: string | undefined } {
+  const data = input.data;
+  const snapshot = data?.ok ? data : null;
+  if (input.isError) return { snapshot, error: "Vault snapshot failed" };
+  if (data && !data.ok) return { snapshot, error: data.reason };
+  return { snapshot, error: undefined };
+}
+
+function resolveDepositGate(input: {
+  isSignedIn: boolean;
+  maxDeposit: bigint | undefined;
+  maxDepositFailed: boolean;
+}): { depositEnabled: boolean; reason?: string } {
+  if (!input.isSignedIn) return { depositEnabled: false };
+  if (input.maxDeposit === undefined) {
+    return {
+      depositEnabled: false,
+      reason: input.maxDepositFailed
+        ? "Could not read whether deposits are open"
+        : "Reading the vault…",
+    };
+  }
+  return vaultDepositGate({
+    asset: ROBINHOOD_USDG.address,
+    usdg: ROBINHOOD_USDG.address,
+    maxDeposit: input.maxDeposit,
+  });
+}
+
+function formatYourDeposit(input: {
+  isSignedIn: boolean;
+  failed: boolean;
+  assets: bigint | undefined;
+}): string {
+  if (!input.isSignedIn) return "—";
+  if (input.failed) return "Unavailable";
+  if (input.assets === undefined) return "…";
+  return `${formatTokenAmountGrouped(input.assets.toString(), ROBINHOOD_USDG.decimals)} USDG`;
+}
+
+function snapshotMetric(
+  pending: boolean,
+  snapshot: VaultSnapshot | null,
+  format: (snapshot: VaultSnapshot) => string,
+): string {
+  if (pending) return "…";
+  if (!snapshot) return "Unavailable";
+  return format(snapshot);
 }
 
 export function EarnPanel() {
@@ -83,28 +146,15 @@ export function EarnPanel() {
     query: { enabled: Boolean(address), refetchInterval: 30_000 },
   });
 
-  const snapshotData = snapshotQuery.data;
-  const snapshot = snapshotData?.ok ? snapshotData : null;
-  const snapshotError = snapshotQuery.isError
-    ? "Vault snapshot failed"
-    : snapshotData && !snapshotData.ok
-      ? snapshotData.reason
-      : null;
-
-  const depositGate = !isSignedIn
-    ? { depositEnabled: false }
-    : maxDepositRead.data === undefined
-      ? {
-          depositEnabled: false,
-          reason: maxDepositRead.isError
-            ? "Could not read whether deposits are open"
-            : "Reading the vault…",
-        }
-      : vaultDepositGate({
-          asset: ROBINHOOD_USDG.address,
-          usdg: ROBINHOOD_USDG.address,
-          maxDeposit: maxDepositRead.data,
-        });
+  const { snapshot, error: snapshotError } = readSnapshotView({
+    isError: snapshotQuery.isError,
+    data: snapshotQuery.data,
+  });
+  const depositGate = resolveDepositGate({
+    isSignedIn,
+    maxDeposit: maxDepositRead.data,
+    maxDepositFailed: maxDepositRead.isError,
+  });
 
   const { data: balanceValue, isLoading: balanceLoading } = useReadContract({
     address: ROBINHOOD_USDG.address as Address,
@@ -125,21 +175,11 @@ export function EarnPanel() {
     return formatTokenAmountGrouped(balanceValue.toString(), ROBINHOOD_USDG.decimals);
   }, [balanceValue]);
 
-  function setMax() {
-    if (!balanceExact) {
-      setAmount("0");
-      return;
-    }
-    setAmount(balanceExact);
-  }
-
-  const yourDeposit = !isSignedIn
-    ? "—"
-    : shareRead.isError || assetsRead.isError
-      ? "Unavailable"
-      : assetsRead.data === undefined
-        ? "…"
-        : `${formatTokenAmountGrouped(assetsRead.data.toString(), ROBINHOOD_USDG.decimals)} USDG`;
+  const yourDeposit = formatYourDeposit({
+    isSignedIn,
+    failed: shareRead.isError || assetsRead.isError,
+    assets: assetsRead.data,
+  });
 
   return (
     <div className="pr-page">
@@ -153,35 +193,11 @@ export function EarnPanel() {
         <p className="text-sm leading-relaxed text-muted">{VAULT.description}</p>
       </div>
 
-      <dl className="grid grid-cols-1 gap-4 border-y border-border py-4 sm:grid-cols-3 sm:gap-3">
-        <Stat
-          label="Net APY"
-          value={
-            snapshotQuery.isPending ? "…" : snapshot ? formatNetApy(snapshot.netApy) : "Unavailable"
-          }
-        />
-        <Stat
-          label="Deposits"
-          value={
-            snapshotQuery.isPending
-              ? "…"
-              : snapshot
-                ? formatCompactUsd(snapshot.totalAssetsUsd)
-                : "Unavailable"
-          }
-        />
-        <Stat
-          label="Liquidity"
-          value={
-            snapshotQuery.isPending
-              ? "…"
-              : snapshot
-                ? formatCompactUsd(snapshot.liquidityUsd)
-                : "Unavailable"
-          }
-        />
-      </dl>
-      {snapshotError ? <p className="text-xs text-muted">{snapshotError}</p> : null}
+      <VaultSnapshotStats
+        pending={snapshotQuery.isPending}
+        snapshot={snapshot}
+        error={snapshotError}
+      />
 
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="space-y-1">
@@ -222,7 +238,9 @@ export function EarnPanel() {
               type="button"
               variant="ghost"
               size="sm"
-              onClick={setMax}
+              onClick={() => {
+                setAmount(balanceExact ? balanceExact : "0");
+              }}
               disabled={!isSignedIn || balanceLoading || !balanceExact}
             >
               Max
@@ -246,6 +264,36 @@ export function EarnPanel() {
         </AmountCompose>
       </form>
     </div>
+  );
+}
+
+function VaultSnapshotStats({
+  pending,
+  snapshot,
+  error,
+}: {
+  pending: boolean;
+  snapshot: VaultSnapshot | null;
+  error: string | undefined;
+}) {
+  return (
+    <>
+      <dl className="grid grid-cols-1 gap-4 border-y border-border py-4 sm:grid-cols-3 sm:gap-3">
+        <Stat
+          label="Net APY"
+          value={snapshotMetric(pending, snapshot, (row) => formatNetApy(row.netApy))}
+        />
+        <Stat
+          label="Deposits"
+          value={snapshotMetric(pending, snapshot, (row) => formatCompactUsd(row.totalAssetsUsd))}
+        />
+        <Stat
+          label="Liquidity"
+          value={snapshotMetric(pending, snapshot, (row) => formatCompactUsd(row.liquidityUsd))}
+        />
+      </dl>
+      {error ? <p className="text-xs text-muted">{error}</p> : null}
+    </>
   );
 }
 
