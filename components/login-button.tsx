@@ -1,13 +1,13 @@
 "use client";
 
-import { useAccount } from "wagmi";
 import { Button } from "@/components/ui/button";
 import { shortenAddress } from "@/lib/utils";
 import { useAppAuth } from "@/lib/auth-bridge";
+import { useSignedInWallet } from "@/lib/use-signed-in-wallet";
 
 export function LoginButton() {
-  const { ready, authenticated, login } = useAppAuth();
-  const { address } = useAccount();
+  const { login } = useAppAuth();
+  const { ready, authenticated, address } = useSignedInWallet();
 
   if (!ready) {
     return (

@@ -6,7 +6,7 @@ USD-denominated payment requests settled as stablecoins on **Robinhood Chain** v
 
 - Next.js App Router + React 19
 - Convex (database + backend functions)
-- Privy for Sandia accounts (wallet or email+OTP), ConnectKit for payer wallets, wagmi/viem for chain reads and sends
+- Privy for Sandia accounts (email OTP and an embedded wallet) and for payer wallet connection, wagmi/viem for chain reads and sends
 - Across Swap API for quotes, approvals, bridging, and deposit tracking
 
 ## Setup
@@ -33,7 +33,6 @@ npx convex dev
 
 ```bash
 NEXT_PUBLIC_PRIVY_APP_ID=<privy-app-id>
-NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=<walletconnect-project-id>
 SANDIA_NONCE_SECRET=<secret>
 ```
 
@@ -54,10 +53,10 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ## Product flow
 
-1. Creator signs in with an external wallet or email+OTP. Email users get a Privy embedded wallet. The wallet is claimed automatically so they can create requests and send.
+1. Creator signs in with email+OTP. Privy creates an embedded wallet, and that wallet is claimed automatically so they can create requests and send.
 2. Create a request: USD amount, optional description and expiry. The recipient is that wallet. The destination token is USDG on Robinhood Chain.
 3. Share the public `/pay/{id}` URL.
-4. Payer connects an injected wallet or WalletConnect through ConnectKit, selects an Across-supported source chain/token, reviews quote (input, fees, min received, ETA), approves if needed, and pays. Paying does not create a Sandia account.
+4. Payer connects an external wallet through Privy, selects an Across-supported source chain/token, reviews quote (input, fees, min received, ETA), approves if needed, and pays. Paying does not create a Sandia account.
 5. The request is marked **completed** only after a deposit receipt matches the request and Across `/deposit` reports `filled` with destination chain 4663, the request token, the snapshotted recipient, an output amount at least as large as the request, and a fill transaction. `/deposit/status` is not used as proof. A minute cron keeps checking if the payer closes the tab.
 
 ## Notes
@@ -67,7 +66,6 @@ Open [http://localhost:3000](http://localhost:3000).
 - The payer's browser also polls every 10 seconds. The server calls Across `GET /deposit` (or `/deposits`) with `ACROSS_API_KEY` on Convex, not a public env var.
 - Register an Across integrator id and set Convex `ACROSS_INTEGRATOR_ID`.
 - `/otc` redirects to `/requests/new`.
-- App accounts use Privy (external or embedded EOA) on Robinhood Chain. The public pay page uses a separate wagmi config and ConnectKit, so a signed-in creator is not the payer.
-- ConnectKit 1.9.2 does not peer React 19. `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` enables the QR path; an injected wallet can connect without it.
+- App accounts use the Privy embedded wallet on Robinhood Chain. The public pay page uses the same Privy wagmi provider and connects an external wallet for payment, so paying does not claim a Sandia account. WalletConnect for payers is the connector enabled in the Privy dashboard.
 - Outbound USDG sends are ordinary ERC-20 transfers. The wallet needs ETH on Robinhood Chain for gas.
 - Stock trading stays unavailable until a 0x quote for a real RHJ token returns `liquidityAvailable: true`. Vault deposits stay unavailable while `maxDeposit` is 0. See `docs/gates.md`.

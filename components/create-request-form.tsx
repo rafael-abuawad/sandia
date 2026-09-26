@@ -125,7 +125,7 @@ export function CreateRequestForm() {
           !isSignedIn ? (
             <div className="flex flex-col items-stretch gap-3">
               <p className="text-sm text-muted">
-                Sign in with a wallet or email to create a request.
+                Sign in with email to create a request.
               </p>
               <LoginButton />
             </div>

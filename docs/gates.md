@@ -19,11 +19,11 @@ Deposit stays disabled. Withdraw and redeem are not submitted until a Sandia acc
 
 No firm quote was returned, so buy and sell stay unavailable. A configured `ZEROX_API_KEY` still has to return `liquidityAvailable: true` before a stock ticket can submit. `XSTOCKS_NOT_AUTHORIZED` or `TOKEN_NOT_SUPPORTED` stops the feature.
 
-## ConnectKit
+## Payer wallet
 
-`connectkit@1.9.2` is the payer wallet on `/pay/[publicId]`, on its own wagmi config. It injects styles from its package, so there is no `connectkit/styles.css` import. Sandia accounts use Privy and are not a ConnectKit connector.
+Payers connect an external wallet on `/pay/[publicId]` through Privy’s `connectWallet`. That uses the same `@privy-io/wagmi` provider as the app. Sandia accounts sign in with email and use the Privy embedded wallet. Paying does not run the Convex wallet claim.
 
-Checked against a local dev server: the app shell renders Privy sign-in, and `/pay/demo` renders without a server error. Opening the modal, connecting an injected wallet, switching chain, and disconnecting still needs a browser with a wallet extension and a live Convex request.
+Opening the connect modal, connecting an injected wallet, switching chain, and paying still needs a browser with a wallet extension and a live Convex request.
 
 ## Privy outbound send
 

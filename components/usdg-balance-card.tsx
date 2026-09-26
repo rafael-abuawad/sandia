@@ -1,10 +1,11 @@
 "use client";
 
 import Image from "next/image";
-import { useAccount, useReadContract } from "wagmi";
+import { useReadContract } from "wagmi";
 import { erc20Abi, type Address } from "viem";
 import { ROBINHOOD_USDG } from "@/lib/destination";
 import { formatTokenAmountGrouped } from "@/lib/money";
+import { useSignedInWallet } from "@/lib/use-signed-in-wallet";
 import { cn } from "@/lib/utils";
 
 type UsdgBalanceCardProps = {
@@ -12,7 +13,7 @@ type UsdgBalanceCardProps = {
 };
 
 export function UsdgBalanceCard({ className }: UsdgBalanceCardProps) {
-  const { address, isConnected } = useAccount();
+  const { address, isConnected } = useSignedInWallet();
   const { data, isLoading, isError } = useReadContract({
     address: ROBINHOOD_USDG.address as Address,
     abi: erc20Abi,

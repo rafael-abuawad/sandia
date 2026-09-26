@@ -1,7 +1,7 @@
 "use client";
 
 import { useId } from "react";
-import { PayConnectButton } from "@/components/providers-connectkit";
+import { PayConnectButton } from "@/components/pay-connect-button";
 import { Button } from "@/components/ui/button";
 import { FieldError } from "@/components/ui/field-error";
 import { Label } from "@/components/ui/label";

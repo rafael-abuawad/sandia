@@ -2,7 +2,7 @@ import type { PrivyClientConfig } from "@privy-io/react-auth";
 import { appChains } from "@/lib/chains";
 
 export const privyConfig: PrivyClientConfig = {
-  loginMethods: ["wallet", "email"],
+  loginMethods: ["email"],
   appearance: {
     theme: "light",
     accentColor: "#9fe870",
@@ -10,7 +10,7 @@ export const privyConfig: PrivyClientConfig = {
   },
   embeddedWallets: {
     ethereum: {
-      createOnLogin: "users-without-wallets",
+      createOnLogin: "all-users",
     },
   },
   defaultChain: appChains[0],
