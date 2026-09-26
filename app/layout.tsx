@@ -27,14 +27,19 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${mono.variable} h-full`} data-scroll-behavior="smooth">
+    <html
+      lang="en"
+      className={`${mono.variable} h-full`}
+      data-scroll-behavior="smooth"
+      suppressHydrationWarning
+    >
       <head>
         <link
           href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=clash-display@500,600,700&display=swap"
           rel="stylesheet"
         />
       </head>
-      <body className="min-h-full flex flex-col antialiased">
+      <body className="min-h-full flex flex-col antialiased" suppressHydrationWarning>
         <a href="#main" className="pr-skip-link">
           Skip to content
         </a>
