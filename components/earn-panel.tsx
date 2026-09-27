@@ -6,7 +6,9 @@ import { useQuery } from "@tanstack/react-query";
 import { useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { STEAKHOUSE_USDG_VAULT, vaultDepositGate } from "@/lib/vault-gate";
+import { userFacingError } from "@/lib/user-facing-error";
 import { LoginButton } from "@/components/login-button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useSignedInWallet } from "@/lib/use-signed-in-wallet";
 import { erc20Abi, parseAbi, type Address } from "viem";
 import { useReadContract } from "wagmi";
@@ -63,8 +65,13 @@ function readSnapshotView(input: {
 }): { snapshot: VaultSnapshot | null; error: string | undefined } {
   const data = input.data;
   const snapshot = data?.ok ? data : null;
-  if (input.isError) return { snapshot, error: "Vault snapshot failed" };
-  if (data && !data.ok) return { snapshot, error: data.reason };
+  if (input.isError) return { snapshot, error: "Vault details are unavailable right now." };
+  if (data && !data.ok) {
+    return {
+      snapshot,
+      error: userFacingError(data.reason, "Vault details are unavailable right now."),
+    };
+  }
   return { snapshot, error: undefined };
 }
 
@@ -111,7 +118,7 @@ function snapshotMetric(
 }
 
 export function EarnPanel() {
-  const { address, isSignedIn } = useSignedInWallet();
+  const { ready, address, isSignedIn } = useSignedInWallet();
   const readSnapshot = useAction(api.vault.readSnapshot);
   const snapshotQuery = useQuery({
     queryKey: ["morpho-vault-snapshot", STEAKHOUSE_USDG_VAULT],
@@ -225,6 +232,7 @@ export function EarnPanel() {
           onChange={setAmount}
           footer={
             <EarnDepositFooter
+              ready={ready}
               isSignedIn={isSignedIn}
               depositEnabled={depositGate.depositEnabled}
               hasAmount={isAmountEntered(amount)}
@@ -381,16 +389,22 @@ function TokenMark({ symbol, logoUrl }: { symbol: string; logoUrl: string | null
 }
 
 function EarnDepositFooter({
+  ready,
   isSignedIn,
   depositEnabled,
   hasAmount,
   depositReason,
 }: {
+  ready: boolean;
   isSignedIn: boolean;
   depositEnabled: boolean;
   hasAmount: boolean;
   depositReason?: string;
 }) {
+  if (!ready) {
+    return <Skeleton className="h-11 w-full" aria-hidden />;
+  }
+
   if (!isSignedIn) {
     return (
       <div className="flex flex-col items-stretch gap-3">

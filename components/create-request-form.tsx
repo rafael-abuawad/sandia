@@ -24,6 +24,7 @@ import {
 } from "@/components/responsive-dialog";
 import { ROBINHOOD_USDG } from "@/lib/destination";
 import { parseUsdToMicros } from "@/lib/money";
+import { userFacingError } from "@/lib/user-facing-error";
 
 function detailsHint(note: string, expiresAtLocal: string): string | undefined {
   const parts: string[] = [];
@@ -101,7 +102,7 @@ export function CreateRequestForm() {
       });
       router.push(`/requests/${result.publicId}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to create request. Try again.");
+      setError(userFacingError(err, "Unable to create request. Try again."));
     } finally {
       setSubmitting(false);
     }
@@ -167,6 +168,9 @@ export function CreateRequestForm() {
                 onChange={(e) => setExpiresAtLocal(e.target.value)}
                 aria-invalid={invalidField === "expires" || undefined}
               />
+              <p className="text-xs text-muted">
+                Leave this blank and the request stays open until it is paid or cancelled.
+              </p>
             </div>
           </ResponsiveDialogBody>
           <ResponsiveDialogFooter>

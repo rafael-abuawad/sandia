@@ -10,7 +10,7 @@ export function vaultDepositGate(input: { asset: string; usdg: string; maxDeposi
   if (input.maxDeposit <= BigInt(0)) {
     return {
       depositEnabled: false,
-      reason: "Deposits are closed because maxDeposit is 0",
+      reason: "Deposits are closed right now.",
     };
   }
   return { depositEnabled: true };

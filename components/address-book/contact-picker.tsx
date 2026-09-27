@@ -18,6 +18,7 @@ import {
   ResponsiveDialogTitle,
 } from "@/components/responsive-dialog";
 import { cn, shortenAddress } from "@/lib/utils";
+import { userFacingError } from "@/lib/user-facing-error";
 
 type ContactPickerProps = {
   open: boolean;
@@ -97,7 +98,7 @@ function ContactPickerSession({
       onSelect(address);
       onOpenChange(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to save contact.");
+      setError(userFacingError(err, "Unable to save contact."));
     } finally {
       setSaving(false);
     }

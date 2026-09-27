@@ -72,7 +72,7 @@ function payBlockerMessage({
   if (!originChainId) return "Select a chain to continue.";
   if (!inputToken) return "Select a token to continue.";
   if (step === "quoting") return "Fetching a quote…";
-  if (quoteError) return quoteError;
+  if (quoteError) return null;
   if (!quote?.swapTx) return "Waiting for a valid route before you can pay.";
   const gap = quoteFundingGap(quote);
   if (gap === "balance") {
@@ -84,11 +84,10 @@ function payBlockerMessage({
   return null;
 }
 
-function payButtonLabel(step: PayStep, quoteError: string | null): string {
+function payButtonLabel(step: PayStep): string {
   if (step === "approving") return "Confirm approval…";
   if (step === "paying") return "Confirm payment…";
   if (step === "tracking") return "Waiting for settlement…";
-  if (quoteError) return "No valid route";
   return "Pay request";
 }
 
@@ -277,7 +276,6 @@ function PayAcrossConnected({
         busy={busy}
         canPay={canPay}
         step={step}
-        quoteError={quoteError}
         onPay={onPay}
       />
       {statusMsg && !isError ? (
@@ -317,12 +315,11 @@ function PayAcrossSessionInfo({
           here.
         </p>
       ) : null}
-      {expiresAt ? (
-        <p className="text-xs text-muted">
-          Expires {formatDisplayDateTime(expiresAt)}. The request stays open until the server marks
-          it expired.
-        </p>
-      ) : null}
+      <p className="text-xs text-muted">
+        {expiresAt
+          ? `Expires ${formatDisplayDateTime(expiresAt)}.`
+          : "This request stays open until it is paid or cancelled."}
+      </p>
     </>
   );
 }
@@ -440,7 +437,6 @@ function PayAcrossActionBar({
   busy,
   canPay,
   step,
-  quoteError,
   onPay,
 }: {
   blocker: string | null;
@@ -448,7 +444,6 @@ function PayAcrossActionBar({
   busy: boolean;
   canPay: boolean;
   step: PayStep;
-  quoteError: string | null;
   onPay: () => void;
 }) {
   return (
@@ -467,7 +462,7 @@ function PayAcrossActionBar({
           onPay();
         }}
       >
-        {payButtonLabel(step, quoteError)}
+        {payButtonLabel(step)}
       </Button>
     </div>
   );

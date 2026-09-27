@@ -17,14 +17,20 @@ const STATUS_LABEL: Record<string, string> = {
   pending: "Bridging",
   submitted: "Submitted",
   filled: "Complete",
-  completed: "Paid",
+  completed: "Complete",
   expired: "Expired",
   cancelled: "Cancelled",
   failed: "Failed",
   refunded: "Refunded",
+  ignored_duplicate: "Duplicate",
 };
+
+export function statusLabel(status: string): string {
+  const key = status.toLowerCase();
+  return STATUS_LABEL[key] ?? "Unknown";
+}
 
 export function StatusBadge({ status }: { status: string }) {
   const key = status.toLowerCase();
-  return <Badge variant={STATUS_VARIANT[key] ?? "accent"}>{STATUS_LABEL[key] ?? status}</Badge>;
+  return <Badge variant={STATUS_VARIANT[key] ?? "neutral"}>{statusLabel(status)}</Badge>;
 }

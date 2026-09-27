@@ -17,6 +17,9 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { PriceChart } from "@/components/stocks/price-chart";
+import { userFacingError } from "@/lib/user-facing-error";
+
+const TRADE_UNAVAILABLE = "Trading is unavailable until a quote shows liquidity.";
 
 function useStockDetail(symbol: string) {
   const [asset, setAsset] = useState<StockToken | null>(null);
@@ -62,12 +65,10 @@ function useStockDetail(symbol: string) {
         setTradeReason(
           probe.ok && probe.liquidityAvailable
             ? null
-            : (probe.reason ?? "0x did not return executable liquidity"),
+            : userFacingError(probe.reason ?? "", TRADE_UNAVAILABLE),
         );
       } catch (probeError) {
-        setTradeReason(
-          probeError instanceof Error ? probeError.message : "0x quote could not be loaded",
-        );
+        setTradeReason(userFacingError(probeError, TRADE_UNAVAILABLE));
       }
 
       if (quoteRes.ok) {
@@ -77,7 +78,7 @@ function useStockDetail(symbol: string) {
         setQuote(null);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load token");
+      setError(userFacingError(err, "This stock could not be loaded."));
     } finally {
       setLoading(false);
     }
@@ -412,10 +413,13 @@ function StockTradeTicket({
         />
         <p className="text-xs text-muted">{preview}</p>
       </div>
+      {tradeReason && !halted && tradeReason !== TRADE_UNAVAILABLE ? (
+        <p className="text-sm text-muted" role="status">
+          {tradeReason}
+        </p>
+      ) : null}
       <Button type="button" className="w-full" size="lg" disabled>
-        {halted
-          ? "Trading halted"
-          : (tradeReason ?? `${side === "buy" ? "Buy" : "Sell"} ${symbol}`)}
+        {halted ? "Trading halted" : `${side === "buy" ? "Buy" : "Sell"} ${symbol}`}
       </Button>
       <p className="text-xs text-muted">
         The execution price is a 0x quote, not the Robinhood mid. The mid is a reference only. Buy

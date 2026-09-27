@@ -14,6 +14,7 @@ import { SendComposeForm } from "@/components/send-form/compose-form";
 import { SendReviewPanel } from "@/components/send-form/review-panel";
 import { SendSuccessPanel } from "@/components/send-form/success-panel";
 import { createInitialSendFormState, sendFormReducer } from "@/components/send-form/state";
+import { userFacingError } from "@/lib/user-facing-error";
 
 export function SendForm() {
   const { isSignedIn, address, chainId } = useSignedInWallet();
@@ -65,7 +66,7 @@ export function SendForm() {
     } catch (err) {
       dispatch({
         type: "setError",
-        error: err instanceof Error ? err.message : "Invalid send details",
+        error: userFacingError(err, "Check the recipient and amount, then try again."),
       });
     }
   }
@@ -82,10 +83,10 @@ export function SendForm() {
     dispatch({ type: "setError", error: null });
     try {
       if (!onRobinhood) {
-        throw new Error("Switch to Robinhood Chain to send USDG. Nothing was sent.");
+        throw new Error("Switch to Robinhood Chain to send USDG.");
       }
       if (!enoughBalance) {
-        throw new Error("USDG balance is below the batch total. Nothing was sent.");
+        throw new Error("This wallet doesn't have enough USDG on Robinhood Chain.");
       }
       const calls = buildUsdgTransferCalls(
         review.recipients.map((row) => ({
@@ -126,7 +127,7 @@ export function SendForm() {
     } catch (err) {
       dispatch({
         type: "setError",
-        error: err instanceof Error ? err.message : "Send failed",
+        error: userFacingError(err, "Send could not be submitted. Try again."),
       });
     } finally {
       dispatch({ type: "confirmFinished" });
@@ -137,11 +138,25 @@ export function SendForm() {
     return <SendSuccessPanel review={review} onReset={() => dispatch({ type: "reset" })} />;
   }
 
+  const sendBlocker =
+    review === null
+      ? null
+      : !onRobinhood
+        ? "Switch to Robinhood Chain to send USDG."
+        : balance === undefined
+          ? "Checking your USDG balance…"
+          : !enoughBalance
+            ? "This wallet doesn't have enough USDG on Robinhood Chain."
+            : !withinCap
+              ? `A send can include at most ${MAX_SEND_RECIPIENTS} recipients.`
+              : null;
+
   if (step === "review" && review) {
     return (
       <SendReviewPanel
         review={review}
         error={error}
+        blocker={sendBlocker}
         confirming={confirming}
         canConfirm={canConfirm}
         onBack={() => dispatch({ type: "backToCompose" })}

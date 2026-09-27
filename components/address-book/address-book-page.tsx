@@ -6,6 +6,7 @@ import { isAddress } from "viem";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import type { Doc } from "@/convex/_generated/dataModel";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useSignedInWallet } from "@/lib/use-signed-in-wallet";
 import { ContactForm } from "@/components/address-book/contact-form";
 import { LoginButton } from "@/components/login-button";
@@ -20,6 +21,7 @@ import {
   ResponsiveDialogTitle,
 } from "@/components/responsive-dialog";
 import { shortenAddress } from "@/lib/utils";
+import { userFacingError } from "@/lib/user-facing-error";
 
 type Editor =
   | { mode: "create" }
@@ -88,7 +90,7 @@ function useAddressBookEditor() {
       }
       closeEditor();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to save contact.");
+      setError(userFacingError(err, "Unable to save contact."));
     } finally {
       setSaving(false);
     }
@@ -102,7 +104,7 @@ function useAddressBookEditor() {
       await removeContact({ contactId: editor.contact._id });
       closeEditor();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to delete contact.");
+      setError(userFacingError(err, "Unable to delete contact."));
     } finally {
       setSaving(false);
     }
@@ -126,7 +128,7 @@ function useAddressBookEditor() {
 }
 
 export function AddressBookPage() {
-  const { isSignedIn } = useSignedInWallet();
+  const { ready, isSignedIn } = useSignedInWallet();
   const contacts = useQuery(api.contacts.list, isSignedIn ? {} : "skip");
   const editor = useAddressBookEditor();
 
@@ -153,6 +155,7 @@ export function AddressBookPage() {
       </div>
 
       <AddressBookContacts
+        ready={ready}
         isSignedIn={isSignedIn}
         contacts={contacts}
         sorted={sorted}
@@ -177,18 +180,43 @@ export function AddressBookPage() {
 }
 
 function AddressBookContacts({
+  ready,
   isSignedIn,
   contacts,
   sorted,
   onEdit,
   onDelete,
 }: {
+  ready: boolean;
   isSignedIn: boolean;
   contacts: Doc<"contacts">[] | undefined;
   sorted: Doc<"contacts">[];
   onEdit: (contact: Doc<"contacts">) => void;
   onDelete: (contact: Doc<"contacts">) => void;
 }) {
+  if (!ready || (isSignedIn && contacts === undefined)) {
+    return (
+      <div
+        className="overflow-hidden rounded-md border border-border"
+        role="status"
+        aria-label="Loading"
+        aria-busy="true"
+      >
+        {["a", "b", "c"].map((row) => (
+          <div
+            key={row}
+            className="flex items-center gap-3 border-b border-border px-3 py-3 last:border-b-0"
+          >
+            <div className="min-w-0 flex-1 space-y-2">
+              <Skeleton className="h-4 w-28" />
+              <Skeleton className="h-3 w-40" />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   if (!isSignedIn) {
     return (
       <div className="pr-panel pr-panel--padded space-y-4">
@@ -196,10 +224,6 @@ function AddressBookContacts({
         <LoginButton />
       </div>
     );
-  }
-
-  if (contacts === undefined) {
-    return <p className="text-sm text-muted">Loading contacts…</p>;
   }
 
   if (sorted.length === 0) {

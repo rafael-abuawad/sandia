@@ -8,7 +8,7 @@ export default function HomePage() {
         <div className="relative max-w-2xl space-y-6">
           <p className="pr-eyebrow pr-animate-in">Payrequest</p>
           <h1 className="pr-display pr-animate-in pr-animate-in-delay-1 text-3xl sm:text-5xl">
-            Request dollars. Receive stablecoins on Robinhood Chain.
+            Request dollars. Receive USDG on Robinhood Chain.
           </h1>
           <p className="pr-lede pr-animate-in pr-animate-in-delay-2">
             Create a payment link or send USDG. Switch modes from the navigation to get started.
@@ -31,7 +31,7 @@ export default function HomePage() {
         {[
           {
             title: "Request",
-            body: "Create a USD payment link. Payers connect a wallet and bridge tokens to the recipient — no account required.",
+            body: "Create a USD payment link. Payers settle from their own chain, and USDG arrives on Robinhood Chain. No Payrequest account required.",
           },
           {
             title: "Send",

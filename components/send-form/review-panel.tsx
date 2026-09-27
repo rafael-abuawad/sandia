@@ -11,6 +11,7 @@ import type { ReviewPayload } from "@/components/send-form/state";
 export function SendReviewPanel({
   review,
   error,
+  blocker,
   confirming,
   canConfirm,
   onBack,
@@ -18,12 +19,14 @@ export function SendReviewPanel({
 }: {
   review: ReviewPayload;
   error: string | null;
+  blocker: string | null;
   confirming: boolean;
   canConfirm: boolean;
   onBack: () => void;
   onConfirm: () => void;
 }) {
   const errorId = useId();
+  const blockerId = useId();
 
   return (
     <div className="space-y-5">
@@ -54,6 +57,11 @@ export function SendReviewPanel({
       </section>
 
       <FieldError id={errorId} message={error} />
+      {blocker && !confirming && !error ? (
+        <p id={blockerId} className="text-sm text-muted" role="status">
+          {blocker}
+        </p>
+      ) : null}
 
       <div className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-10 flex gap-3 bg-[color-mix(in_srgb,var(--background)_92%,transparent)] py-3 backdrop-blur-sm md:static md:bg-transparent md:p-0 md:backdrop-blur-none">
         <Button
@@ -69,6 +77,9 @@ export function SendReviewPanel({
           type="button"
           className="flex-1"
           disabled={confirming || !canConfirm}
+          aria-describedby={
+            !canConfirm && blocker && !error ? blockerId : error ? errorId : undefined
+          }
           onClick={onConfirm}
         >
           {confirming ? "Sending…" : "Confirm send"}

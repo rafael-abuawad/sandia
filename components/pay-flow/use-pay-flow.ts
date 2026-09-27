@@ -19,6 +19,8 @@ import {
 } from "@/lib/across/client";
 import { appChains, PAYER_CHAIN_IDS, isPayerTokenAllowed, displayTokenSymbol } from "@/lib/chains";
 import { initialPayFlowState, payFlowReducer } from "@/components/pay-flow/state";
+import { statusLabel } from "@/components/status-badge";
+import { userFacingError } from "@/lib/user-facing-error";
 
 const CHAIN_ORDER = [1, 8453, 42161, 10, 137, 56, 43114, 143];
 const SYMBOL_ORDER = [
@@ -50,7 +52,7 @@ function acrossStatusCopy(status: string): string {
     case "filled":
       return "Payment settled on Robinhood Chain.";
     default:
-      return `Bridge status: ${status}`;
+      return `Bridge status: ${statusLabel(status)}.`;
   }
 }
 
@@ -165,7 +167,7 @@ export function usePayFlow(publicId: string) {
         if (!cancelled) {
           dispatch({
             type: "routesFailed",
-            error: e instanceof Error ? e.message : "Failed to load routes",
+            error: userFacingError(e, "Chains and tokens could not be loaded. Refresh and try again."),
           });
         }
       }
@@ -226,7 +228,7 @@ export function usePayFlow(publicId: string) {
     } catch (e) {
       dispatch({
         type: "quoteFailed",
-        error: e instanceof Error ? e.message : "No valid route",
+        error: userFacingError(e, "No route is available for this token. Try another one."),
       });
     }
   }, [request, address, originChainId, inputToken, publicId, quoteSwap]);
@@ -269,7 +271,10 @@ export function usePayFlow(publicId: string) {
         if (result.acrossStatus === "expired" || result.acrossStatus === "refunded") {
           dispatch({
             type: "paymentFailed",
-            message: `Transfer ${result.acrossStatus}. Funds will be refunded. You can try again.`,
+            message:
+              result.acrossStatus === "refunded"
+                ? "This transfer was refunded. You can try again."
+                : "This transfer expired. Funds will be refunded. You can try again.",
           });
           return;
         }
@@ -281,7 +286,7 @@ export function usePayFlow(publicId: string) {
         if (!cancelled) {
           dispatch({
             type: "statusChanged",
-            message: e instanceof Error ? e.message : "Status sync failed",
+            message: userFacingError(e, "Settlement status could not be refreshed."),
           });
         }
       }
@@ -384,7 +389,7 @@ export function usePayFlow(publicId: string) {
     } catch (e) {
       dispatch({
         type: "paymentFailed",
-        message: e instanceof Error ? e.message : "Payment failed",
+        message: userFacingError(e, "Payment could not be submitted. Try again."),
       });
     }
   }

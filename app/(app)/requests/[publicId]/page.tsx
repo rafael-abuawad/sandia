@@ -20,6 +20,8 @@ import {
 } from "@/components/ui/input-group";
 import { formatDisplayDateTime } from "@/lib/format-datetime";
 import { formatTokenAmount, formatUsdFromMicros } from "@/lib/money";
+import { userFacingError } from "@/lib/user-facing-error";
+import RequestDetailLoading from "./loading";
 
 export default function RequestDetailPage({ params }: { params: Promise<{ publicId: string }> }) {
   const { publicId } = use(params);
@@ -39,7 +41,7 @@ function RequestDetail({ publicId }: { publicId: string }) {
   );
 
   if (!ready) {
-    return <p className="text-sm text-muted">Loading…</p>;
+    return <RequestDetailLoading />;
   }
 
   if (!isSignedIn) {
@@ -47,7 +49,7 @@ function RequestDetail({ publicId }: { publicId: string }) {
   }
 
   if (request === undefined) {
-    return <p className="text-sm text-muted">Loading…</p>;
+    return <RequestDetailLoading />;
   }
 
   if (request === null) {
@@ -110,7 +112,7 @@ function RequestDetailLoaded({
       await cancel({ publicId });
       setConfirmCancel(false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Unable to cancel request. Try again.");
+      setError(userFacingError(e, "Unable to cancel request. Try again."));
     } finally {
       setBusy(false);
     }
@@ -141,26 +143,24 @@ function RequestDetailLoaded({
         <StatusBadge status={request.status} />
       </div>
 
-      {(request.description || expiresLabel) && (
-        <dl className="space-y-1 text-sm">
-          {request.description ? (
-            <div className="flex justify-between gap-4">
-              <dt className="text-muted">Note</dt>
-              <dd className="text-right text-foreground">{request.description}</dd>
-            </div>
-          ) : null}
-          {expiresLabel ? (
-            <div className="flex justify-between gap-4">
-              <dt className="text-muted">Expires</dt>
-              <dd className="text-right text-foreground">{expiresLabel}</dd>
-            </div>
-          ) : null}
+      <dl className="space-y-1 text-sm">
+        {request.description ? (
           <div className="flex justify-between gap-4">
-            <dt className="text-muted">Paid to</dt>
-            <dd className="pr-mono text-right text-foreground">{request.recipientAddress}</dd>
+            <dt className="text-muted">Note</dt>
+            <dd className="text-right text-foreground">{request.description}</dd>
           </div>
-        </dl>
-      )}
+        ) : null}
+        <div className="flex justify-between gap-4">
+          <dt className="text-muted">Expires</dt>
+          <dd className="text-right text-foreground">
+            {expiresLabel ?? "Stays open until paid or cancelled"}
+          </dd>
+        </div>
+        <div className="flex justify-between gap-4">
+          <dt className="text-muted">Paid to</dt>
+          <dd className="pr-mono text-right text-foreground">{request.recipientAddress}</dd>
+        </div>
+      </dl>
 
       <div className="pr-panel pr-panel--padded space-y-4">
         <p className="pr-kicker">Payment link</p>

@@ -99,7 +99,7 @@ export function SendComposeForm({
   const footer = !isConnected ? (
     <div className="flex flex-col items-stretch gap-3">
       <p className="text-sm text-muted">
-        Sign in to continue this demo send. No transaction will be sent yet.
+        Sign in to send USDG.
       </p>
       <LoginButton />
     </div>
