@@ -1,6 +1,7 @@
 from src import Send
 from moccasin.boa_tools import VyperContract
 from moccasin.config import get_active_network
+from script.verify import verify_contract
 
 
 def deploy() -> VyperContract:
@@ -10,9 +11,7 @@ def deploy() -> VyperContract:
 
     active_network = get_active_network()
     if active_network.has_explorer():
-        result = active_network.moccasin_verify(send)
-        result.wait_for_verification()
-        print("Verified Sandia Send")
+        verify_contract(send)
     else:
         print("Skipped verification: this network has no explorer")
 

@@ -7,5 +7,8 @@ dot_env = ".env"
 url = "https://rpc.mainnet.chain.robinhood.com"
 chain_id = 4663
 prompt_live = true
+# Public explorer page. Script verification uses the Pro API instead,
+# because this host answers non-browser clients with a Cloudflare challenge.
 explorer_uri = "https://robinhoodchain.blockscout.com"
 explorer_type = "blockscout"
+explorer_api_key = "${BLOCKSCOUT_API_KEY}"
