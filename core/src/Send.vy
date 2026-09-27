@@ -13,7 +13,7 @@
 from ethereum.ercs import IERC20
 
 
-MAX_SEND_LENGTH: public(constant(uint256)) = 128
+MAX_SEND_LENGTH: public(constant(uint256)) = 32
 
 
 struct Recipient:
