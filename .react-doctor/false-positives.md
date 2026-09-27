@@ -22,9 +22,9 @@ Sequential `await` here is required correctness, not a missed optimization.
 
 ## react-doctor/async-await-in-loop · `components/send-form.tsx`
 
-USDG batch transfers must run **in order**: each `writeContractAsync` consumes the
-wallet nonce and the next popup/receipt depends on the previous hash confirming.
-`Promise.all` would race nonces and ask the wallet to sign overlapping transfers.
+A batch send approves USDG for the Sandia Send contract, waits for that receipt,
+then calls `sandia_send`. The approval must mine first so the allowance and nonce
+are ready. A single recipient is one `transfer` and does not use the contract.
 
 ## react-doctor/async-await-in-loop · `convex/outboundActions.ts`
 

@@ -43,6 +43,14 @@ npx convex env set PRIVY_APP_ID <same-as-NEXT_PUBLIC_PRIVY_APP_ID>
 npx convex env set SANDIA_NONCE_SECRET <secret>
 ```
 
+Batch sends also need the deployed Sandia Send address in `.env.local`:
+
+```bash
+NEXT_PUBLIC_SANDIA_SEND_ADDRESS=<sandia-send-address>
+```
+
+A single recipient still transfers USDG directly. Two or more recipients approve that contract, then call `sandia_send`.
+
 5. In another terminal:
 
 ```bash

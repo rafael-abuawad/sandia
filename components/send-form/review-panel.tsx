@@ -34,8 +34,9 @@ export function SendReviewPanel({
         <div>
           <h2 className="pr-section-title">Review send</h2>
           <p className="mt-1 text-sm text-muted">
-            Robinhood Chain · USDG. Each recipient is a separate transfer. Your wallet needs ETH on
-            Robinhood Chain for gas.
+            {review.mode === "massive"
+              ? "Robinhood Chain · USDG. This batch is one send after you approve USDG for the total. Your wallet needs ETH on Robinhood Chain for gas."
+              : "Robinhood Chain · USDG. This is a direct transfer. Your wallet needs ETH on Robinhood Chain for gas."}
           </p>
         </div>
 

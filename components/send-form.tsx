@@ -1,20 +1,35 @@
 "use client";
 
 import { useMemo, useReducer } from "react";
-import { erc20Abi, type Address } from "viem";
+import { erc20Abi, type Address, type Hex } from "viem";
 import { usePublicClient, useReadContract, useWriteContract } from "wagmi";
 import { useAction, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { formatUsdFromMicros, parseUsdToMicros } from "@/lib/money";
 import { ROBINHOOD_USDG } from "@/lib/destination";
 import { useSignedInWallet } from "@/lib/use-signed-in-wallet";
-import { buildUsdgTransferCalls, MAX_SEND_RECIPIENTS } from "@/lib/send/calls";
+import {
+  buildSandiaSendCall,
+  buildUsdgTransferCalls,
+  MAX_SEND_RECIPIENTS,
+  sandiaSendAbi,
+  sandiaSendAddress,
+} from "@/lib/send/calls";
 import { buildReviewPayload } from "@/components/send-form/helpers";
 import { SendComposeForm } from "@/components/send-form/compose-form";
 import { SendReviewPanel } from "@/components/send-form/review-panel";
 import { SendSuccessPanel } from "@/components/send-form/success-panel";
 import { createInitialSendFormState, sendFormReducer } from "@/components/send-form/state";
 import { userFacingError } from "@/lib/user-facing-error";
+
+function isSandiaSendConfigured(): boolean {
+  try {
+    sandiaSendAddress();
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export function SendForm() {
   const { isSignedIn, address, chainId } = useSignedInWallet();
@@ -75,7 +90,31 @@ export function SendForm() {
   const enoughBalance =
     review !== null && balance !== undefined && balance >= BigInt(review.totalUsdMicros);
   const withinCap = (review?.recipients.length ?? 0) <= MAX_SEND_RECIPIENTS;
-  const canConfirm = Boolean(review && onRobinhood && enoughBalance && withinCap && !confirming);
+  const isBatch = (review?.recipients.length ?? 0) > 1;
+  const sendConfigured = !isBatch || isSandiaSendConfigured();
+  const canConfirm = Boolean(
+    review && onRobinhood && enoughBalance && withinCap && sendConfigured && !confirming,
+  );
+
+  async function recordFilled(
+    userOpHash: Hex,
+    calls: Array<{ recipient: Address; amount: bigint }>,
+  ) {
+    if (!userOpHash.startsWith("0x") || userOpHash.length !== 66) {
+      throw new Error("The transfer was submitted, but no transaction hash was returned.");
+    }
+    await recordSend({
+      userOpHash,
+      calls: calls.map((call) => ({
+        recipient: call.recipient,
+        amount: call.amount.toString(),
+      })),
+    });
+    const verified = await attachBundle({ userOpHash, txHashes: [userOpHash] });
+    if (verified.status !== "filled") {
+      throw new Error(verified.reason ?? "The receipt did not pay every recipient.");
+    }
+  }
 
   async function onConfirm() {
     if (!review) return;
@@ -88,14 +127,57 @@ export function SendForm() {
       if (!enoughBalance) {
         throw new Error("This wallet doesn't have enough USDG on Robinhood Chain.");
       }
-      const calls = buildUsdgTransferCalls(
-        review.recipients.map((row) => ({
-          address: row.address,
-          amountUsdMicros: row.amountUsdMicros,
-        })),
-      );
-      const txHashes: string[] = [];
-      for (const call of calls) {
+      const recipientInputs = review.recipients.map((row) => ({
+        address: row.address,
+        amountUsdMicros: row.amountUsdMicros,
+      }));
+
+      if (recipientInputs.length > 1) {
+        if (!address) throw new Error("Sign in to send USDG.");
+        if (!publicClient) {
+          throw new Error("Robinhood Chain is not reachable. Refresh and try again.");
+        }
+        const batch = buildSandiaSendCall(recipientInputs);
+        const allowance = await publicClient.readContract({
+          address: ROBINHOOD_USDG.address as Address,
+          abi: erc20Abi,
+          functionName: "allowance",
+          args: [address, batch.to],
+        });
+        if (allowance < batch.total) {
+          // Approval must mine before sandia_send so the allowance and nonce are ready.
+          const approveHash = await writeContractAsync({
+            address: ROBINHOOD_USDG.address as Address,
+            abi: erc20Abi,
+            functionName: "approve",
+            args: [batch.to, batch.total],
+            chainId: ROBINHOOD_USDG.chainId,
+          });
+          const approveReceipt = await publicClient.waitForTransactionReceipt({
+            hash: approveHash,
+          });
+          if (approveReceipt.status !== "success") {
+            throw new Error("USDG approval did not confirm. Try again.");
+          }
+        }
+        const hash = await writeContractAsync({
+          address: batch.to,
+          abi: sandiaSendAbi,
+          functionName: "sandia_send",
+          args: [batch.recipients, ROBINHOOD_USDG.address as Address],
+          chainId: ROBINHOOD_USDG.chainId,
+        });
+        const receipt = await publicClient.waitForTransactionReceipt({ hash });
+        if (receipt.status !== "success") {
+          throw new Error("The batch send did not confirm. Try again.");
+        }
+        await recordFilled(
+          hash,
+          batch.recipients.map((row) => ({ recipient: row.account, amount: row.amount })),
+        );
+      } else {
+        const [call] = buildUsdgTransferCalls(recipientInputs);
+        if (!call) throw new Error("Add a recipient");
         const hash = await writeContractAsync({
           address: ROBINHOOD_USDG.address as Address,
           abi: erc20Abi,
@@ -106,22 +188,7 @@ export function SendForm() {
         if (publicClient) {
           await publicClient.waitForTransactionReceipt({ hash });
         }
-        txHashes.push(hash);
-      }
-      const userOpHash = txHashes[0];
-      if (!userOpHash || !userOpHash.startsWith("0x") || userOpHash.length !== 66) {
-        throw new Error("The transfer was submitted, but no transaction hash was returned.");
-      }
-      await recordSend({
-        userOpHash,
-        calls: calls.map((call) => ({
-          recipient: call.recipient,
-          amount: call.amount.toString(),
-        })),
-      });
-      const verified = await attachBundle({ userOpHash, txHashes });
-      if (verified.status !== "filled") {
-        throw new Error(verified.reason ?? "The receipt did not pay every recipient.");
+        await recordFilled(hash, [{ recipient: call.recipient, amount: call.amount }]);
       }
       dispatch({ type: "confirmSucceeded" });
     } catch (err) {
@@ -149,7 +216,9 @@ export function SendForm() {
             ? "This wallet doesn't have enough USDG on Robinhood Chain."
             : !withinCap
               ? `A send can include at most ${MAX_SEND_RECIPIENTS} recipients.`
-              : null;
+              : !sendConfigured
+                ? "Sandia Send is not configured."
+                : null;
 
   if (step === "review" && review) {
     return (
