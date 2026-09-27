@@ -13,6 +13,7 @@ import type * as activity from "../activity.js";
 import type * as contacts from "../contacts.js";
 import type * as crons from "../crons.js";
 import type * as directSettlement from "../directSettlement.js";
+import type * as lib_acrossDeposit from "../lib/acrossDeposit.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_depositLog from "../lib/depositLog.js";
 import type * as lib_fillProof from "../lib/fillProof.js";
@@ -38,6 +39,7 @@ declare const fullApi: ApiFromModules<{
   contacts: typeof contacts;
   crons: typeof crons;
   directSettlement: typeof directSettlement;
+  "lib/acrossDeposit": typeof lib_acrossDeposit;
   "lib/auth": typeof lib_auth;
   "lib/depositLog": typeof lib_depositLog;
   "lib/fillProof": typeof lib_fillProof;

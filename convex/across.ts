@@ -5,6 +5,7 @@ import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { createPublicClient, http, type Hex } from "viem";
 import { arbitrum, avalanche, base, bsc, mainnet, monad, optimism, polygon } from "viem/chains";
+import { parseAcrossDeposit, type AcrossDepositRecord } from "./lib/acrossDeposit";
 import { matchDepositToRequest, parseDepositLogs } from "./lib/depositLog";
 import { RECONCILE_BATCH } from "./lib/fillProof";
 import { matchTransferToPayment, parseTransferLogs } from "./lib/transferLog";
@@ -27,19 +28,6 @@ const chainsById = new Map<
     (chain) => [chain.id, chain],
   ),
 );
-
-type AcrossDepositRecord = {
-  status?: string;
-  fillTxnRef?: string;
-  fillTx?: string;
-  destinationChainId?: number;
-  originChainId?: number;
-  depositTxnRef?: string;
-  depositTxHash?: string;
-  recipient?: string;
-  outputToken?: string;
-  outputAmount?: string;
-};
 
 function acrossHeaders(): HeadersInit {
   const headers: Record<string, string> = { Accept: "application/json" };
@@ -64,34 +52,13 @@ async function acrossGet(path: string, params: Record<string, string>): Promise<
   return await res.json();
 }
 
-function asRecord(value: unknown): AcrossDepositRecord | null {
-  if (!value || typeof value !== "object") return null;
-  return value as AcrossDepositRecord;
-}
-
 /** `/deposit` carries recipient, token, and amount. `/deposit/status` does not. */
 export async function fetchDepositProof(depositTxnRef: string): Promise<AcrossDepositRecord> {
-  const single = await acrossGet("/deposit", { depositTxnRef });
-  const record = asRecord(single);
-  if (record?.status) return record;
-
-  const list = await acrossGet("/deposits", { depositTxHash: depositTxnRef });
-  const rows = Array.isArray(list)
-    ? list
-    : list && typeof list === "object" && Array.isArray((list as { deposits?: unknown[] }).deposits)
-      ? (list as { deposits: unknown[] }).deposits
-      : [];
-  const match = rows
-    .map(asRecord)
-    .find(
-      (row) =>
-        row?.depositTxHash?.toLowerCase() === depositTxnRef.toLowerCase() ||
-        row?.depositTxnRef?.toLowerCase() === depositTxnRef.toLowerCase(),
-    );
-  if (!match) {
+  const record = parseAcrossDeposit(await acrossGet("/deposit", { depositTxnRef }));
+  if (!record) {
     throw new Error("Across has not indexed this deposit yet");
   }
-  return match;
+  return record;
 }
 
 async function readOriginDeposit(originChainId: number, depositTxnRef: string) {
