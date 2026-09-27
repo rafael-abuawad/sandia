@@ -29,14 +29,13 @@ pnpm install
 npx convex dev
 ```
 
-4. Set Privy and wallet-claim secrets in `.env.local`:
+4. Set the Privy app id in `.env.local`:
 
 ```bash
 NEXT_PUBLIC_PRIVY_APP_ID=<privy-app-id>
-SANDIA_NONCE_SECRET=<secret>
 ```
 
-Create a Privy app with email OTP and wallets enabled. Allow `http://localhost:3000`. On Convex:
+Create a Privy app with email OTP and wallets enabled. Allow `http://localhost:3000`. On Convex, set the same app id and the wallet-claim secret:
 
 ```bash
 npx convex env set PRIVY_APP_ID <same-as-NEXT_PUBLIC_PRIVY_APP_ID>
