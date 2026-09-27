@@ -23,11 +23,7 @@ import { appChains, PAYER_CHAIN_IDS, isPayerTokenAllowed, displayTokenSymbol } f
 import { isDirectUsdgPay, isRobinhoodEthPay, ROBINHOOD_USDG } from "@/lib/destination";
 import { ethSpendBaseUnits } from "@/lib/zerox-quote";
 import { buildUsdgPaymentTransfer } from "@/lib/send/calls";
-import {
-  initialPayFlowState,
-  payFlowReducer,
-  type SentPayment,
-} from "@/components/pay-flow/state";
+import { initialPayFlowState, payFlowReducer, type SentPayment } from "@/components/pay-flow/state";
 import { statusLabel } from "@/components/status-badge";
 import { userFacingError } from "@/lib/user-facing-error";
 
@@ -416,7 +412,11 @@ export function usePayFlow(publicId: string) {
         await submitEthSwap({ publicId, payerAddress: sent.payerAddress, depositTxnRef: tracked });
       }
       window.sessionStorage.setItem(`sandia-deposit:${publicId}`, tracked);
-      dispatch({ type: "depositTracked", depositTxnRef: tracked, message: TRACKED_MESSAGE[sent.kind] });
+      dispatch({
+        type: "depositTracked",
+        depositTxnRef: tracked,
+        message: TRACKED_MESSAGE[sent.kind],
+      });
     } catch (e) {
       dispatch({
         type: "paymentUnverified",

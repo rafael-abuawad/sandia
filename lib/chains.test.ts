@@ -54,7 +54,9 @@ describe("isPayerTokenAllowed", () => {
     expect(isPayerTokenAllowed("WPOL", "0x0d500b1d8e8ef31e21c99d1db9a6444d3adf1270", 137)).toBe(
       true,
     );
-    expect(isPayerTokenAllowed("WBNB", "0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c", 56)).toBe(true);
+    expect(isPayerTokenAllowed("WBNB", "0xbb4cdb9cbd36b01bd1cbaebf2de08d9173bc095c", 56)).toBe(
+      true,
+    );
     expect(isPayerTokenAllowed("WAVAX", "0xb31f66aa3c1e785363f0875a1b74e27b85fd66c7", 43114)).toBe(
       true,
     );
