@@ -1,7 +1,9 @@
 "use client";
 
+import { AppBrand } from "@/components/app-brand";
 import { PayAcrossPanel } from "@/components/pay-flow/across-pay-panel";
 import { PayAttemptsList, PayTerminalStatus } from "@/components/pay-flow/attempts-list";
+import { PayRequestLoading } from "@/components/pay-flow/pay-request-loading";
 import { PayRequestSummary } from "@/components/pay-flow/request-summary";
 import { usePayFlow } from "@/components/pay-flow/use-pay-flow";
 
@@ -21,9 +23,14 @@ export function PayFlow({ publicId }: PayFlowProps) {
     step,
     quoteError,
     quote,
+    ethQuote,
     tradeType,
     selectedToken,
     chains,
+    directPay,
+    directBalance,
+    robinhoodEth,
+    ethBalance,
     canPay,
     paymentInProgress,
     payerAddress,
@@ -39,7 +46,7 @@ export function PayFlow({ publicId }: PayFlowProps) {
   } = usePayFlow(publicId);
 
   if (request === undefined) {
-    return <p className="text-sm text-muted">Loading payment request…</p>;
+    return <PayRequestLoading />;
   }
   if (request === null) {
     return (
@@ -56,6 +63,7 @@ export function PayFlow({ publicId }: PayFlowProps) {
 
   return (
     <div className="space-y-6">
+      <AppBrand name="Sandia" />
       <PayRequestSummary
         amountUsdMicros={request.amountUsdMicros}
         status={request.status}
@@ -80,12 +88,17 @@ export function PayFlow({ publicId }: PayFlowProps) {
           step={step}
           quoteError={quoteError}
           quote={quote}
+          ethQuote={ethQuote}
           tradeType={tradeType}
           selectedToken={selectedToken}
           chains={chains}
           destinationTokenSymbol={request.destinationTokenSymbol}
           destinationTokenDecimals={request.destinationTokenDecimals}
           outputAmountBaseUnits={request.outputAmountBaseUnits}
+          directPay={directPay}
+          directBalance={directBalance}
+          robinhoodEth={robinhoodEth}
+          ethBalance={ethBalance}
           canPay={canPay}
           payerAddress={payerAddress}
           paymentInProgress={Boolean(paymentInProgress)}

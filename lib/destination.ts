@@ -9,3 +9,18 @@ export const ROBINHOOD_USDG = {
   logoUrl: "/assets/tokens/usdg.svg",
   chainLogoUrl: "/assets/chains/robinhood.svg",
 } as const;
+
+/** Wrapped ETH on Robinhood. The pay screen labels this token ETH. */
+export const ROBINHOOD_WETH = "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73" as const;
+
+/** USDG on Robinhood settles with a same-chain transfer. */
+export function isDirectUsdgPay(chainId: number | null, tokenAddress: string): boolean {
+  if (chainId !== ROBINHOOD_USDG.chainId || !tokenAddress) return false;
+  return tokenAddress.toLowerCase() === ROBINHOOD_USDG.address.toLowerCase();
+}
+
+/** ETH on Robinhood swaps to USDG through 0x. Across does not quote same-chain routes. */
+export function isRobinhoodEthPay(chainId: number | null, tokenAddress: string): boolean {
+  if (chainId !== ROBINHOOD_USDG.chainId || !tokenAddress) return false;
+  return tokenAddress.toLowerCase() === ROBINHOOD_WETH.toLowerCase();
+}

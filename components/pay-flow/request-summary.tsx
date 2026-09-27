@@ -60,8 +60,9 @@ export function PayRequestSummary({
         </p>
       ) : null}
       <p className="text-xs text-muted">
-        The USD amount converts 1:1 into {destinationTokenSymbol}. Across may add a bridge fee on
-        what you send; the recipient still receives at least the requested amount.
+        The USD amount converts 1:1 into {destinationTokenSymbol}. Paying in USDG on Robinhood sends
+        that amount in full, with no route fee. Other tokens can include a route fee, and the
+        recipient still receives at least the requested amount.
       </p>
     </section>
   );

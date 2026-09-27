@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildUsdgTransferCalls } from "./calls";
+import { buildUsdgPaymentTransfer, buildUsdgTransferCalls } from "./calls";
 
 describe("buildUsdgTransferCalls", () => {
   it("rejects a bad address, a zero amount, and more than 20 recipients", () => {
@@ -26,5 +26,14 @@ describe("buildUsdgTransferCalls", () => {
     expect(calls).toHaveLength(2);
     expect(calls[0]?.amount).toBe(1_500_000n);
     expect(calls[1]?.data.startsWith("0x")).toBe(true);
+  });
+});
+
+describe("buildUsdgPaymentTransfer", () => {
+  it("encodes the request amount in base units", () => {
+    const call = buildUsdgPaymentTransfer("0x1111111111111111111111111111111111111111", "2500000");
+    expect(call.amount).toBe(2_500_000n);
+    expect(call.value).toBe(0n);
+    expect(call.data.startsWith("0xa9059cbb")).toBe(true);
   });
 });

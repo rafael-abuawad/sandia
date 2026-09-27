@@ -97,6 +97,35 @@ export const getByDepositTxnRef = internalQuery({
   },
 });
 
+/** Attempt plus the request fields needed to verify a direct USDG transfer. */
+export const getSettlementTarget = internalQuery({
+  args: { depositTxnRef: v.string() },
+  returns: v.union(
+    v.object({
+      settlementKind: v.union(v.literal("across"), v.literal("direct")),
+      destinationTokenAddress: v.string(),
+      recipientAddress: v.string(),
+      outputAmountBaseUnits: v.string(),
+    }),
+    v.null(),
+  ),
+  handler: async (ctx, args) => {
+    const attempt = await ctx.db
+      .query("paymentAttempts")
+      .withIndex("by_depositTxnRef", (q) => q.eq("depositTxnRef", args.depositTxnRef.toLowerCase()))
+      .unique();
+    if (!attempt) return null;
+    const request = await ctx.db.get(attempt.requestId);
+    if (!request) return null;
+    return {
+      settlementKind: attempt.settlementKind ?? "across",
+      destinationTokenAddress: request.destinationTokenAddress,
+      recipientAddress: request.recipientAddress,
+      outputAmountBaseUnits: request.outputAmountBaseUnits,
+    };
+  },
+});
+
 export const listForReconciliation = internalQuery({
   args: { limit: v.number() },
   returns: v.array(

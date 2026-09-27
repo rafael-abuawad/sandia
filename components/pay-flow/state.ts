@@ -1,5 +1,6 @@
 import type { Hex } from "viem";
 import type { AcrossChain, AcrossToken, AcrossSwapQuote } from "@/lib/across/client";
+import type { EthSwapQuote } from "@/lib/zerox-quote";
 
 export type PayStep = "idle" | "quoting" | "approving" | "paying" | "tracking" | "done" | "error";
 
@@ -9,6 +10,7 @@ export type PayFlowState = {
   originChainId: number | null;
   inputToken: string;
   quote: AcrossSwapQuote | null;
+  ethQuote: EthSwapQuote | null;
   tradeType: "exactOutput" | "minOutput" | null;
   quoteError: string | null;
   step: PayStep;
@@ -23,6 +25,7 @@ export const initialPayFlowState: PayFlowState = {
   originChainId: null,
   inputToken: "",
   quote: null,
+  ethQuote: null,
   tradeType: null,
   quoteError: null,
   step: "idle",
@@ -52,6 +55,7 @@ export type PayFlowAction =
       quote: AcrossSwapQuote;
       tradeType: "exactOutput" | "minOutput";
     }
+  | { type: "ethQuoteSucceeded"; quote: EthSwapQuote }
   | { type: "quoteFailed"; error: string }
   | { type: "stepChanged"; step: PayStep }
   | { type: "statusChanged"; message: string | null }
@@ -79,6 +83,7 @@ export function payFlowReducer(state: PayFlowState, action: PayFlowAction): PayF
         originChainId: action.chainId,
         inputToken: "",
         quote: null,
+        ethQuote: null,
         quoteError: null,
         tradeType: null,
         step: "idle",
@@ -88,6 +93,7 @@ export function payFlowReducer(state: PayFlowState, action: PayFlowAction): PayF
         ...state,
         inputToken: action.token,
         quote: null,
+        ethQuote: null,
         quoteError: null,
         tradeType: null,
         step: action.nextStep,
@@ -97,6 +103,7 @@ export function payFlowReducer(state: PayFlowState, action: PayFlowAction): PayF
         ...state,
         inputToken: "",
         quote: null,
+        ethQuote: null,
         quoteError: null,
       };
     case "quoteStarted":
@@ -105,18 +112,31 @@ export function payFlowReducer(state: PayFlowState, action: PayFlowAction): PayF
         step: "quoting",
         quoteError: null,
         quote: null,
+        ethQuote: null,
       };
     case "quoteSucceeded":
       return {
         ...state,
         quote: action.quote,
+        ethQuote: null,
         tradeType: action.tradeType,
+        step: "idle",
+        quoteError: null,
+      };
+    case "ethQuoteSucceeded":
+      return {
+        ...state,
+        quote: null,
+        ethQuote: action.quote,
+        tradeType: null,
         step: "idle",
         quoteError: null,
       };
     case "quoteFailed":
       return {
         ...state,
+        quote: null,
+        ethQuote: null,
         quoteError: action.error,
         step: "error",
       };

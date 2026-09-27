@@ -18,6 +18,38 @@ export function usdMicrosToUsdgBaseUnits(amountUsdMicros: number): bigint {
   return BigInt(amountUsdMicros);
 }
 
+function encodeUsdgTransfer(recipient: Address, amount: bigint): TransferCall {
+  return {
+    to: ROBINHOOD_USDG.address as Address,
+    data: encodeFunctionData({
+      abi: erc20Abi,
+      functionName: "transfer",
+      args: [recipient, amount],
+    }),
+    value: BigInt(0),
+    recipient,
+    amount,
+  };
+}
+
+/** One USDG transfer for a payment request. Amount is already in token base units. */
+export function buildUsdgPaymentTransfer(
+  recipientAddress: string,
+  amountBaseUnits: string,
+): TransferCall {
+  if (!isAddress(recipientAddress)) {
+    throw new Error("Recipient is not a valid address");
+  }
+  if (!/^\d+$/.test(amountBaseUnits)) {
+    throw new Error("Amount must be greater than zero");
+  }
+  const amount = BigInt(amountBaseUnits);
+  if (amount <= 0n) {
+    throw new Error("Amount must be greater than zero");
+  }
+  return encodeUsdgTransfer(recipientAddress.toLowerCase() as Address, amount);
+}
+
 /** One ERC-20 transfer per recipient. Each transfer is its own transaction. */
 export function buildUsdgTransferCalls(
   recipients: Array<{ address: string; amountUsdMicros: number }>,
@@ -34,17 +66,6 @@ export function buildUsdgTransferCalls(
     const recipient = row.address.toLowerCase() as Address;
     if (seen.has(recipient)) throw new Error("Each recipient can appear once");
     seen.add(recipient);
-    const amount = usdMicrosToUsdgBaseUnits(row.amountUsdMicros);
-    return {
-      to: ROBINHOOD_USDG.address as Address,
-      data: encodeFunctionData({
-        abi: erc20Abi,
-        functionName: "transfer",
-        args: [recipient, amount],
-      }),
-      value: BigInt(0),
-      recipient,
-      amount,
-    };
+    return encodeUsdgTransfer(recipient, usdMicrosToUsdgBaseUnits(row.amountUsdMicros));
   });
 }

@@ -3,7 +3,7 @@
 import { ChevronDown } from "lucide-react";
 import { TokenChainIcon } from "@/components/token-chain-icon";
 import type { AcrossSwapQuote, AcrossChain, AcrossToken } from "@/lib/across/client";
-import { chainName } from "@/lib/chains";
+import { chainName, displayTokenSymbol } from "@/lib/chains";
 import { ROBINHOOD_USDG } from "@/lib/destination";
 import { formatTokenAmount } from "@/lib/money";
 
@@ -38,7 +38,7 @@ export function PayQuoteDetails({
     quote.inputAmount ?? quote.maxInputAmount ?? "0",
     selectedToken?.decimals ?? 18,
   );
-  const sendSymbol = selectedToken?.symbol ?? "TOKEN";
+  const sendSymbol = selectedToken ? displayTokenSymbol(selectedToken.symbol) : "TOKEN";
 
   return (
     <div className="pr-inset space-y-0">
@@ -47,7 +47,7 @@ export function PayQuoteDetails({
         <span className="flex min-w-0 items-center gap-2 text-sm text-foreground">
           {selectedToken && (
             <TokenChainIcon
-              tokenSymbol={selectedToken.symbol}
+              tokenSymbol={sendSymbol}
               tokenLogoUrl={selectedToken.logoUrl}
               chainName={chainName(originChainId ?? 0)}
               chainLogoUrl={chains.find((c) => c.chainId === originChainId)?.logoUrl}
@@ -120,8 +120,8 @@ export function PayQuoteDetails({
             <span className="text-right text-foreground">{tradeTypeLabel(tradeType)}</span>
           </div>
           <p className="pt-1 text-xs text-muted">
-            Across bridges your tokens to Robinhood Chain. Quotes are not cached and may change
-            every block.
+            This route converts your tokens into USDG on Robinhood Chain. Quotes are not cached and
+            may change every block.
           </p>
         </div>
       </details>

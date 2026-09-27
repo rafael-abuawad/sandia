@@ -1,5 +1,6 @@
 import { defineChain } from "viem";
 import { mainnet, optimism, polygon, arbitrum, base, avalanche, bsc, monad } from "viem/chains";
+import { ROBINHOOD_USDG } from "./destination";
 
 /** Robinhood Chain — https://docs.robinhood.com/chain/connecting/ */
 export const robinhoodChain = defineChain({
@@ -29,6 +30,7 @@ export const PAYER_CHAIN_IDS = new Set<number>([
   8453, // Base
   42161, // Arbitrum
   43114, // Avalanche
+  4663, // Robinhood
 ]);
 
 /**
@@ -69,13 +71,22 @@ export function displayTokenSymbol(symbol: string): string {
   return map[symbol.toUpperCase()] ?? symbol;
 }
 
-export function isPayerTokenAllowed(symbol: string, address: string): boolean {
-  if (!PAYER_TOKEN_SYMBOLS.has(symbol.toUpperCase())) return false;
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+
+/**
+ * Tokens a payer can select. Robinhood is limited to WETH (shown as ETH) and USDG.
+ * Other chains keep the shared allowlist, and USDG stays off those chains.
+ */
+export function isPayerTokenAllowed(symbol: string, address: string, chainId?: number): boolean {
+  const normalized = address.toLowerCase();
   // Prefer wrapped natives for Across; skip zero-address native placeholders.
-  if (address.toLowerCase() === "0x0000000000000000000000000000000000000000") {
-    return false;
+  if (normalized === ZERO_ADDRESS) return false;
+  const upper = symbol.toUpperCase();
+  if (chainId === robinhoodChain.id) {
+    if (upper === "USDG") return normalized === ROBINHOOD_USDG.address.toLowerCase();
+    return upper === "WETH";
   }
-  return true;
+  return PAYER_TOKEN_SYMBOLS.has(upper);
 }
 
 /** EVM chains exposed to payer wallets. */

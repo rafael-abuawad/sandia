@@ -291,8 +291,21 @@ export const syncDepositStatus = action({
     reason?: string;
   }> => {
     const depositTxnRef = args.depositTxnRef.toLowerCase();
+    const target = await ctx.runQuery(internal.paymentAttempts.getSettlementTarget, {
+      depositTxnRef,
+    });
     try {
-      const record = await fetchDepositProof(depositTxnRef);
+      const record =
+        target?.settlementKind === "direct"
+          ? await readDirectProof(depositTxnRef, {
+              token: target.destinationTokenAddress,
+              recipient: target.recipientAddress,
+              amount: target.outputAmountBaseUnits,
+            })
+          : await fetchDepositProof(depositTxnRef);
+      if (target?.settlementKind === "direct") {
+        console.log("payment_status_direct", { depositTxnRef, status: record.status });
+      }
       const result = await ctx.runMutation(
         internal.paymentAttempts.applyAcrossStatus,
         proofArgs(depositTxnRef, record, false),
