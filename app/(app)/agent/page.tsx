@@ -3,6 +3,11 @@
 import { useAction, useQuery } from "convex/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowUpRight, BrainCircuit } from "lucide-react";
+import {
+  AgentMascot,
+  type AgentMascotHandle,
+  type AgentMascotMood,
+} from "@/components/agent-mascot";
 import { StockTradeTicket } from "@/components/stocks/stock-detail";
 import { CreateRequestForm } from "@/components/create-request-form";
 import { SendForm } from "@/components/send-form";
@@ -75,6 +80,8 @@ export default function AgentPage() {
   const [operationPending, setOperationPending] = useState(false);
   const [stocks, setStocks] = useState<AgentStock[]>([]);
   const [stockError, setStockError] = useState<string | null>(null);
+  const [intentFocused, setIntentFocused] = useState(false);
+  const mascot = useRef<AgentMascotHandle>(null);
   const requestId = useRef(0);
   const nextOperationId = useRef(0);
   const stocksPromise = useRef<Promise<AgentStock[]> | null>(null);
@@ -189,6 +196,8 @@ export default function AgentPage() {
           .sort((a, b) => b[1] - a[1])
           .slice(0, 4)
       : [];
+  const mascotMood: AgentMascotMood =
+    loading || operationLoading ? "thinking" : intentFocused ? "attentive" : "idle";
 
   return (
     <div className="pr-page mx-auto w-full max-w-2xl gap-8">
@@ -203,13 +212,19 @@ export default function AgentPage() {
           </div>
         </div>
       </header>
+      <AgentMascot ref={mascot} mood={mascotMood} className="pr-animate-in" />
       <form onSubmit={submitIntent} className="space-y-3" noValidate>
         <div className="space-y-2">
           <Label htmlFor="agent-intent">Your intent</Label>
           <Textarea
             id="agent-intent"
             value={prompt}
-            onChange={(event) => setPrompt(event.target.value)}
+            onChange={(event) => {
+              setPrompt(event.target.value);
+              mascot.current?.noticeTyping();
+            }}
+            onFocus={() => setIntentFocused(true)}
+            onBlur={() => setIntentFocused(false)}
             placeholder="For example, “Send 100 USDG to Marco”"
             maxLength={2_000}
             aria-describedby={error ? "agent-error" : "agent-hint"}
@@ -254,6 +269,7 @@ export default function AgentPage() {
               onClick={() => {
                 setPrompt(example);
                 setError(null);
+                mascot.current?.bounce();
               }}
             >
               {example}

@@ -565,6 +565,91 @@ samp {
   animation: pr-fade var(--duration-slow) var(--ease-out) both;
 }
 
+/* Agent mascot. Eye offsets are in the logo's local SVG units, not screen pixels. */
+
+@keyframes pr-mascot-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+@keyframes pr-mascot-shadow {
+  0%,
+  100% {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scaleX(0.82);
+    opacity: 0.6;
+  }
+}
+
+@keyframes pr-mascot-blink {
+  0%,
+  92%,
+  96%,
+  100% {
+    transform: scaleY(1);
+  }
+  94% {
+    transform: scaleY(0.1);
+  }
+}
+
+@keyframes pr-mascot-think {
+  0%,
+  100% {
+    transform: translate(-36px, -28px);
+  }
+  50% {
+    transform: translate(36px, -28px);
+  }
+}
+
+.pr-mascot {
+  --mascot-look-y: 0px;
+}
+
+.pr-mascot[data-mood="attentive"] {
+  --mascot-look-y: 52px;
+}
+
+.pr-mascot[data-typing] {
+  --mascot-look-y: 110px;
+}
+
+.pr-mascot-float {
+  animation: pr-mascot-float 4.8s ease-in-out infinite;
+}
+
+.pr-mascot-shadow {
+  animation: pr-mascot-shadow 4.8s ease-in-out infinite;
+}
+
+.pr-mascot-body {
+  transform-origin: 50% 100%;
+}
+
+.pr-mascot-look {
+  transform: translateY(var(--mascot-look-y));
+  transition: transform 360ms var(--ease-out);
+}
+
+.pr-mascot[data-mood="thinking"] .pr-mascot-think {
+  animation: pr-mascot-think 1.6s ease-in-out infinite;
+}
+
+.pr-mascot-eye {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: pr-mascot-blink 5.2s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
@@ -574,8 +659,16 @@ samp {
   .pr-animate-in-delay-1,
   .pr-animate-in-delay-2,
   .pr-animate-in-delay-3,
-  .pr-animate-fade {
+  .pr-animate-fade,
+  .pr-mascot-float,
+  .pr-mascot-shadow,
+  .pr-mascot-eye,
+  .pr-mascot[data-mood="thinking"] .pr-mascot-think {
     animation: none;
+  }
+
+  .pr-mascot-look {
+    transition: none;
   }
 
   .animate-pulse {
