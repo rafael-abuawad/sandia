@@ -17,7 +17,7 @@ function MissingEnv({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-6 text-center text-foreground">
       <div className="max-w-md space-y-3">
-        <h1 className="pr-brand text-2xl">Payrequest</h1>
+        <h1 className="pr-brand text-2xl">Sandia</h1>
         <p className="text-sm text-muted">{children}</p>
       </div>
     </div>

@@ -236,7 +236,7 @@ export function PayAcrossPanel({
         />
       ) : (
         <p className="text-sm text-muted">
-          Connect a wallet to pay. Paying does not create a Payrequest account.
+          Connect a wallet to pay. Paying does not create a Sandia account.
         </p>
       )}
     </section>

@@ -10,7 +10,7 @@ const mono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Payrequest",
+  title: "Sandia",
   description:
     "Create USD payment requests and receive stablecoins on Robinhood Chain via Across Protocol.",
 };

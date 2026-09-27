@@ -6,7 +6,7 @@ export default function HomePage() {
     <div className="pr-stack pr-page--hero mx-auto">
       <section className="pr-panel pr-panel--hero pr-animate-in">
         <div className="relative max-w-2xl space-y-6">
-          <p className="pr-eyebrow pr-animate-in">Payrequest</p>
+          <p className="pr-eyebrow pr-animate-in">Sandia</p>
           <h1 className="pr-display pr-animate-in pr-animate-in-delay-1 text-3xl sm:text-5xl">
             Request dollars. Receive USDG on Robinhood Chain.
           </h1>
@@ -31,7 +31,7 @@ export default function HomePage() {
         {[
           {
             title: "Request",
-            body: "Create a USD payment link. Payers settle from their own chain, and USDG arrives on Robinhood Chain. No Payrequest account required.",
+            body: "Create a USD payment link. Payers settle from their own chain, and USDG arrives on Robinhood Chain. No Sandia account required.",
           },
           {
             title: "Send",

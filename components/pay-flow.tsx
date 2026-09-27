@@ -63,7 +63,7 @@ export function PayFlow({ publicId }: PayFlowProps) {
 
   return (
     <div className="space-y-6">
-      <AppBrand name="Sandia" />
+      <AppBrand />
       <PayRequestSummary
         amountUsdMicros={request.amountUsdMicros}
         status={request.status}

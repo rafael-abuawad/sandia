@@ -1,10 +1,10 @@
 "use client";
 
-import { use, useEffect, useId, useState } from "react";
+import { use, useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { useMutation, usePaginatedQuery, useQuery } from "convex/react";
-import { Check, Copy } from "lucide-react";
-import { PaymentQr } from "@/components/payment-qr";
+import { Check, Copy, Share } from "lucide-react";
+import { PaymentQr, paymentQrToPngFile } from "@/components/payment-qr";
 import { LoginButton } from "@/components/login-button";
 import { useSignedInWallet } from "@/lib/use-signed-in-wallet";
 import { api } from "@/convex/_generated/api";
@@ -97,13 +97,46 @@ function RequestDetailLoaded({
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [canShareQr, setCanShareQr] = useState(false);
   const [payUrl, setPayUrl] = useState(`/pay/${publicId}`);
   const payPath = `/pay/${publicId}`;
+  const qrRef = useRef<SVGSVGElement>(null);
+  const shareFileRef = useRef<File | null>(null);
+  const sharingRef = useRef(false);
   const expiresLabel = request.expiresAt != null ? formatDisplayDateTime(request.expiresAt) : null;
 
   useEffect(() => {
     setPayUrl(`${window.location.origin}${payPath}`);
   }, [payPath]);
+
+  useEffect(() => {
+    const svg = qrRef.current;
+    if (
+      !svg ||
+      !payUrl.startsWith("http") ||
+      typeof navigator.share !== "function" ||
+      typeof navigator.canShare !== "function"
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+    void paymentQrToPngFile(svg)
+      .then((file) => {
+        if (cancelled) return;
+        const payload: ShareData = { text: payUrl, files: [file] };
+        if (!navigator.canShare(payload)) return;
+        shareFileRef.current = file;
+        setCanShareQr(true);
+      })
+      .catch(() => {
+        if (!cancelled) setCanShareQr(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [payUrl]);
 
   async function onCancel() {
     setBusy(true);
@@ -125,6 +158,22 @@ function RequestDetailLoaded({
       window.setTimeout(() => setCopied(false), 1500);
     } catch {
       setError("Could not copy the link. Select it and copy it manually.");
+    }
+  }
+
+  async function shareLink() {
+    const file = shareFileRef.current;
+    if (!file || sharingRef.current) return;
+    sharingRef.current = true;
+    setError(null);
+    try {
+      await navigator.share({ text: payUrl, files: [file] });
+    } catch (e) {
+      if (!(e instanceof DOMException && e.name === "AbortError")) {
+        setError("Could not share the payment link. Copy it instead.");
+      }
+    } finally {
+      sharingRef.current = false;
     }
   }
 
@@ -164,7 +213,7 @@ function RequestDetailLoaded({
 
       <div className="pr-panel pr-panel--padded space-y-4">
         <p className="pr-kicker">Payment link</p>
-        <PaymentQr value={payUrl} />
+        <PaymentQr ref={qrRef} value={payUrl} />
         <InputGroup>
           <InputGroupInput
             readOnly
@@ -174,6 +223,11 @@ function RequestDetailLoaded({
             onFocus={(e) => e.currentTarget.select()}
           />
           <InputGroupAddon>
+            {canShareQr ? (
+              <InputGroupButton aria-label="Share payment link" onClick={() => void shareLink()}>
+                <Share className="size-4" strokeWidth={1.5} />
+              </InputGroupButton>
+            ) : null}
             <InputGroupButton
               aria-label={copied ? "Copied" : "Copy payment link"}
               onClick={() => void copyLink()}
