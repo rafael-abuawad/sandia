@@ -59,10 +59,10 @@ function formatUsdFromAmount(amount: string): string {
   });
 }
 
-function readSnapshotView(input: {
-  isError: boolean;
-  data: VaultSnapshotResult | undefined;
-}): { snapshot: VaultSnapshot | null; error: string | undefined } {
+function readSnapshotView(input: { isError: boolean; data: VaultSnapshotResult | undefined }): {
+  snapshot: VaultSnapshot | null;
+  error: string | undefined;
+} {
   const data = input.data;
   const snapshot = data?.ok ? data : null;
   if (input.isError) return { snapshot, error: "Vault details are unavailable right now." };

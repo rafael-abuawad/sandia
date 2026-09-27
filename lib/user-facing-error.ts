@@ -8,14 +8,8 @@ const REPLACEMENTS: Array<[RegExp, string]> = [
   [/^payment request is not payable$/i, "This request can no longer be paid."],
   [/^payment request not found$/i, "This payment request could not be found."],
   [/^no valid route$/i, "No route is available for this token. Try another one."],
-  [
-    /^no executable quote/i,
-    "No route is available for this token. Try another one.",
-  ],
-  [
-    /^route simulation failed\b/i,
-    "This route could not be quoted. Try another token.",
-  ],
+  [/^no executable quote/i, "No route is available for this token. Try another one."],
+  [/^route simulation failed\b/i, "This route could not be quoted. Try another token."],
   [
     /0x did not return executable liquidity/i,
     "Trading is unavailable until a quote shows liquidity.",
@@ -32,8 +26,7 @@ function innerMessage(raw: string): string {
 
 /** Product copy for a thrown error. Convex request ids and stack paths never pass through. */
 export function userFacingError(error: unknown, fallback: string): string {
-  const raw =
-    error instanceof Error ? error.message : typeof error === "string" ? error : "";
+  const raw = error instanceof Error ? error.message : typeof error === "string" ? error : "";
   const message = innerMessage(raw);
   if (!message || TECHNICAL.test(message)) return fallback;
   for (const [pattern, replacement] of REPLACEMENTS) {

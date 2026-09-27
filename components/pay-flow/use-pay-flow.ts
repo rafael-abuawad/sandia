@@ -167,7 +167,10 @@ export function usePayFlow(publicId: string) {
         if (!cancelled) {
           dispatch({
             type: "routesFailed",
-            error: userFacingError(e, "Chains and tokens could not be loaded. Refresh and try again."),
+            error: userFacingError(
+              e,
+              "Chains and tokens could not be loaded. Refresh and try again.",
+            ),
           });
         }
       }
