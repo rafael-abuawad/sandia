@@ -36,13 +36,12 @@ def sandia_send(
     @param currency ERC-20 pulled from the caller via `transferFrom`.
     @return The number of recipients paid.
     """
-    count: uint256 = len(recipients)
-    assert count != 0  # dev: send has empty batch
+    assert len(recipients) != 0  # dev: send has empty batch
     assert currency.address != empty(address)  # dev: send currency is zero address
 
     for recipient: Recipient in recipients:
         self._pay(currency, recipient)
-    return count
+    return len(recipients)
 
 
 @internal
@@ -54,6 +53,7 @@ def _pay(currency: IERC20, recipient: Recipient):
     """
     assert recipient.account != empty(address)  # dev: send recipient is zero address
     assert recipient.amount != 0  # dev: send amount is zero
+
     success: bool = extcall currency.transferFrom(
         msg.sender,
         recipient.account,
