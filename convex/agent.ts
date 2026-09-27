@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { action } from "./_generated/server";
 import { resolveIntentWithJev } from "../lib/jev-client";
+import { MAX_AGENT_PROMPT_LENGTH } from "../lib/agent-intent";
 
 const actionValidator = v.union(
   v.literal("send"),
@@ -30,8 +31,8 @@ export const resolveIntent = action({
   handler: async (ctx, { prompt }) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Sign in to use AI Agent.");
-    if (prompt.trim().length === 0 || prompt.length > 2_000) {
-      throw new Error("Enter an intent between 1 and 2,000 characters.");
+    if (prompt.trim().length === 0 || prompt.length > MAX_AGENT_PROMPT_LENGTH) {
+      throw new Error(`Enter an intent between 1 and ${MAX_AGENT_PROMPT_LENGTH} characters.`);
     }
     const apiKey = process.env.OPENROUTER_API_KEY;
     if (!apiKey) throw new Error("AI Agent is not configured yet. Try again later.");

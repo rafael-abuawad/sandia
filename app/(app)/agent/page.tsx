@@ -27,6 +27,7 @@ import {
 } from "@/components/responsive-dialog";
 import { api } from "@/convex/_generated/api";
 import {
+  MAX_AGENT_PROMPT_LENGTH,
   extractExplicitAmount,
   extractStockUnit,
   resolveBatchRecipients,
@@ -165,8 +166,8 @@ export default function AgentPage() {
       setError("Describe one operation to continue.");
       return;
     }
-    if (prompt.length > 2_000) {
-      setError("Keep your intent under 2,000 characters.");
+    if (prompt.length > MAX_AGENT_PROMPT_LENGTH) {
+      setError(`Keep your intent under ${MAX_AGENT_PROMPT_LENGTH} characters.`);
       return;
     }
     const currentRequest = ++requestId.current;
@@ -226,7 +227,7 @@ export default function AgentPage() {
             onFocus={() => setIntentFocused(true)}
             onBlur={() => setIntentFocused(false)}
             placeholder="For example, “Send 100 USDG to Marco”"
-            maxLength={2_000}
+            maxLength={MAX_AGENT_PROMPT_LENGTH}
             aria-describedby={error ? "agent-error" : "agent-hint"}
             aria-invalid={Boolean(error) || undefined}
             rows={4}
@@ -234,7 +235,9 @@ export default function AgentPage() {
           />
           <p id="agent-hint" className="flex justify-between gap-3 text-xs text-muted">
             <span>AI Agent prepares a form for you to review. It never submits a transaction.</span>
-            <span className="shrink-0">{prompt.length}/2000</span>
+            <span className="shrink-0">
+              {prompt.length}/{MAX_AGENT_PROMPT_LENGTH}
+            </span>
           </p>
         </div>
         {!isSignedIn ? (

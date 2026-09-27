@@ -1,3 +1,5 @@
+export const MAX_AGENT_PROMPT_LENGTH = 200;
+
 export const INTENT_ACTIONS = [
   "send",
   "batch_send",
