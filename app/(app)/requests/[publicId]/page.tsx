@@ -188,7 +188,7 @@ function RequestDetailLoaded({
         </InputGroup>
         <div className="flex flex-wrap gap-2">
           <Button asChild size="sm" variant="outline">
-            <Link href={`/pay/${publicId}`}>Open pay page</Link>
+            <Link href={`/pay/${publicId}`} target="_blank" rel="noopener noreferrer">Open pay page</Link>
           </Button>
           {request.status === "open" && !confirmCancel && (
             <Button
