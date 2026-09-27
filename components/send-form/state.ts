@@ -48,10 +48,20 @@ export const initialSendFormState: SendFormState = {
   confirming: false,
 };
 
-export function createInitialSendFormState(): SendFormState {
+export function createInitialSendFormState(initial?: {
+  mode?: SendMode;
+  address?: string;
+  amount?: string;
+  recipients?: Array<{ address: string; amount: string }>;
+}): SendFormState {
   return {
     ...initialSendFormState,
-    rows: [newRecipientRow(), newRecipientRow()],
+    mode: initial?.mode ?? (initial?.recipients ? "massive" : "single"),
+    singleAddress: initial?.address ?? "",
+    singleAmount: initial?.amount ?? initialSendFormState.singleAmount,
+    rows: initial?.recipients?.length
+      ? initial.recipients.map((recipient) => ({ id: crypto.randomUUID(), ...recipient }))
+      : [newRecipientRow(), newRecipientRow()],
   };
 }
 

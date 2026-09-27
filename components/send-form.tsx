@@ -32,7 +32,17 @@ function isSandiaSendConfigured(): boolean {
   }
 }
 
-export function SendForm() {
+export function SendForm({
+  initialValues,
+  onPendingChange,
+}: {
+  initialValues?: {
+    address?: string;
+    amount?: string;
+    recipients?: Array<{ address: string; amount: string }>;
+  };
+  onPendingChange?: (pending: boolean) => void;
+}) {
   const { isSignedIn, address, chainId } = useSignedInWallet();
   const { wallets } = useWallets();
   const { sendTransaction } = useSendTransaction();
@@ -47,7 +57,7 @@ export function SendForm() {
     chainId: ROBINHOOD_USDG.chainId,
     query: { enabled: Boolean(address) },
   });
-  const [state, dispatch] = useReducer(sendFormReducer, undefined, createInitialSendFormState);
+  const [state, dispatch] = useReducer(sendFormReducer, initialValues, createInitialSendFormState);
   const { mode, step, singleAddress, singleAmount, rows, review, error, confirming } = state;
   const attemptedChainSwitch = useRef<string | null>(null);
   const embedded = getEmbeddedConnectedWallet(wallets);
@@ -144,6 +154,7 @@ export function SendForm() {
 
   async function onConfirm() {
     if (!review) return;
+    onPendingChange?.(true);
     dispatch({ type: "confirmStarted" });
     dispatch({ type: "setError", error: null });
     try {
@@ -212,6 +223,7 @@ export function SendForm() {
       });
     } finally {
       dispatch({ type: "confirmFinished" });
+      onPendingChange?.(false);
     }
   }
 

@@ -38,7 +38,15 @@ function detailsHint(note: string, expiresAtLocal: string): string | undefined {
   return parts.length > 0 ? parts.join(" · ") : undefined;
 }
 
-export function CreateRequestForm() {
+export function CreateRequestForm({
+  initialAmount = "",
+  embeddedPresentation = false,
+  onPendingChange,
+}: {
+  initialAmount?: string;
+  embeddedPresentation?: boolean;
+  onPendingChange?: (pending: boolean) => void;
+}) {
   const router = useRouter();
   const { isSignedIn } = useSignedInWallet();
   const createRequest = useMutation(api.paymentRequests.create);
@@ -46,7 +54,7 @@ export function CreateRequestForm() {
   const amountRefId = useId();
   const expiresRef = useRef<HTMLInputElement>(null);
 
-  const [amount, setAmount] = useState("");
+  const [amount, setAmount] = useState(initialAmount);
   const [description, setDescription] = useState("");
   const [expiresAtLocal, setExpiresAtLocal] = useState("");
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -81,6 +89,7 @@ export function CreateRequestForm() {
     }
 
     setSubmitting(true);
+    onPendingChange?.(true);
     try {
       const amountUsdMicros = parseUsdToMicros(amount);
       const expiresAt = expiresAtLocal ? new Date(expiresAtLocal).getTime() : undefined;
@@ -89,6 +98,7 @@ export function CreateRequestForm() {
         setInvalidField("expires");
         setDetailsOpen(true);
         setSubmitting(false);
+        onPendingChange?.(false);
         return;
       }
 
@@ -105,6 +115,7 @@ export function CreateRequestForm() {
       setError(userFacingError(err, "Unable to create request. Try again."));
     } finally {
       setSubmitting(false);
+      onPendingChange?.(false);
     }
   }
 
@@ -136,16 +147,14 @@ export function CreateRequestForm() {
         }
       />
 
-      <ResponsiveDialog open={detailsOpen} onOpenChange={setDetailsOpen}>
-        <ResponsiveDialogContent>
-          <ResponsiveDialogHeader>
-            <ResponsiveDialogTitle>Request details</ResponsiveDialogTitle>
-            <ResponsiveDialogDescription>
-              Optional note and expiration. Funds always settle to your connected wallet as USDG on
+      {embeddedPresentation ? (
+        detailsOpen ? (
+          <div className="space-y-4 rounded-lg border border-border p-4">
+            <p className="pr-display text-base">Request details</p>
+            <p className="text-sm text-muted">
+              Optional note and expiration. The request settles to your connected wallet as USDG on
               Robinhood Chain.
-            </ResponsiveDialogDescription>
-          </ResponsiveDialogHeader>
-          <ResponsiveDialogBody className="space-y-4">
+            </p>
             <div className="space-y-2">
               <Label htmlFor="note">Note</Label>
               <Textarea
@@ -166,22 +175,60 @@ export function CreateRequestForm() {
                 onChange={(e) => setExpiresAtLocal(e.target.value)}
                 aria-invalid={invalidField === "expires" || undefined}
               />
-              <p className="text-xs text-muted">
-                Leave this blank and the request stays open until it is paid or cancelled.
-              </p>
             </div>
-          </ResponsiveDialogBody>
-          <ResponsiveDialogFooter>
-            <Button
-              type="button"
-              className="w-full sm:w-auto"
-              onClick={() => setDetailsOpen(false)}
-            >
+            <Button type="button" variant="secondary" onClick={() => setDetailsOpen(false)}>
               Done
             </Button>
-          </ResponsiveDialogFooter>
-        </ResponsiveDialogContent>
-      </ResponsiveDialog>
+          </div>
+        ) : null
+      ) : (
+        <ResponsiveDialog open={detailsOpen} onOpenChange={setDetailsOpen}>
+          <ResponsiveDialogContent>
+            <ResponsiveDialogHeader>
+              <ResponsiveDialogTitle>Request details</ResponsiveDialogTitle>
+              <ResponsiveDialogDescription>
+                Optional note and expiration. Funds always settle to your connected wallet as USDG
+                on Robinhood Chain.
+              </ResponsiveDialogDescription>
+            </ResponsiveDialogHeader>
+            <ResponsiveDialogBody className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="note">Note</Label>
+                <Textarea
+                  id="note"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="What's this for?"
+                  rows={3}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="expires">Expires</Label>
+                <Input
+                  ref={expiresRef}
+                  id="expires"
+                  type="datetime-local"
+                  value={expiresAtLocal}
+                  onChange={(e) => setExpiresAtLocal(e.target.value)}
+                  aria-invalid={invalidField === "expires" || undefined}
+                />
+                <p className="text-xs text-muted">
+                  Leave this blank and the request stays open until it is paid or cancelled.
+                </p>
+              </div>
+            </ResponsiveDialogBody>
+            <ResponsiveDialogFooter>
+              <Button
+                type="button"
+                className="w-full sm:w-auto"
+                onClick={() => setDetailsOpen(false)}
+              >
+                Done
+              </Button>
+            </ResponsiveDialogFooter>
+          </ResponsiveDialogContent>
+        </ResponsiveDialog>
+      )}
     </form>
   );
 }

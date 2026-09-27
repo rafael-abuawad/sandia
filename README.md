@@ -11,6 +11,10 @@ USD-denominated payment requests settled as stablecoins on **Robinhood Chain** v
 
 ## Setup
 
+After step 3 initializes Convex, configure Jev through OpenRouter. Keep this key in Convex only:
+
+    npx convex env set OPENROUTER_API_KEY <openrouter-api-key>
+
 1. Copy env template:
 
 ```bash

@@ -319,7 +319,7 @@ function StockDetailHeader({
   );
 }
 
-function StockTradeTicket({
+export function StockTradeTicket({
   symbol,
   halted,
   side,
@@ -330,6 +330,7 @@ function StockTradeTicket({
   onTicketAmountChange,
   tradeReason,
   estimate,
+  embeddedPresentation = false,
 }: {
   symbol: string;
   halted: boolean;
@@ -341,6 +342,7 @@ function StockTradeTicket({
   onTicketAmountChange: (value: string) => void;
   tradeReason: string | null;
   estimate: { shares: number; usd: number } | null;
+  embeddedPresentation?: boolean;
 }) {
   const preview = estimate
     ? unit === "usd"
@@ -349,7 +351,13 @@ function StockTradeTicket({
     : "Enter an amount to preview the fill.";
 
   return (
-    <div className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-10 space-y-3 rounded-[var(--radius-xl)] border border-border bg-[color-mix(in_srgb,var(--panel-solid)_94%,transparent)] p-4 backdrop-blur-md md:static md:bottom-auto">
+    <div
+      className={
+        embeddedPresentation
+          ? "space-y-3 rounded-[var(--radius-xl)] border border-border bg-panel p-4"
+          : "sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-10 space-y-3 rounded-[var(--radius-xl)] border border-border bg-[color-mix(in_srgb,var(--panel-solid)_94%,transparent)] p-4 backdrop-blur-md md:static md:bottom-auto"
+      }
+    >
       <div className="grid grid-cols-2 gap-2" role="group" aria-label="Order side">
         <Button
           type="button"

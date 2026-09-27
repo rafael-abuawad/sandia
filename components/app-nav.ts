@@ -1,4 +1,11 @@
-import { ArrowDownLeft, ArrowUpRight, PiggyBank, LineChart, type LucideIcon } from "lucide-react";
+import {
+  ArrowDownLeft,
+  ArrowUpRight,
+  PiggyBank,
+  LineChart,
+  BrainCircuit,
+  type LucideIcon,
+} from "lucide-react";
 
 export type AppNavItem = {
   label: string;
@@ -8,6 +15,12 @@ export type AppNavItem = {
 };
 
 export const appNavItems: AppNavItem[] = [
+  {
+    label: "AI Agent",
+    href: "/agent",
+    icon: BrainCircuit,
+    match: (pathname) => pathname.startsWith("/agent"),
+  },
   {
     label: "Request",
     href: "/requests/new",

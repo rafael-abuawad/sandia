@@ -10,6 +10,7 @@
 
 import type * as across from "../across.js";
 import type * as activity from "../activity.js";
+import type * as agent from "../agent.js";
 import type * as contacts from "../contacts.js";
 import type * as crons from "../crons.js";
 import type * as directSettlement from "../directSettlement.js";
@@ -36,6 +37,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   across: typeof across;
   activity: typeof activity;
+  agent: typeof agent;
   contacts: typeof contacts;
   crons: typeof crons;
   directSettlement: typeof directSettlement;
