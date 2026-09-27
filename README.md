@@ -74,5 +74,5 @@ Open [http://localhost:3000](http://localhost:3000).
 - Register an Across integrator id and set Convex `ACROSS_INTEGRATOR_ID`.
 - `/otc` redirects to `/requests/new`.
 - App accounts use the Privy embedded wallet on Robinhood Chain. The public pay page uses the same Privy wagmi provider and connects an external wallet for payment, so paying does not claim a Sandia account. WalletConnect for payers is the connector enabled in the Privy dashboard.
-- Outbound USDG sends are ordinary ERC-20 transfers. The wallet needs ETH on Robinhood Chain for gas.
+- Outbound USDG sends use Privy's embedded-wallet gas sponsorship on Robinhood Chain, so the sender does not need ETH. In the Privy Dashboard, enable **Fee sponsorship → Sponsor gas fees**, add Robinhood Chain to supported chains, fund billing, and allow client-initiated sponsored transactions. Privy requires TEE wallet execution for native sponsorship. Set spending caps before enabling this in production. Batch sends sponsor both the USDG approval and the Sandia Send call.
 - Stock trading stays unavailable until a 0x quote for a real RHJ token returns `liquidityAvailable: true`. Vault deposits stay unavailable while `maxDeposit` is 0. See `docs/gates.md`.

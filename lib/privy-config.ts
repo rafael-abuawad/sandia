@@ -1,5 +1,5 @@
 import type { PrivyClientConfig } from "@privy-io/react-auth";
-import { appChains } from "@/lib/chains";
+import { appChains, robinhoodChain } from "@/lib/chains";
 
 export const privyConfig: PrivyClientConfig = {
   loginMethods: ["email"],
@@ -13,6 +13,6 @@ export const privyConfig: PrivyClientConfig = {
       createOnLogin: "all-users",
     },
   },
-  defaultChain: appChains[0],
+  defaultChain: robinhoodChain,
   supportedChains: [...appChains],
 };

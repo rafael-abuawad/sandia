@@ -27,4 +27,4 @@ Opening the connect modal, connecting an injected wallet, switching chain, and p
 
 ## Privy outbound send
 
-Outbound USDG sends are ordinary ERC-20 transfers from the signed-in EOA. The wallet needs ETH on Robinhood Chain for gas. There is no paymaster.
+Outbound USDG sends use Privy's sponsored embedded-wallet transactions on Robinhood Chain. Privy uses a paymaster for gas, so the signed-in wallet does not need ETH. Both steps of a batch send (USDG approval and Sandia Send) request sponsorship. Live sending still requires fee sponsorship and Robinhood Chain to be enabled in the Privy Dashboard, billing configured, client-initiated sponsored transactions allowed, and TEE wallet execution. A live sponsored send and receipt have not been verified from this workspace.

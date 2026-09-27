@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useReducer } from "react";
-import { erc20Abi, type Address, type Hex } from "viem";
-import { usePublicClient, useReadContract, useWriteContract } from "wagmi";
+import { useEffect, useMemo, useReducer, useRef } from "react";
+import { encodeFunctionData, erc20Abi, type Address, type Hex } from "viem";
+import { getEmbeddedConnectedWallet, useSendTransaction, useWallets } from "@privy-io/react-auth";
+import { usePublicClient, useReadContract } from "wagmi";
 import { useAction, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { formatUsdFromMicros, parseUsdToMicros } from "@/lib/money";
@@ -12,9 +13,9 @@ import {
   buildSandiaSendCall,
   buildUsdgTransferCalls,
   MAX_SEND_RECIPIENTS,
-  sandiaSendAbi,
   sandiaSendAddress,
 } from "@/lib/send/calls";
+import { sponsoredSendRequest } from "@/lib/send/sponsored";
 import { buildReviewPayload } from "@/components/send-form/helpers";
 import { SendComposeForm } from "@/components/send-form/compose-form";
 import { SendReviewPanel } from "@/components/send-form/review-panel";
@@ -33,7 +34,8 @@ function isSandiaSendConfigured(): boolean {
 
 export function SendForm() {
   const { isSignedIn, address, chainId } = useSignedInWallet();
-  const { writeContractAsync } = useWriteContract();
+  const { wallets } = useWallets();
+  const { sendTransaction } = useSendTransaction();
   const publicClient = usePublicClient({ chainId: ROBINHOOD_USDG.chainId });
   const recordSend = useMutation(api.outbound.record);
   const attachBundle = useAction(api.outboundActions.attachBundle);
@@ -47,6 +49,24 @@ export function SendForm() {
   });
   const [state, dispatch] = useReducer(sendFormReducer, undefined, createInitialSendFormState);
   const { mode, step, singleAddress, singleAmount, rows, review, error, confirming } = state;
+  const attemptedChainSwitch = useRef<string | null>(null);
+  const embedded = getEmbeddedConnectedWallet(wallets);
+
+  useEffect(() => {
+    if (!isSignedIn || !address || !embedded || chainId === undefined) return;
+    if (chainId === ROBINHOOD_USDG.chainId) {
+      attemptedChainSwitch.current = null;
+      return;
+    }
+    const key = `${address.toLowerCase()}:${chainId}`;
+    if (attemptedChainSwitch.current === key) return;
+    attemptedChainSwitch.current = key;
+    void embedded.switchChain(ROBINHOOD_USDG.chainId).catch((err: unknown) => {
+      console.error("embedded_wallet_chain_switch_failed", {
+        message: err instanceof Error ? err.message : "Could not switch embedded wallet chain",
+      });
+    });
+  }, [isSignedIn, address, embedded, chainId]);
 
   const liveTotalLabel = useMemo(() => {
     if (mode === "single") {
@@ -86,15 +106,21 @@ export function SendForm() {
     }
   }
 
-  const onRobinhood = chainId === ROBINHOOD_USDG.chainId;
   const enoughBalance =
     review !== null && balance !== undefined && balance >= BigInt(review.totalUsdMicros);
   const withinCap = (review?.recipients.length ?? 0) <= MAX_SEND_RECIPIENTS;
   const isBatch = (review?.recipients.length ?? 0) > 1;
   const sendConfigured = !isBatch || isSandiaSendConfigured();
   const canConfirm = Boolean(
-    review && onRobinhood && enoughBalance && withinCap && sendConfigured && !confirming,
+    review && isSignedIn && enoughBalance && withinCap && sendConfigured && !confirming,
   );
+
+  async function sendSponsored(call: { to: Address; data: Hex; value: bigint }): Promise<Hex> {
+    if (!address) throw new Error("Sign in to send USDG.");
+    const request = sponsoredSendRequest(call, address);
+    const { hash } = await sendTransaction(request.transaction, request.options);
+    return hash;
+  }
 
   async function recordFilled(
     userOpHash: Hex,
@@ -121,8 +147,9 @@ export function SendForm() {
     dispatch({ type: "confirmStarted" });
     dispatch({ type: "setError", error: null });
     try {
-      if (!onRobinhood) {
-        throw new Error("Switch to Robinhood Chain to send USDG.");
+      if (!address) throw new Error("Sign in to send USDG.");
+      if (!publicClient) {
+        throw new Error("Robinhood Chain is not reachable. Refresh and try again.");
       }
       if (!enoughBalance) {
         throw new Error("This wallet doesn't have enough USDG on Robinhood Chain.");
@@ -133,10 +160,6 @@ export function SendForm() {
       }));
 
       if (recipientInputs.length > 1) {
-        if (!address) throw new Error("Sign in to send USDG.");
-        if (!publicClient) {
-          throw new Error("Robinhood Chain is not reachable. Refresh and try again.");
-        }
         const batch = buildSandiaSendCall(recipientInputs);
         const allowance = await publicClient.readContract({
           address: ROBINHOOD_USDG.address as Address,
@@ -146,12 +169,14 @@ export function SendForm() {
         });
         if (allowance < batch.total) {
           // Approval must mine before sandia_send so the allowance and nonce are ready.
-          const approveHash = await writeContractAsync({
-            address: ROBINHOOD_USDG.address as Address,
-            abi: erc20Abi,
-            functionName: "approve",
-            args: [batch.to, batch.total],
-            chainId: ROBINHOOD_USDG.chainId,
+          const approveHash = await sendSponsored({
+            to: ROBINHOOD_USDG.address as Address,
+            data: encodeFunctionData({
+              abi: erc20Abi,
+              functionName: "approve",
+              args: [batch.to, batch.total],
+            }),
+            value: 0n,
           });
           const approveReceipt = await publicClient.waitForTransactionReceipt({
             hash: approveHash,
@@ -160,13 +185,7 @@ export function SendForm() {
             throw new Error("USDG approval did not confirm. Try again.");
           }
         }
-        const hash = await writeContractAsync({
-          address: batch.to,
-          abi: sandiaSendAbi,
-          functionName: "sandia_send",
-          args: [batch.recipients, ROBINHOOD_USDG.address as Address],
-          chainId: ROBINHOOD_USDG.chainId,
-        });
+        const hash = await sendSponsored(batch);
         const receipt = await publicClient.waitForTransactionReceipt({ hash });
         if (receipt.status !== "success") {
           throw new Error("The batch send did not confirm. Try again.");
@@ -178,15 +197,10 @@ export function SendForm() {
       } else {
         const [call] = buildUsdgTransferCalls(recipientInputs);
         if (!call) throw new Error("Add a recipient");
-        const hash = await writeContractAsync({
-          address: ROBINHOOD_USDG.address as Address,
-          abi: erc20Abi,
-          functionName: "transfer",
-          args: [call.recipient, call.amount],
-          chainId: ROBINHOOD_USDG.chainId,
-        });
-        if (publicClient) {
-          await publicClient.waitForTransactionReceipt({ hash });
+        const hash = await sendSponsored(call);
+        const receipt = await publicClient.waitForTransactionReceipt({ hash });
+        if (receipt.status !== "success") {
+          throw new Error("The transfer did not confirm. Try again.");
         }
         await recordFilled(hash, [{ recipient: call.recipient, amount: call.amount }]);
       }
@@ -208,8 +222,8 @@ export function SendForm() {
   const sendBlocker =
     review === null
       ? null
-      : !onRobinhood
-        ? "Switch to Robinhood Chain to send USDG."
+      : !isSignedIn
+        ? "Sign in to send USDG."
         : balance === undefined
           ? "Checking your USDG balance…"
           : !enoughBalance
