@@ -61,6 +61,8 @@ type PayAcrossPanelProps = {
   onTokenChange: (value: string) => void;
   onRefreshQuote: () => void;
   onPay: () => void;
+  paymentSent: boolean;
+  onRetryVerification: () => void;
 };
 
 function payBlockerMessage({
@@ -166,6 +168,8 @@ export function PayAcrossPanel({
   onTokenChange,
   onRefreshQuote,
   onPay,
+  paymentSent,
+  onRetryVerification,
 }: PayAcrossPanelProps) {
   const errorId = useId();
   const blockerId = useId();
@@ -233,6 +237,8 @@ export function PayAcrossPanel({
           onTokenChange={onTokenChange}
           onRefreshQuote={onRefreshQuote}
           onPay={onPay}
+          paymentSent={paymentSent}
+          onRetryVerification={onRetryVerification}
         />
       ) : (
         <p className="text-sm text-muted">
@@ -279,6 +285,8 @@ function PayAcrossConnected({
   onTokenChange,
   onRefreshQuote,
   onPay,
+  paymentSent,
+  onRetryVerification,
 }: Omit<PayAcrossPanelProps, "isConnected" | "directBalance" | "ethBalance"> & {
   errorId: string;
   blockerId: string;
@@ -327,13 +335,19 @@ function PayAcrossConnected({
           <p className="text-sm text-danger" role="alert">
             {statusMsg}
           </p>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={directPay || ethQuote || quote ? onPay : onRefreshQuote}
-          >
-            Try again
-          </Button>
+          {paymentSent ? (
+            <Button variant="secondary" size="sm" onClick={onRetryVerification}>
+              Check again
+            </Button>
+          ) : (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={directPay || ethQuote || quote ? onPay : onRefreshQuote}
+            >
+              Try again
+            </Button>
+          )}
         </div>
       ) : null}
       <PayAcrossActionBar

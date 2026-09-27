@@ -1,3 +1,6 @@
+import { matchTransferToPayment, type ParsedTransfer } from "./transferLog";
+import { ROBINHOOD_CHAIN_ID } from "./fillProof";
+
 export type AcrossDepositRecord = {
   status?: string;
   fillTxnRef?: string;
@@ -22,6 +25,28 @@ function asText(value: unknown): string | undefined {
 function asChainId(value: unknown): number | undefined {
   const id = typeof value === "string" ? Number(value) : value;
   return typeof id === "number" && Number.isSafeInteger(id) ? id : undefined;
+}
+
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+
+/**
+ * Fill evidence read from the Robinhood settlement receipt. The payee must receive the
+ * requested USDG in that transaction, whether the relayer pays directly or a handler forwards it.
+ */
+export function transferFillEvidence(
+  fillTxnRef: string,
+  expected: { token: string; recipient: string; amount: string },
+  transfers: ParsedTransfer[],
+): AcrossDepositRecord {
+  const matched = matchTransferToPayment(transfers, expected);
+  return {
+    status: "filled",
+    fillTxnRef,
+    destinationChainId: ROBINHOOD_CHAIN_ID,
+    outputToken: expected.token,
+    recipient: matched.ok ? expected.recipient : ZERO_ADDRESS,
+    outputAmount: matched.ok ? matched.amount.toString() : "0",
+  };
 }
 
 /** Across `/deposit` nests the record under `deposit` and sends chain ids as strings. */

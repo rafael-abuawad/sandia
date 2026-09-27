@@ -10,6 +10,7 @@ function depositLog(overrides?: {
   recipient?: `0x${string}`;
   chainId?: bigint;
   amount?: bigint;
+  message?: `0x${string}`;
 }): Log {
   const topics = encodeEventTopics({
     abi: [v3FundsDeposited],
@@ -43,7 +44,7 @@ function depositLog(overrides?: {
       0,
       overrides?.recipient ?? recipient,
       "0x0000000000000000000000000000000000000000",
-      "0x",
+      overrides?.message ?? "0x",
     ],
   );
   return {
@@ -77,5 +78,16 @@ describe("deposit logs", () => {
     expect(
       matchDepositToRequest(parseDepositLogs([depositLog({ chainId: 8453n })]), expected).ok,
     ).toBe(false);
+  });
+
+  it("accepts a deposit to an Across destination handler that carries a message", () => {
+    const handler = "0xa8ad2e87e2043711d8bec77e8bc3e2683c0ab6bd";
+    const withMessage = parseDepositLogs([depositLog({ recipient: handler, message: "0x1234" })]);
+    expect(matchDepositToRequest(withMessage, expected).ok).toBe(true);
+
+    const short = parseDepositLogs([
+      depositLog({ recipient: handler, message: "0x1234", amount: 999_999n }),
+    ]);
+    expect(matchDepositToRequest(short, expected).ok).toBe(false);
   });
 });

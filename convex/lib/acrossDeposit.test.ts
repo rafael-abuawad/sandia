@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { parseAcrossDeposit } from "./acrossDeposit";
+import { parseAcrossDeposit, transferFillEvidence } from "./acrossDeposit";
 import { evaluateFill } from "./fillProof";
+import type { ParsedTransfer } from "./transferLog";
 
 /** Trimmed `GET /api/deposit?depositTxnRef=` response for a Base → Robinhood USDG fill. */
 const depositResponse = {
@@ -26,7 +27,7 @@ const depositResponse = {
 const expected = {
   destinationChainId: 4663,
   destinationTokenAddress: "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
-  recipientAddress: "0x7960dd41fd8f8cb1542d9cefe45a855794c9be39",
+  recipientAddress: "0x7960dd41fd8f8cb1542d9cefe45a855794c9be39" as const,
   outputAmountBaseUnits: "250000",
 };
 
@@ -62,5 +63,64 @@ describe("parseAcrossDeposit", () => {
     expect(parseAcrossDeposit(null)).toBeNull();
     expect(parseAcrossDeposit({ pagination: {} })).toBeNull();
     expect(parseAcrossDeposit({ deposit: { id: 1 } })).toBeNull();
+  });
+});
+
+describe("transferFillEvidence", () => {
+  const usdg = "0x5fc5360d0400a0fd4f2af552add042d716f1d168";
+  const handler = "0xa8ad2e87e2043711d8bec77e8bc3e2683c0ab6bd";
+  const fillTxnRef = "0x21373a3f9cd4131e643b924de596aa72d63a9f01fce83684369b809fa6b3060a";
+  const target = {
+    token: expected.destinationTokenAddress,
+    recipient: expected.recipientAddress,
+    amount: expected.outputAmountBaseUnits,
+  };
+
+  function evidenceOutcome(transfers: ParsedTransfer[]) {
+    const record = transferFillEvidence(fillTxnRef, target, transfers);
+    return evaluateFill(
+      {
+        status: record.status!,
+        destinationChainId: record.destinationChainId,
+        outputToken: record.outputToken,
+        recipient: record.recipient,
+        outputAmount: record.outputAmount,
+        fillTxnRef: record.fillTxnRef,
+      },
+      expected,
+    ).outcome;
+  }
+
+  it("completes when the fill routes USDG through a handler to the payee", () => {
+    expect(
+      evidenceOutcome([
+        {
+          token: usdg,
+          from: "0x394311a6aaa0d8e3411d8b62de4578d41322d1bd",
+          to: handler,
+          amount: 252141n,
+        },
+        { token: usdg, from: handler, to: expected.recipientAddress, amount: 250000n },
+        {
+          token: usdg,
+          from: handler,
+          to: "0x9a8f92a830a5cb89a3816e3d267cb7791c16b04d",
+          amount: 2141n,
+        },
+      ]),
+    ).toBe("filled");
+  });
+
+  it("rejects a fill that never pays the payee", () => {
+    expect(
+      evidenceOutcome([
+        {
+          token: usdg,
+          from: "0x394311a6aaa0d8e3411d8b62de4578d41322d1bd",
+          to: handler,
+          amount: 252141n,
+        },
+      ]),
+    ).toBe("mismatch");
   });
 });

@@ -6,6 +6,7 @@ export type ParsedDeposit = {
   destinationChainId: number;
   recipient: `0x${string}`;
   depositor: `0x${string}`;
+  message: Hex;
 };
 
 export type DepositMatch = { ok: true; deposit: ParsedDeposit } | { ok: false; reason: string };
@@ -78,6 +79,7 @@ export function parseDepositLogs(logs: Log[]): ParsedDeposit[] {
           destinationChainId?: bigint;
           recipient?: unknown;
           depositor?: unknown;
+          message?: Hex;
         };
         const outputToken = asAddress(args.outputToken);
         const recipient = asAddress(args.recipient);
@@ -90,6 +92,7 @@ export function parseDepositLogs(logs: Log[]): ParsedDeposit[] {
           destinationChainId: Number(args.destinationChainId),
           recipient,
           depositor,
+          message: args.message ?? "0x",
         });
         break;
       } catch {
@@ -100,6 +103,10 @@ export function parseDepositLogs(logs: Log[]): ParsedDeposit[] {
   return found;
 }
 
+/**
+ * Some Across routes deposit to a destination handler contract whose message pays the
+ * recipient. Those deposits are accepted here, and the fill's USDG transfer proves the payee.
+ */
 export function matchDepositToRequest(
   deposits: ParsedDeposit[],
   expected: {
@@ -117,8 +124,9 @@ export function matchDepositToRequest(
     return (
       deposit.destinationChainId === expected.destinationChainId &&
       deposit.outputToken.toLowerCase() === expected.destinationTokenAddress.toLowerCase() &&
-      deposit.recipient.toLowerCase() === expected.recipientAddress.toLowerCase() &&
-      deposit.outputAmount >= required
+      deposit.outputAmount >= required &&
+      (deposit.recipient.toLowerCase() === expected.recipientAddress.toLowerCase() ||
+        deposit.message !== "0x")
     );
   });
   if (!match) {

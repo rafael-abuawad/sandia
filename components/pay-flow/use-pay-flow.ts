@@ -23,7 +23,11 @@ import { appChains, PAYER_CHAIN_IDS, isPayerTokenAllowed, displayTokenSymbol } f
 import { isDirectUsdgPay, isRobinhoodEthPay, ROBINHOOD_USDG } from "@/lib/destination";
 import { ethSpendBaseUnits } from "@/lib/zerox-quote";
 import { buildUsdgPaymentTransfer } from "@/lib/send/calls";
-import { initialPayFlowState, payFlowReducer } from "@/components/pay-flow/state";
+import {
+  initialPayFlowState,
+  payFlowReducer,
+  type SentPayment,
+} from "@/components/pay-flow/state";
 import { statusLabel } from "@/components/status-badge";
 import { userFacingError } from "@/lib/user-facing-error";
 
@@ -50,6 +54,12 @@ const SYMBOL_ORDER = [
 ];
 
 export type DirectPayBalance = "loading" | "short" | "ready" | "unavailable";
+
+const TRACKED_MESSAGE: Record<SentPayment["kind"], string> = {
+  across: "Deposit submitted. Waiting for settlement…",
+  direct: "Transfer submitted. Confirming settlement…",
+  eth: "Swap submitted. Confirming settlement…",
+};
 
 function acrossStatusCopy(status: string): string {
   switch (status) {
@@ -114,6 +124,7 @@ export function usePayFlow(publicId: string) {
     statusMsg,
     depositTxnRef,
     pendingTx,
+    unverifiedPayment,
   } = state;
 
   const { isSuccess: txSuccess, isError: txError } = useWaitForTransactionReceipt({
@@ -388,6 +399,40 @@ export function usePayFlow(publicId: string) {
     [tokens, originChainId, inputToken],
   );
 
+  async function recordSentPayment(sent: SentPayment) {
+    try {
+      await waitForHash(sent.hash, sent.chainId);
+      const tracked = sent.hash.toLowerCase();
+      if (sent.kind === "across") {
+        await submitDeposit({
+          publicId,
+          payerAddress: sent.payerAddress,
+          ...sent.details,
+          depositTxnRef: tracked,
+        });
+      } else if (sent.kind === "direct") {
+        await submitDirect({ publicId, payerAddress: sent.payerAddress, depositTxnRef: tracked });
+      } else {
+        await submitEthSwap({ publicId, payerAddress: sent.payerAddress, depositTxnRef: tracked });
+      }
+      window.sessionStorage.setItem(`sandia-deposit:${publicId}`, tracked);
+      dispatch({ type: "depositTracked", depositTxnRef: tracked, message: TRACKED_MESSAGE[sent.kind] });
+    } catch (e) {
+      dispatch({
+        type: "paymentUnverified",
+        payment: sent,
+        message: `${userFacingError(e, "The payment could not be confirmed yet.")} Your payment was already sent, so don't pay again.`,
+      });
+    }
+  }
+
+  async function retryVerification() {
+    if (!unverifiedPayment) return;
+    dispatch({ type: "stepChanged", step: "tracking" });
+    dispatch({ type: "statusChanged", message: "Checking your payment…" });
+    await recordSentPayment(unverifiedPayment);
+  }
+
   async function executeDirectPayment() {
     if (!address || !request) return;
     const required = /^\d+$/.test(request.outputAmountBaseUnits)
@@ -401,6 +446,7 @@ export function usePayFlow(publicId: string) {
       return;
     }
 
+    let hash: Hex;
     try {
       if (chainId !== ROBINHOOD_USDG.chainId) {
         await switchChainAsync({ chainId: ROBINHOOD_USDG.chainId });
@@ -410,39 +456,33 @@ export function usePayFlow(publicId: string) {
         request.recipientAddress,
         request.outputAmountBaseUnits,
       );
-      const hash = await sendTransactionAsync({
+      hash = await sendTransactionAsync({
         to: call.to,
         data: call.data,
         value: call.value,
         chainId: ROBINHOOD_USDG.chainId,
       });
       dispatch({ type: "pendingTxSet", hash });
-      await waitForHash(hash, ROBINHOOD_USDG.chainId);
-
-      const tracked = hash.toLowerCase();
-      await submitDirect({
-        publicId,
-        payerAddress: address,
-        depositTxnRef: tracked,
-      });
-      window.sessionStorage.setItem(`sandia-deposit:${publicId}`, tracked);
-      dispatch({
-        type: "depositTracked",
-        depositTxnRef: tracked,
-        message: "Transfer submitted. Confirming settlement…",
-      });
     } catch (e) {
       dispatch({
         type: "paymentFailed",
         message: userFacingError(e, "Payment could not be submitted. Try again."),
       });
+      return;
     }
+    await recordSentPayment({
+      kind: "direct",
+      hash,
+      chainId: ROBINHOOD_USDG.chainId,
+      payerAddress: address,
+    });
   }
 
   async function executeEthPayment() {
     if (!address || !request || !ethQuote) return;
     const shown = ethSpendBaseUnits(ethQuote);
 
+    let hash: Hex;
     try {
       const fresh = await quoteEthToUsdg({ publicId, taker: address });
       if (ethSpendBaseUnits(fresh) > shown) {
@@ -458,7 +498,7 @@ export function usePayFlow(publicId: string) {
         await switchChainAsync({ chainId: ROBINHOOD_USDG.chainId });
       }
       dispatch({ type: "stepChanged", step: "paying" });
-      const hash = await sendTransactionAsync({
+      hash = await sendTransactionAsync({
         to: fresh.transaction.to as Address,
         data: fresh.transaction.data as Hex,
         value: BigInt(fresh.transaction.value),
@@ -466,26 +506,19 @@ export function usePayFlow(publicId: string) {
         chainId: ROBINHOOD_USDG.chainId,
       });
       dispatch({ type: "pendingTxSet", hash });
-      await waitForHash(hash, ROBINHOOD_USDG.chainId);
-
-      const tracked = hash.toLowerCase();
-      await submitEthSwap({
-        publicId,
-        payerAddress: address,
-        depositTxnRef: tracked,
-      });
-      window.sessionStorage.setItem(`sandia-deposit:${publicId}`, tracked);
-      dispatch({
-        type: "depositTracked",
-        depositTxnRef: tracked,
-        message: "Swap submitted. Confirming settlement…",
-      });
     } catch (e) {
       dispatch({
         type: "paymentFailed",
         message: userFacingError(e, "Payment could not be submitted. Try again."),
       });
+      return;
     }
+    await recordSentPayment({
+      kind: "eth",
+      hash,
+      chainId: ROBINHOOD_USDG.chainId,
+      payerAddress: address,
+    });
   }
 
   async function executePayment() {
@@ -509,6 +542,8 @@ export function usePayFlow(publicId: string) {
       return;
     }
 
+    let hash: Hex;
+    let swapChainId: number;
     try {
       if (chainId !== originChainId) {
         await switchChainAsync({ chainId: originChainId });
@@ -537,20 +572,28 @@ export function usePayFlow(publicId: string) {
       if (chainId !== swap.chainId) {
         await switchChainAsync({ chainId: swap.chainId });
       }
-      const hash = await sendTransactionAsync({
+      hash = await sendTransactionAsync({
         to: swap.to as Address,
         data: swap.data as Hex,
         value: swap.value ? BigInt(swap.value) : undefined,
         gas: swap.gas ? BigInt(swap.gas) : undefined,
         chainId: swap.chainId,
       });
+      swapChainId = swap.chainId;
       dispatch({ type: "pendingTxSet", hash });
-      await waitForHash(hash, swap.chainId);
-
-      const tracked = hash.toLowerCase();
-      await submitDeposit({
-        publicId,
-        payerAddress: address,
+    } catch (e) {
+      dispatch({
+        type: "paymentFailed",
+        message: userFacingError(e, "Payment could not be submitted. Try again."),
+      });
+      return;
+    }
+    await recordSentPayment({
+      kind: "across",
+      hash,
+      chainId: swapChainId,
+      payerAddress: address,
+      details: {
         originChainId,
         inputToken,
         quotedInputAmount: quote.inputAmount ?? quote.maxInputAmount ?? "0",
@@ -558,21 +601,8 @@ export function usePayFlow(publicId: string) {
         minOutputAmount: quote.minOutputAmount ?? request.outputAmountBaseUnits,
         feesJson: JSON.stringify(quote.fees ?? {}),
         quoteId: quote.id,
-        depositTxnRef: tracked,
-      });
-      window.sessionStorage.setItem(`sandia-deposit:${publicId}`, tracked);
-
-      dispatch({
-        type: "depositTracked",
-        depositTxnRef: tracked,
-        message: "Deposit submitted. Waiting for settlement…",
-      });
-    } catch (e) {
-      dispatch({
-        type: "paymentFailed",
-        message: userFacingError(e, "Payment could not be submitted. Try again."),
-      });
-    }
+      },
+    });
   }
 
   const paymentInProgress = request?.status === "pending" && !depositTxnRef;
@@ -609,6 +639,7 @@ export function usePayFlow(publicId: string) {
     !!request &&
     request.status === "open" &&
     !paymentInProgress &&
+    !unverifiedPayment &&
     step !== "approving" &&
     step !== "paying" &&
     step !== "tracking" &&
@@ -649,7 +680,9 @@ export function usePayFlow(publicId: string) {
     depositTxnRef,
     onChainChange,
     onTokenChange,
+    paymentSent: Boolean(unverifiedPayment),
     refreshQuote,
     executePayment,
+    retryVerification,
   };
 }

@@ -4,6 +4,23 @@ import type { EthSwapQuote } from "@/lib/zerox-quote";
 
 export type PayStep = "idle" | "quoting" | "approving" | "paying" | "tracking" | "done" | "error";
 
+export type AcrossDepositDetails = {
+  originChainId: number;
+  inputToken: string;
+  quotedInputAmount: string;
+  expectedOutputAmount: string;
+  minOutputAmount: string;
+  feesJson: string;
+  quoteId?: string;
+};
+
+/** A payment transaction the wallet already sent. It must be verified, never paid again. */
+export type SentPayment = {
+  hash: Hex;
+  chainId: number;
+  payerAddress: string;
+} & ({ kind: "across"; details: AcrossDepositDetails } | { kind: "direct" } | { kind: "eth" });
+
 export type PayFlowState = {
   chains: AcrossChain[];
   tokens: AcrossToken[];
@@ -17,6 +34,7 @@ export type PayFlowState = {
   statusMsg: string | null;
   depositTxnRef: string | null;
   pendingTx: Hex | undefined;
+  unverifiedPayment: SentPayment | null;
 };
 
 export const initialPayFlowState: PayFlowState = {
@@ -32,6 +50,7 @@ export const initialPayFlowState: PayFlowState = {
   statusMsg: null,
   depositTxnRef: null,
   pendingTx: undefined,
+  unverifiedPayment: null,
 };
 
 export type PayFlowAction =
@@ -62,6 +81,7 @@ export type PayFlowAction =
   | { type: "depositTracked"; depositTxnRef: string; message?: string }
   | { type: "pendingTxSet"; hash: Hex }
   | { type: "paymentFailed"; message: string }
+  | { type: "paymentUnverified"; payment: SentPayment; message: string }
   | { type: "paymentDone"; message?: string };
 
 export function payFlowReducer(state: PayFlowState, action: PayFlowAction): PayFlowState {
@@ -150,6 +170,7 @@ export function payFlowReducer(state: PayFlowState, action: PayFlowAction): PayF
         depositTxnRef: action.depositTxnRef,
         step: "tracking",
         statusMsg: action.message ?? state.statusMsg,
+        unverifiedPayment: null,
       };
     case "pendingTxSet":
       return { ...state, pendingTx: action.hash };
@@ -158,6 +179,13 @@ export function payFlowReducer(state: PayFlowState, action: PayFlowAction): PayF
         ...state,
         step: "error",
         statusMsg: action.message,
+      };
+    case "paymentUnverified":
+      return {
+        ...state,
+        step: "error",
+        statusMsg: action.message,
+        unverifiedPayment: action.payment,
       };
     case "paymentDone":
       return {

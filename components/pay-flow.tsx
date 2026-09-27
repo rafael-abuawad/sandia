@@ -41,8 +41,10 @@ export function PayFlow({ publicId }: PayFlowProps) {
     depositTxnRef,
     onChainChange,
     onTokenChange,
+    paymentSent,
     refreshQuote,
     executePayment,
+    retryVerification,
   } = usePayFlow(publicId);
 
   if (request === undefined) {
@@ -111,6 +113,8 @@ export function PayFlow({ publicId }: PayFlowProps) {
           onTokenChange={onTokenChange}
           onRefreshQuote={() => void refreshQuote()}
           onPay={() => void executePayment()}
+          paymentSent={paymentSent}
+          onRetryVerification={() => void retryVerification()}
         />
       )}
 

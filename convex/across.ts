@@ -5,10 +5,14 @@ import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { createPublicClient, http, type Hex } from "viem";
 import { arbitrum, avalanche, base, bsc, mainnet, monad, optimism, polygon } from "viem/chains";
-import { parseAcrossDeposit, type AcrossDepositRecord } from "./lib/acrossDeposit";
+import {
+  parseAcrossDeposit,
+  transferFillEvidence,
+  type AcrossDepositRecord,
+} from "./lib/acrossDeposit";
 import { matchDepositToRequest, parseDepositLogs } from "./lib/depositLog";
 import { RECONCILE_BATCH } from "./lib/fillProof";
-import { matchTransferToPayment, parseTransferLogs } from "./lib/transferLog";
+import { parseTransferLogs } from "./lib/transferLog";
 
 const ACROSS_API = "https://app.across.to/api";
 const FETCH_TIMEOUT_MS = 8_000;
@@ -78,35 +82,47 @@ async function readOriginDeposit(originChainId: number, depositTxnRef: string) {
   return parseDepositLogs(receipt.logs);
 }
 
-async function readDirectProof(
-  txHash: string,
-  expected: { token: string; recipient: string; amount: string },
-): Promise<AcrossDepositRecord> {
+type SettlementExpectation = { token: string; recipient: string; amount: string };
+
+async function readRobinhoodTransfers(txHash: string) {
   const client = createPublicClient({
     chain: robinhoodChain,
     transport: http(robinhoodChain.rpcUrls.default.http[0]),
   });
   const receipt = await client.getTransactionReceipt({ hash: txHash as Hex });
-  const transfers = receipt.status === "success" ? parseTransferLogs(receipt.logs) : [];
-  const matched = matchTransferToPayment(transfers, expected);
-  if (!matched.ok) {
-    return {
-      status: "filled",
-      fillTxnRef: txHash,
-      destinationChainId: 4663,
-      outputToken: expected.token,
-      recipient: "0x0000000000000000000000000000000000000000",
-      outputAmount: "0",
-    };
+  return receipt.status === "success" ? parseTransferLogs(receipt.logs) : [];
+}
+
+async function readDirectProof(
+  txHash: string,
+  expected: SettlementExpectation,
+): Promise<AcrossDepositRecord> {
+  return transferFillEvidence(txHash, expected, await readRobinhoodTransfers(txHash));
+}
+
+/** Across reports the fill; the Robinhood receipt proves the payee received the USDG. */
+async function readAcrossProof(
+  depositTxnRef: string,
+  expected: SettlementExpectation,
+): Promise<AcrossDepositRecord> {
+  const record = await fetchDepositProof(depositTxnRef);
+  const fillTxnRef = record.fillTxnRef ?? record.fillTx;
+  if (
+    record.status?.toLowerCase() !== "filled" ||
+    !fillTxnRef ||
+    record.destinationChainId !== robinhoodChain.id
+  ) {
+    return record;
   }
-  return {
-    status: "filled",
-    fillTxnRef: txHash,
-    destinationChainId: 4663,
-    outputToken: expected.token,
-    recipient: expected.recipient,
-    outputAmount: matched.amount.toString(),
-  };
+  const evidence = transferFillEvidence(
+    fillTxnRef,
+    expected,
+    await readRobinhoodTransfers(fillTxnRef),
+  );
+  if (evidence.recipient !== expected.recipient) {
+    console.error("payment_fill_missing_payee_transfer", { depositTxnRef, fillTxnRef });
+  }
+  return evidence;
 }
 
 export const submitDeposit = action({
@@ -146,6 +162,13 @@ export const submitDeposit = action({
         reason: matched.reason,
       });
       throw new Error(matched.reason);
+    }
+    if (matched.deposit.recipient !== request.recipientAddress.toLowerCase()) {
+      console.log("payment_deposit_via_handler", {
+        publicId: args.publicId,
+        depositTxnRef: args.depositTxnRef.toLowerCase(),
+        handler: matched.deposit.recipient,
+      });
     }
 
     const saved = await ctx.runMutation(internal.paymentAttempts.acceptVerifiedDeposit, {
@@ -262,15 +285,17 @@ export const syncDepositStatus = action({
       depositTxnRef,
     });
     try {
+      if (!target) throw new Error("Payment attempt not found");
+      const expected = {
+        token: target.destinationTokenAddress,
+        recipient: target.recipientAddress,
+        amount: target.outputAmountBaseUnits,
+      };
       const record =
-        target?.settlementKind === "direct"
-          ? await readDirectProof(depositTxnRef, {
-              token: target.destinationTokenAddress,
-              recipient: target.recipientAddress,
-              amount: target.outputAmountBaseUnits,
-            })
-          : await fetchDepositProof(depositTxnRef);
-      if (target?.settlementKind === "direct") {
+        target.settlementKind === "direct"
+          ? await readDirectProof(depositTxnRef, expected)
+          : await readAcrossProof(depositTxnRef, expected);
+      if (target.settlementKind === "direct") {
         console.log("payment_status_direct", { depositTxnRef, status: record.status });
       }
       const result = await ctx.runMutation(
@@ -314,14 +339,15 @@ export const reconcilePending = internalAction({
     let errors = 0;
     for (const attempt of attempts) {
       try {
+        const expected = {
+          token: attempt.destinationTokenAddress,
+          recipient: attempt.recipientAddress,
+          amount: attempt.outputAmountBaseUnits,
+        };
         const record =
           attempt.settlementKind === "direct"
-            ? await readDirectProof(attempt.depositTxnRef, {
-                token: attempt.destinationTokenAddress,
-                recipient: attempt.recipientAddress,
-                amount: attempt.outputAmountBaseUnits,
-              })
-            : await fetchDepositProof(attempt.depositTxnRef);
+            ? await readDirectProof(attempt.depositTxnRef, expected)
+            : await readAcrossProof(attempt.depositTxnRef, expected);
         await ctx.runMutation(
           internal.paymentAttempts.applyAcrossStatus,
           proofArgs(attempt.depositTxnRef, record, false),
