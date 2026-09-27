@@ -3,15 +3,28 @@
 import { useMemo, useState } from "react";
 import Image from "next/image";
 import { useQuery } from "@tanstack/react-query";
-import { useAction } from "convex/react";
+import { useAction, useMutation } from "convex/react";
+import { useSendTransaction } from "@privy-io/react-auth";
 import { api } from "@/convex/_generated/api";
-import { STEAKHOUSE_USDG_VAULT, vaultDepositGate } from "@/lib/vault-gate";
+import { STEAKHOUSE_USDG_VAULT, vaultDepositGate, vaultExitGate } from "@/lib/vault-gate";
+import {
+  buildVaultApprove,
+  buildVaultDeposit,
+  buildVaultRedeem,
+  buildVaultWithdraw,
+  chooseVaultExit,
+  parseUsdgBaseUnits,
+  VAULT_ADDRESS,
+  vaultAbi,
+  type VaultCall,
+} from "@/lib/vault-calls";
+import { sponsoredSendRequest } from "@/lib/send/sponsored";
 import { userFacingError } from "@/lib/user-facing-error";
 import { LoginButton } from "@/components/login-button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSignedInWallet } from "@/lib/use-signed-in-wallet";
-import { erc20Abi, parseAbi, type Address } from "viem";
-import { useReadContract } from "wagmi";
+import { erc20Abi, getAddress, type Address, type Hex } from "viem";
+import { usePublicClient, useReadContract } from "wagmi";
 import { ROBINHOOD_USDG } from "@/lib/destination";
 import { formatTokenAmount, formatTokenAmountGrouped } from "@/lib/money";
 import {
@@ -26,6 +39,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { AmountCompose } from "@/components/amount-compose";
 import { isAmountEntered } from "@/lib/amount-entered";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 const VAULT = {
@@ -35,14 +49,15 @@ const VAULT = {
     "Earn USDG on Robinhood Chain through the Steakhouse Morpho vault. The curator is not a custodian, and liquidity can delay an exit.",
 } as const;
 
-const vaultAbi = parseAbi([
-  "function balanceOf(address account) view returns (uint256)",
-  "function convertToAssets(uint256 shares) view returns (uint256)",
-  "function maxDeposit(address receiver) view returns (uint256)",
-]);
+const DEPOSIT_COPY = "Deposit USDG into the Steakhouse vault. Your shares stay in this account.";
+const WITHDRAW_COPY = "Withdraw USDG from the Steakhouse vault back to this account.";
+const REDEEM_COPY = "Redeem the full position. USDG comes back to this account.";
+const DEPOSIT_BLOCKED = "The vault can't take this deposit right now.";
+const EXIT_BLOCKED = "The vault can't return this amount right now. Try a smaller amount.";
+const WALLET_SHORT = "This wallet doesn't have enough USDG on Robinhood Chain.";
+const POSITION_SHORT = "This account doesn't have that much in the vault.";
 
-const VAULT_ADDRESS = STEAKHOUSE_USDG_VAULT as Address;
-
+type VaultMode = "deposit" | "withdraw";
 type VaultSnapshotResult = VaultSnapshot & {
   ok: boolean;
   reason?: string;
@@ -75,27 +90,6 @@ function readSnapshotView(input: { isError: boolean; data: VaultSnapshotResult |
   return { snapshot, error: undefined };
 }
 
-function resolveDepositGate(input: {
-  isSignedIn: boolean;
-  maxDeposit: bigint | undefined;
-  maxDepositFailed: boolean;
-}): { depositEnabled: boolean; reason?: string } {
-  if (!input.isSignedIn) return { depositEnabled: false };
-  if (input.maxDeposit === undefined) {
-    return {
-      depositEnabled: false,
-      reason: input.maxDepositFailed
-        ? "Could not read whether deposits are open"
-        : "Reading the vault…",
-    };
-  }
-  return vaultDepositGate({
-    asset: ROBINHOOD_USDG.address,
-    usdg: ROBINHOOD_USDG.address,
-    maxDeposit: input.maxDeposit,
-  });
-}
-
 function formatYourDeposit(input: {
   isSignedIn: boolean;
   failed: boolean;
@@ -117,16 +111,29 @@ function snapshotMetric(
   return format(snapshot);
 }
 
+function unreachable(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : "";
+  return /failed to fetch|network|timed out|http request/i.test(message);
+}
+
 export function EarnPanel() {
   const { ready, address, isSignedIn } = useSignedInWallet();
+  const { sendTransaction } = useSendTransaction();
+  const publicClient = usePublicClient({ chainId: ROBINHOOD_USDG.chainId });
   const readSnapshot = useAction(api.vault.readSnapshot);
+  const recordVault = useMutation(api.vaultActivity.record);
+  const confirmVault = useAction(api.vaultActivityActions.confirm);
   const snapshotQuery = useQuery({
     queryKey: ["morpho-vault-snapshot", STEAKHOUSE_USDG_VAULT],
     queryFn: () => readSnapshot({}),
     staleTime: 60_000,
     retry: 1,
   });
+  const [mode, setMode] = useState<VaultMode>("deposit");
   const [amount, setAmount] = useState("");
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const shareRead = useReadContract({
     address: VAULT_ADDRESS,
@@ -144,10 +151,34 @@ export function EarnPanel() {
     chainId: ROBINHOOD_USDG.chainId,
     query: { enabled: shareRead.data !== undefined, refetchInterval: 30_000 },
   });
-  const maxDepositRead = useReadContract({
+  const canSendAssets = useReadContract({
     address: VAULT_ADDRESS,
     abi: vaultAbi,
-    functionName: "maxDeposit",
+    functionName: "canSendAssets",
+    args: address ? [address] : undefined,
+    chainId: ROBINHOOD_USDG.chainId,
+    query: { enabled: Boolean(address), refetchInterval: 30_000 },
+  });
+  const canReceiveShares = useReadContract({
+    address: VAULT_ADDRESS,
+    abi: vaultAbi,
+    functionName: "canReceiveShares",
+    args: address ? [address] : undefined,
+    chainId: ROBINHOOD_USDG.chainId,
+    query: { enabled: Boolean(address), refetchInterval: 30_000 },
+  });
+  const canSendShares = useReadContract({
+    address: VAULT_ADDRESS,
+    abi: vaultAbi,
+    functionName: "canSendShares",
+    args: address ? [address] : undefined,
+    chainId: ROBINHOOD_USDG.chainId,
+    query: { enabled: Boolean(address), refetchInterval: 30_000 },
+  });
+  const canReceiveAssets = useReadContract({
+    address: VAULT_ADDRESS,
+    abi: vaultAbi,
+    functionName: "canReceiveAssets",
     args: address ? [address] : undefined,
     chainId: ROBINHOOD_USDG.chainId,
     query: { enabled: Boolean(address), refetchInterval: 30_000 },
@@ -157,13 +188,12 @@ export function EarnPanel() {
     isError: snapshotQuery.isError,
     data: snapshotQuery.data,
   });
-  const depositGate = resolveDepositGate({
-    isSignedIn,
-    maxDeposit: maxDepositRead.data,
-    maxDepositFailed: maxDepositRead.isError,
-  });
 
-  const { data: balanceValue, isLoading: balanceLoading } = useReadContract({
+  const {
+    data: balanceValue,
+    isLoading: balanceLoading,
+    refetch: refetchBalance,
+  } = useReadContract({
     address: ROBINHOOD_USDG.address as Address,
     abi: erc20Abi,
     functionName: "balanceOf",
@@ -182,11 +212,259 @@ export function EarnPanel() {
     return formatTokenAmountGrouped(balanceValue.toString(), ROBINHOOD_USDG.decimals);
   }, [balanceValue]);
 
+  const parsedAmount = useMemo(() => {
+    if (!isAmountEntered(amount)) return null;
+    try {
+      return parseUsdgBaseUnits(amount);
+    } catch {
+      return null;
+    }
+  }, [amount]);
+
+  const positionAssets = assetsRead.data;
+  const positionShares = shareRead.data;
+  const depositReadsFailed = canSendAssets.isError || canReceiveShares.isError;
+  const exitReadsFailed = canSendShares.isError || canReceiveAssets.isError;
+  const depositOpen =
+    canSendAssets.data === undefined || canReceiveShares.data === undefined
+      ? undefined
+      : canSendAssets.data && canReceiveShares.data;
+  const exitOpen =
+    canSendShares.data === undefined || canReceiveAssets.data === undefined
+      ? undefined
+      : canSendShares.data && canReceiveAssets.data;
+
+  const depositGate = !isSignedIn
+    ? { enabled: false }
+    : depositOpen === undefined
+      ? {
+          enabled: false,
+          reason: depositReadsFailed
+            ? "Could not read whether deposits are open"
+            : "Reading the vault…",
+        }
+      : vaultDepositGate({
+          canSendAssets: canSendAssets.data === true,
+          canReceiveShares: canReceiveShares.data === true,
+        });
+  const exitGate = !isSignedIn
+    ? { enabled: false }
+    : exitOpen === undefined
+      ? {
+          enabled: false,
+          reason: exitReadsFailed
+            ? "Could not read whether withdrawals are open"
+            : "Reading the vault…",
+        }
+      : vaultExitGate({
+          canSendShares: canSendShares.data === true,
+          canReceiveAssets: canReceiveAssets.data === true,
+        });
+  const gate = mode === "deposit" ? depositGate : exitGate;
+
+  const exit =
+    mode === "withdraw" &&
+    parsedAmount !== null &&
+    positionAssets !== undefined &&
+    positionShares !== undefined &&
+    positionAssets > 0n &&
+    positionShares > 0n &&
+    parsedAmount <= positionAssets
+      ? chooseVaultExit({
+          assets: parsedAmount,
+          positionAssets,
+          shares: positionShares,
+        })
+      : null;
+
+  const walletShort =
+    mode === "deposit" &&
+    parsedAmount !== null &&
+    balanceValue !== undefined &&
+    parsedAmount > balanceValue;
+  const positionShort =
+    mode === "withdraw" &&
+    parsedAmount !== null &&
+    positionAssets !== undefined &&
+    parsedAmount > positionAssets;
+  const positionLoading =
+    isSignedIn && (shareRead.isLoading || (shareRead.data !== undefined && assetsRead.isLoading));
+  const fundsKnown = mode === "deposit" ? balanceValue !== undefined : positionAssets !== undefined;
+  const canSubmit = Boolean(
+    address &&
+    publicClient &&
+    gate.enabled &&
+    parsedAmount &&
+    fundsKnown &&
+    !walletShort &&
+    !positionShort &&
+    !pending &&
+    (mode === "deposit" || exit),
+  );
+
   const yourDeposit = formatYourDeposit({
     isSignedIn,
     failed: shareRead.isError || assetsRead.isError,
-    assets: assetsRead.data,
+    assets: positionAssets,
   });
+
+  const actionName =
+    mode === "deposit" ? "Deposit" : exit?.kind === "redeem" ? "Redeem" : "Withdraw";
+  const pendingLabel =
+    mode === "deposit" ? "Depositing…" : exit?.kind === "redeem" ? "Redeeming…" : "Withdrawing…";
+  const kicker =
+    mode === "deposit"
+      ? "You're depositing"
+      : exit?.kind === "redeem"
+        ? "You're redeeming"
+        : "You're withdrawing";
+
+  function clearStatus() {
+    setError(null);
+    setNotice(null);
+  }
+
+  async function sendSponsored(call: VaultCall): Promise<Hex> {
+    if (!address) throw new Error("Sign in to continue.");
+    const request = sponsoredSendRequest(call, address);
+    const { hash } = await sendTransaction(request.transaction, request.options);
+    return hash;
+  }
+
+  async function waitForSuccess(hash: Hex, failure: string) {
+    if (!publicClient) throw new Error("Robinhood Chain is not reachable. Refresh and try again.");
+    const receipt = await publicClient.waitForTransactionReceipt({ hash });
+    if (receipt.status !== "success") throw new Error(failure);
+  }
+
+  async function onSubmit() {
+    if (!canSubmit || !address || !publicClient || parsedAmount === null) return;
+    const account = getAddress(address);
+    setPending(true);
+    clearStatus();
+    try {
+      let kind: "deposit" | "withdraw" | "redeem";
+      let call: VaultCall;
+      let assets = parsedAmount;
+      let shares: bigint | undefined;
+
+      if (mode === "deposit") {
+        kind = "deposit";
+        const allowance = await publicClient.readContract({
+          address: getAddress(ROBINHOOD_USDG.address),
+          abi: erc20Abi,
+          functionName: "allowance",
+          args: [account, VAULT_ADDRESS],
+        });
+        if (allowance < parsedAmount) {
+          const approveHash = await sendSponsored(buildVaultApprove(parsedAmount));
+          await waitForSuccess(approveHash, "USDG approval did not confirm. Try again.");
+        }
+        try {
+          await publicClient.simulateContract({
+            address: VAULT_ADDRESS,
+            abi: vaultAbi,
+            functionName: "deposit",
+            args: [parsedAmount, account],
+            account,
+          });
+        } catch (simulationError) {
+          if (unreachable(simulationError)) {
+            throw new Error("Robinhood Chain is not reachable. Refresh and try again.");
+          }
+          throw new Error(DEPOSIT_BLOCKED);
+        }
+        call = buildVaultDeposit(parsedAmount, account);
+      } else {
+        if (!exit) throw new Error(POSITION_SHORT);
+        kind = exit.kind;
+        assets = exit.assets;
+        shares = exit.kind === "redeem" ? exit.shares : undefined;
+        try {
+          if (exit.kind === "redeem") {
+            await publicClient.simulateContract({
+              address: VAULT_ADDRESS,
+              abi: vaultAbi,
+              functionName: "redeem",
+              args: [exit.shares, account, account],
+              account,
+            });
+          } else {
+            await publicClient.simulateContract({
+              address: VAULT_ADDRESS,
+              abi: vaultAbi,
+              functionName: "withdraw",
+              args: [exit.assets, account, account],
+              account,
+            });
+          }
+        } catch (simulationError) {
+          if (unreachable(simulationError)) {
+            throw new Error("Robinhood Chain is not reachable. Refresh and try again.");
+          }
+          throw new Error(EXIT_BLOCKED);
+        }
+        call =
+          exit.kind === "redeem"
+            ? buildVaultRedeem(exit.shares, account)
+            : buildVaultWithdraw(exit.assets, account);
+      }
+
+      const hash = await sendSponsored(call);
+      await waitForSuccess(hash, "The vault transaction did not confirm. Try again.");
+      setAmount("");
+      await Promise.all([shareRead.refetch(), assetsRead.refetch(), refetchBalance()]).catch(
+        () => undefined,
+      );
+      const id = await recordVault({
+        kind,
+        assets: assets.toString(),
+        shares: shares?.toString(),
+        userOpHash: hash,
+      });
+      const verified = await confirmVault({ id });
+      if (verified.status !== "filled") {
+        throw new Error(verified.reason ?? "The receipt could not be checked.");
+      }
+      setNotice(
+        kind === "deposit"
+          ? "Deposit confirmed."
+          : kind === "redeem"
+            ? "Redemption confirmed."
+            : "Withdrawal confirmed.",
+      );
+    } catch (submitError) {
+      setError(
+        userFacingError(
+          submitError,
+          mode === "deposit"
+            ? "Deposit could not be submitted. Try again."
+            : "Withdrawal could not be submitted. Try again.",
+        ),
+      );
+    } finally {
+      setPending(false);
+    }
+  }
+
+  const blocker = !gate.enabled
+    ? (gate.reason ?? null)
+    : mode === "deposit" && isSignedIn && balanceLoading
+      ? "Checking your USDG balance…"
+      : mode === "withdraw" && positionLoading
+        ? "Checking your vault balance…"
+        : mode === "deposit" && isSignedIn && balanceValue === undefined
+          ? "Could not read your USDG balance."
+          : mode === "withdraw" && isSignedIn && positionAssets === undefined
+            ? "Could not read your vault balance."
+            : walletShort
+              ? WALLET_SHORT
+              : positionShort
+                ? POSITION_SHORT
+                : null;
+
+  const description =
+    mode === "deposit" ? DEPOSIT_COPY : exit?.kind === "redeem" ? REDEEM_COPY : WITHDRAW_COPY;
 
   return (
     <div className="pr-page">
@@ -222,21 +500,52 @@ export function EarnPanel() {
         className="space-y-3"
         onSubmit={(event) => {
           event.preventDefault();
+          void onSubmit();
         }}
       >
+        <ToggleGroup
+          type="single"
+          variant="outline"
+          size="sm"
+          spacing={2}
+          value={mode}
+          onValueChange={(next) => {
+            if (next === "deposit" || next === "withdraw") {
+              setMode(next);
+              clearStatus();
+            }
+          }}
+          aria-label="Vault action"
+          className="flex w-full gap-2"
+        >
+          <ToggleGroupItem value="deposit" className="flex-1" disabled={pending}>
+            Deposit
+          </ToggleGroupItem>
+          <ToggleGroupItem value="withdraw" className="flex-1" disabled={pending}>
+            Withdraw
+          </ToggleGroupItem>
+        </ToggleGroup>
         <AmountCompose
-          kicker="You're depositing"
+          kicker={kicker}
           prefix="$"
           suffix="USDG"
           value={amount}
-          onChange={setAmount}
+          onChange={(next) => {
+            setAmount(next);
+            clearStatus();
+          }}
+          error={error ? <p className="text-sm text-danger">{error}</p> : null}
           footer={
-            <EarnDepositFooter
+            <EarnActionFooter
               ready={ready}
               isSignedIn={isSignedIn}
-              depositEnabled={depositGate.depositEnabled}
-              hasAmount={isAmountEntered(amount)}
-              depositReason={depositGate.reason}
+              mode={mode}
+              pending={pending}
+              canSubmit={canSubmit}
+              hasAmount={parsedAmount !== null}
+              actionName={pending ? pendingLabel : actionName}
+              gateEnabled={gate.enabled}
+              message={notice ?? blocker ?? description}
             />
           }
         >
@@ -247,17 +556,35 @@ export function EarnPanel() {
               variant="ghost"
               size="sm"
               onClick={() => {
-                setAmount(balanceExact ? balanceExact : "0");
+                if (mode === "deposit") {
+                  setAmount(balanceExact ? balanceExact : "0");
+                } else if (positionAssets !== undefined) {
+                  setAmount(formatTokenAmount(positionAssets.toString(), ROBINHOOD_USDG.decimals));
+                }
+                clearStatus();
               }}
-              disabled={!isSignedIn || balanceLoading || !balanceExact}
+              disabled={
+                pending ||
+                !isSignedIn ||
+                (mode === "deposit"
+                  ? balanceLoading || !balanceExact
+                  : positionAssets === undefined)
+              }
             >
               Max
             </Button>
           </div>
           <AvailableBalance
             isSignedIn={isSignedIn}
-            balanceLoading={balanceLoading}
-            balanceDisplay={balanceDisplay}
+            loading={mode === "deposit" ? balanceLoading : positionLoading}
+            display={
+              mode === "deposit"
+                ? balanceDisplay
+                : positionAssets === undefined
+                  ? null
+                  : formatTokenAmountGrouped(positionAssets.toString(), ROBINHOOD_USDG.decimals)
+            }
+            label={mode === "deposit" ? "Available" : "In vault"}
           />
           <div className="space-y-2">
             <Label>Vault</Label>
@@ -388,18 +715,26 @@ function TokenMark({ symbol, logoUrl }: { symbol: string; logoUrl: string | null
   );
 }
 
-function EarnDepositFooter({
+function EarnActionFooter({
   ready,
   isSignedIn,
-  depositEnabled,
+  mode,
+  pending,
+  canSubmit,
   hasAmount,
-  depositReason,
+  gateEnabled,
+  actionName,
+  message,
 }: {
   ready: boolean;
   isSignedIn: boolean;
-  depositEnabled: boolean;
+  mode: VaultMode;
+  pending: boolean;
+  canSubmit: boolean;
   hasAmount: boolean;
-  depositReason?: string;
+  gateEnabled: boolean;
+  actionName: string;
+  message: string;
 }) {
   if (!ready) {
     return <Skeleton className="h-11 w-full" aria-hidden />;
@@ -408,27 +743,32 @@ function EarnDepositFooter({
   if (!isSignedIn) {
     return (
       <div className="flex flex-col items-stretch gap-3">
-        <p className="text-sm text-muted">Sign in to deposit into the vault.</p>
+        <p className="text-sm text-muted">
+          {mode === "deposit"
+            ? "Sign in to deposit into the vault."
+            : "Sign in to withdraw from the vault."}
+        </p>
         <LoginButton />
       </div>
     );
   }
 
-  const actionLabel = depositEnabled
-    ? hasAmount
-      ? "Deposit"
-      : "Enter an amount"
-    : "Deposit unavailable";
+  const label = pending
+    ? actionName
+    : !hasAmount
+      ? "Enter an amount"
+      : !gateEnabled
+        ? mode === "deposit"
+          ? "Deposit unavailable"
+          : "Withdraw unavailable"
+        : actionName;
 
   return (
     <div className="space-y-2">
-      <Button type="submit" className="w-full" size="lg" disabled>
-        {actionLabel}
+      <Button type="submit" className="w-full" size="lg" disabled={!canSubmit}>
+        {label}
       </Button>
-      <p className="text-center text-xs text-muted">
-        {depositReason ?? "Deposit stays disabled until maxDeposit is above zero."} Withdraw and
-        redeem stay closed until a Sandia account receipt can be checked.
-      </p>
+      <p className="text-center text-xs text-muted">{message}</p>
       <p className="text-center text-xs text-muted">
         <a
           className="underline underline-offset-2"
@@ -443,20 +783,26 @@ function EarnDepositFooter({
 
 function AvailableBalance({
   isSignedIn,
-  balanceLoading,
-  balanceDisplay,
+  loading,
+  display,
+  label,
 }: {
   isSignedIn: boolean;
-  balanceLoading: boolean;
-  balanceDisplay: string | null;
+  loading: boolean;
+  display: string | null;
+  label: string;
 }) {
-  const label = !isSignedIn
+  const value = !isSignedIn
     ? "—"
-    : balanceLoading
+    : loading
       ? "…"
-      : balanceDisplay
-        ? `${balanceDisplay} ${ROBINHOOD_USDG.symbol}`
+      : display
+        ? `${display} ${ROBINHOOD_USDG.symbol}`
         : `0 ${ROBINHOOD_USDG.symbol}`;
 
-  return <p className="pr-mono text-xs text-muted">Available: {label}</p>;
+  return (
+    <p className="pr-mono text-xs text-muted">
+      {label}: {value}
+    </p>
+  );
 }

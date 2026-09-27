@@ -26,6 +26,8 @@ import type * as paymentAttempts from "../paymentAttempts.js";
 import type * as paymentRequests from "../paymentRequests.js";
 import type * as users from "../users.js";
 import type * as vault from "../vault.js";
+import type * as vaultActivity from "../vaultActivity.js";
+import type * as vaultActivityActions from "../vaultActivityActions.js";
 import type * as zerox from "../zerox.js";
 
 import type {
@@ -53,6 +55,8 @@ declare const fullApi: ApiFromModules<{
   paymentRequests: typeof paymentRequests;
   users: typeof users;
   vault: typeof vault;
+  vaultActivity: typeof vaultActivity;
+  vaultActivityActions: typeof vaultActivityActions;
   zerox: typeof zerox;
 }>;
 

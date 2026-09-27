@@ -1,6 +1,7 @@
 "use client";
 
 import { useAction, useQuery } from "convex/react";
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowUpRight, BrainCircuit } from "lucide-react";
 import {
@@ -458,13 +459,13 @@ function EarnIntentPanel({
           placeholder="Enter an amount"
         />
       </div>
-      <Button type="button" className="w-full" size="lg" disabled>
-        {isDeposit ? "Deposit unavailable" : "Withdraw unavailable"}
+      <Button asChild className="w-full" size="lg">
+        <Link href="/earn">{isDeposit ? "Deposit on Earn" : "Withdraw on Earn"}</Link>
       </Button>
       <p className="text-sm text-muted" role="status">
         {isDeposit
-          ? "Earn deposits stay disabled until the vault accepts USDG deposits."
-          : "Withdraw and redeem stay closed until the app can verify a Sandia account receipt."}
+          ? "Finish this deposit on Earn."
+          : "Finish this withdrawal on Earn. Max redeems the full position."}
       </p>
       <p className="text-xs text-muted">
         Steakhouse USDG is a vault investment. Review the vault disclosures before depositing.

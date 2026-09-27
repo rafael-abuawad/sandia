@@ -141,5 +141,7 @@ export default defineSchema({
     failureReason: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
-  }).index("by_user", ["userId"]),
+  })
+    .index("by_user", ["userId"])
+    .index("by_userOpHash", ["userOpHash"]),
 });

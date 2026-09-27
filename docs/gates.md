@@ -11,7 +11,7 @@ Address `0xBeEff033F34C046626B8D0A041844C5d1A5409dd` on chain 4663.
 - `totalAssets()` returned `493859497664019` base units.
 - `maxDeposit` for `0x0000000000000000000000000000000000000001` returned `0`.
 
-Deposit stays disabled. Withdraw and redeem are not submitted until a Sandia account receipt can be checked. The lending screen reads these values instead of a fixed APY or TVL.
+Morpho Vault V2 always returns 0 from `maxDeposit`, `maxWithdraw`, and `maxRedeem`. That is not a closed vault. Earn submits `deposit`, `withdraw`, and `redeem`, then checks the receipt for a `Deposit` or `Withdraw` log. The lending screen reads APY, deposits, and liquidity from the vault snapshot.
 
 ## 0x stock quote
 

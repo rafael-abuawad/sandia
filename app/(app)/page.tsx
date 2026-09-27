@@ -39,7 +39,7 @@ export default function HomePage() {
           },
           {
             title: "Stocks and earn",
-            body: "Stock trades and vault deposits appear only after a live quote or vault call says they are open.",
+            body: "Stock trades appear only after a live quote says they are open. Deposit, withdraw, and redeem USDG from Earn.",
           },
         ].map((item) => (
           <div key={item.title} className="pr-feature">
