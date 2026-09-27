@@ -230,6 +230,10 @@ export const quoteSwap = action({
 
     const quote = (await acrossGet("/swap/approval", params)) as {
       swapTx?: { simulationSuccess?: boolean };
+      checks?: {
+        balance?: { actual?: string; expected?: string };
+        allowance?: { actual?: string; expected?: string };
+      };
       message?: string;
       error?: string;
     };
@@ -237,7 +241,14 @@ export const quoteSwap = action({
       throw new Error(quote.message || quote.error || "No executable quote for this route");
     }
     if (quote.swapTx.simulationSuccess === false) {
-      throw new Error("Route simulation failed. Refresh the quote or pick another token.");
+      console.warn("across_quote_simulation_failed", {
+        originChainId: args.originChainId,
+        tradeType: args.tradeType,
+        balanceActual: quote.checks?.balance?.actual,
+        balanceExpected: quote.checks?.balance?.expected,
+        allowanceActual: quote.checks?.allowance?.actual,
+        allowanceExpected: quote.checks?.allowance?.expected,
+      });
     }
     return quote;
   },

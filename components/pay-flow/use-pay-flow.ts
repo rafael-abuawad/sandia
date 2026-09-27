@@ -11,7 +11,12 @@ import { useAction, usePaginatedQuery, useQuery } from "convex/react";
 import { type Hex, type Address, createPublicClient, http } from "viem";
 import { api } from "@/convex/_generated/api";
 import type { ChainOption, TokenOption } from "@/components/token-chain-select";
-import { fetchAcrossChains, fetchAcrossTokens, type AcrossSwapQuote } from "@/lib/across/client";
+import {
+  fetchAcrossChains,
+  fetchAcrossTokens,
+  quoteFundingGap,
+  type AcrossSwapQuote,
+} from "@/lib/across/client";
 import { appChains, PAYER_CHAIN_IDS, isPayerTokenAllowed, displayTokenSymbol } from "@/lib/chains";
 import { initialPayFlowState, payFlowReducer } from "@/components/pay-flow/state";
 
@@ -217,9 +222,6 @@ export function usePayFlow(publicId: string) {
       if (q.quoteExpiryTimestamp && q.quoteExpiryTimestamp * 1000 < Date.now()) {
         throw new Error("Quote expired before display — try again");
       }
-      if (q.swapTx?.simulationSuccess === false) {
-        throw new Error("Route simulation failed. Refresh the quote or pick another token.");
-      }
       dispatch({ type: "quoteSucceeded", quote: q, tradeType: tt });
     } catch (e) {
       dispatch({
@@ -388,14 +390,16 @@ export function usePayFlow(publicId: string) {
   }
 
   const paymentInProgress = request?.status === "pending" && !depositTxnRef;
-  const simulationFailed = quote?.swapTx?.simulationSuccess === false;
+  const fundingGap = quote ? quoteFundingGap(quote) : null;
+  const simulationBlocked =
+    quote?.swapTx?.simulationSuccess === false && fundingGap !== "allowance";
 
   const canPay =
     !!request &&
     request.status === "open" &&
     !paymentInProgress &&
     !!quote?.swapTx &&
-    !simulationFailed &&
+    !simulationBlocked &&
     !quoteError &&
     step !== "approving" &&
     step !== "paying" &&

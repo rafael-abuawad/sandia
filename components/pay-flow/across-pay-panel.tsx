@@ -14,7 +14,12 @@ import {
 import { QuoteSkeleton } from "@/components/quote-skeleton";
 import { PayQuoteDetails } from "@/components/pay-flow/quote-details";
 import type { PayStep } from "@/components/pay-flow/state";
-import type { AcrossChain, AcrossSwapQuote, AcrossToken } from "@/lib/across/client";
+import {
+  quoteFundingGap,
+  type AcrossChain,
+  type AcrossSwapQuote,
+  type AcrossToken,
+} from "@/lib/across/client";
 import { formatDisplayDateTime } from "@/lib/format-datetime";
 import { shortenAddress } from "@/lib/utils";
 import type { Hex } from "viem";
@@ -54,12 +59,14 @@ function payBlockerMessage({
   step,
   quote,
   quoteError,
+  tokenSymbol,
 }: {
   originChainId: number | null;
   inputToken: string;
   step: PayStep;
   quote: AcrossSwapQuote | null;
   quoteError: string | null;
+  tokenSymbol?: string;
 }): string | null {
   if (step === "approving" || step === "paying" || step === "tracking") return null;
   if (!originChainId) return "Select a chain to continue.";
@@ -67,6 +74,13 @@ function payBlockerMessage({
   if (step === "quoting") return "Fetching a quote…";
   if (quoteError) return quoteError;
   if (!quote?.swapTx) return "Waiting for a valid route before you can pay.";
+  const gap = quoteFundingGap(quote);
+  if (gap === "balance") {
+    return `This wallet doesn't have enough ${tokenSymbol ?? "of this token"} on this chain.`;
+  }
+  if (quote.swapTx.simulationSuccess === false && gap !== "allowance") {
+    return "Across couldn't simulate this route. Try another token.";
+  }
   return null;
 }
 
@@ -111,7 +125,14 @@ export function PayAcrossPanel({
   const chainId = useId();
   const tokenId = useId();
   const blocker = isConnected
-    ? payBlockerMessage({ originChainId, inputToken, step, quote, quoteError })
+    ? payBlockerMessage({
+        originChainId,
+        inputToken,
+        step,
+        quote,
+        quoteError,
+        tokenSymbol: selectedToken?.symbol,
+      })
     : null;
   const busy = step === "approving" || step === "paying" || step === "tracking";
   const isError = step === "error";

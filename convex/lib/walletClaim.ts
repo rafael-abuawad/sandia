@@ -1,4 +1,5 @@
-import { recoverMessageAddress, type Hex } from "viem";
+import { secp256k1 } from "@noble/curves/secp256k1";
+import { getAddress, hashMessage, hexToNumber, keccak256, size, type Hex } from "viem";
 
 export const WALLET_CLAIM_PREFIX = "Sandia wallet claim";
 
@@ -47,12 +48,28 @@ export async function assertClaimNonce(
   }
 }
 
+function toRecoveryBit(yParityOrV: number): number {
+  if (yParityOrV === 0 || yParityOrV === 1) return yParityOrV;
+  if (yParityOrV === 27) return 0;
+  if (yParityOrV === 28) return 1;
+  throw new Error("Invalid signature");
+}
+
+/**
+ * Recover the signer of an EIP-191 personal_sign message.
+ * viem's recoverMessageAddress dynamically imports @noble/curves, which the Convex runtime rejects.
+ */
 export async function recoverClaimAddress(nonce: string, signature: string): Promise<string> {
-  const recovered = await recoverMessageAddress({
-    message: walletClaimMessage(nonce),
-    signature: signature as Hex,
-  });
-  return recovered.toLowerCase();
+  const signatureHex = signature as Hex;
+  if (size(signatureHex) !== 65) throw new Error("Invalid signature");
+  const hash = hashMessage(walletClaimMessage(nonce));
+  const yParityOrV = hexToNumber(`0x${signatureHex.slice(130)}`);
+  const publicKey = secp256k1.Signature.fromCompact(signatureHex.slice(2, 130))
+    .addRecoveryBit(toRecoveryBit(yParityOrV))
+    .recoverPublicKey(hash.slice(2))
+    .toHex(false);
+  const addressHash = keccak256(`0x${publicKey.slice(2)}`);
+  return getAddress(`0x${addressHash.slice(-40)}`).toLowerCase();
 }
 
 export function assertLinkTargets(input: {

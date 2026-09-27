@@ -232,18 +232,22 @@ export const expireDueRequests = internalMutation({
   returns: v.object({ expired: v.number() }),
   handler: async (ctx) => {
     const now = Date.now();
+    // Missing expiresAt sorts before every number, so lte(now) alone would expire open-ended requests.
     const due = await ctx.db
       .query("paymentRequests")
-      .withIndex("by_status_and_expiresAt", (q) => q.eq("status", "open").lte("expiresAt", now))
+      .withIndex("by_status_and_expiresAt", (q) =>
+        q.eq("status", "open").gt("expiresAt", 0).lte("expiresAt", now),
+      )
       .take(100);
+    const expired = due.filter((req) => req.expiresAt !== undefined && req.expiresAt <= now);
 
     await Promise.all(
-      due.map((req) => ctx.db.patch(req._id, { status: "expired", updatedAt: now })),
+      expired.map((req) => ctx.db.patch(req._id, { status: "expired", updatedAt: now })),
     );
-    if (due.length > 0) {
-      console.log("payment_requests_expired", { count: due.length });
+    if (expired.length > 0) {
+      console.log("payment_requests_expired", { count: expired.length });
     }
-    return { expired: due.length };
+    return { expired: expired.length };
   },
 });
 
