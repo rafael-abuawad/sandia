@@ -1,4 +1,4 @@
-# Payrequest
+# Sandia
 
 USD-denominated payment requests settled as stablecoins on **Robinhood Chain** via [Across Protocol](https://docs.across.to/).
 

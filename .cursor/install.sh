@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Idempotent bootstrap for the Payrequest Cloud Agent environment.
+# Idempotent bootstrap for the Sandia Cloud Agent environment.
 # Installs JS dependencies and initializes a local (anonymous) Convex backend
 # so `NEXT_PUBLIC_CONVEX_URL` is written to .env.local and functions are pushed.
 set -euo pipefail
