@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { BookUser, Plus } from "lucide-react";
 import { isAddress } from "viem";
@@ -38,7 +38,7 @@ export function ContactPicker({
   return (
     <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
       <ContactPickerSession
-        key={open ? "open" : "closed"}
+        open={open}
         onOpenChange={onOpenChange}
         onSelect={onSelect}
         draftAddress={draftAddress}
@@ -49,11 +49,12 @@ export function ContactPicker({
 }
 
 function ContactPickerSession({
+  open,
   onOpenChange,
   onSelect,
   draftAddress,
   startOnSave = false,
-}: Omit<ContactPickerProps, "open">) {
+}: ContactPickerProps) {
   const { isSignedIn } = useSignedInWallet();
   const contacts = useQuery(api.contacts.list, isSignedIn ? {} : "skip");
   const createContact = useMutation(api.contacts.create);
@@ -62,6 +63,14 @@ function ContactPickerSession({
   const [name, setName] = useState("");
   const [address, setAddress] = useState(() => draftAddress?.trim() || "");
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    setShowForm(startOnSave);
+    setName("");
+    setAddress(draftAddress?.trim() || "");
+    setError(null);
+  }, [open, startOnSave, draftAddress]);
 
   const sorted = useMemo(() => {
     if (!contacts) return [];

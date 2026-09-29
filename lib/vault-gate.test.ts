@@ -1,21 +1,24 @@
 import { describe, expect, it } from "vitest";
-import { vaultDepositGate } from "./vault-gate";
-
-const usdg = "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168";
+import { vaultDepositGate, vaultExitGate } from "./vault-gate";
 
 describe("vaultDepositGate", () => {
-  it("disables deposit when maxDeposit is zero", () => {
-    expect(vaultDepositGate({ asset: usdg, usdg, maxDeposit: 0n }).depositEnabled).toBe(false);
+  it("allows a deposit when both gates are open", () => {
+    expect(vaultDepositGate({ canSendAssets: true, canReceiveShares: true }).enabled).toBe(true);
   });
 
-  it("enables deposit only for USDG with room", () => {
-    expect(vaultDepositGate({ asset: usdg, usdg, maxDeposit: 1n }).depositEnabled).toBe(true);
-    expect(
-      vaultDepositGate({
-        asset: "0x0000000000000000000000000000000000000001",
-        usdg,
-        maxDeposit: 10n,
-      }).depositEnabled,
-    ).toBe(false);
+  it("blocks a deposit when either gate is closed", () => {
+    expect(vaultDepositGate({ canSendAssets: false, canReceiveShares: true }).enabled).toBe(false);
+    expect(vaultDepositGate({ canSendAssets: true, canReceiveShares: false }).enabled).toBe(false);
+  });
+});
+
+describe("vaultExitGate", () => {
+  it("allows an exit when both gates are open", () => {
+    expect(vaultExitGate({ canSendShares: true, canReceiveAssets: true }).enabled).toBe(true);
+  });
+
+  it("blocks an exit when either gate is closed", () => {
+    expect(vaultExitGate({ canSendShares: false, canReceiveAssets: true }).enabled).toBe(false);
+    expect(vaultExitGate({ canSendShares: true, canReceiveAssets: false }).enabled).toBe(false);
   });
 });

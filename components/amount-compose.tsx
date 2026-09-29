@@ -22,6 +22,7 @@ type AmountComposeProps = {
   children?: ReactNode;
   footer: ReactNode;
   error?: ReactNode;
+  errorId?: string;
   inputId?: string;
   invalid?: boolean;
 };
@@ -59,6 +60,7 @@ export function AmountCompose({
   children,
   footer,
   error,
+  errorId,
   inputId,
   invalid,
 }: AmountComposeProps) {
@@ -89,6 +91,7 @@ export function AmountCompose({
             value={value}
             onChange={(e) => onChange(sanitizeAmount(e.target.value))}
             aria-invalid={invalid || undefined}
+            aria-describedby={invalid && errorId ? errorId : undefined}
             className={cn("pr-money", prefix && "pl-0")}
           />
           {suffix ? (

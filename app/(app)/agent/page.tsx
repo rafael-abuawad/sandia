@@ -1,8 +1,14 @@
 "use client";
 
 import { useAction, useQuery } from "convex/react";
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowUpRight, BrainCircuit } from "lucide-react";
+import {
+  AgentMascot,
+  type AgentMascotHandle,
+  type AgentMascotMood,
+} from "@/components/agent-mascot";
 import { StockTradeTicket } from "@/components/stocks/stock-detail";
 import { CreateRequestForm } from "@/components/create-request-form";
 import { SendForm } from "@/components/send-form";
@@ -22,6 +28,7 @@ import {
 } from "@/components/responsive-dialog";
 import { api } from "@/convex/_generated/api";
 import {
+  MAX_AGENT_PROMPT_LENGTH,
   extractExplicitAmount,
   extractStockUnit,
   resolveBatchRecipients,
@@ -75,6 +82,8 @@ export default function AgentPage() {
   const [operationPending, setOperationPending] = useState(false);
   const [stocks, setStocks] = useState<AgentStock[]>([]);
   const [stockError, setStockError] = useState<string | null>(null);
+  const [intentFocused, setIntentFocused] = useState(false);
+  const mascot = useRef<AgentMascotHandle>(null);
   const requestId = useRef(0);
   const nextOperationId = useRef(0);
   const stocksPromise = useRef<Promise<AgentStock[]> | null>(null);
@@ -158,8 +167,8 @@ export default function AgentPage() {
       setError("Describe one operation to continue.");
       return;
     }
-    if (prompt.length > 2_000) {
-      setError("Keep your intent under 2,000 characters.");
+    if (prompt.length > MAX_AGENT_PROMPT_LENGTH) {
+      setError(`Keep your intent under ${MAX_AGENT_PROMPT_LENGTH} characters.`);
       return;
     }
     const currentRequest = ++requestId.current;
@@ -189,6 +198,8 @@ export default function AgentPage() {
           .sort((a, b) => b[1] - a[1])
           .slice(0, 4)
       : [];
+  const mascotMood: AgentMascotMood =
+    loading || operationLoading ? "thinking" : intentFocused ? "attentive" : "idle";
 
   return (
     <div className="pr-page mx-auto w-full max-w-2xl gap-8">
@@ -203,15 +214,21 @@ export default function AgentPage() {
           </div>
         </div>
       </header>
+      <AgentMascot ref={mascot} mood={mascotMood} className="pr-animate-in" />
       <form onSubmit={submitIntent} className="space-y-3" noValidate>
         <div className="space-y-2">
           <Label htmlFor="agent-intent">Your intent</Label>
           <Textarea
             id="agent-intent"
             value={prompt}
-            onChange={(event) => setPrompt(event.target.value)}
+            onChange={(event) => {
+              setPrompt(event.target.value);
+              mascot.current?.noticeTyping();
+            }}
+            onFocus={() => setIntentFocused(true)}
+            onBlur={() => setIntentFocused(false)}
             placeholder="For example, “Send 100 USDG to Marco”"
-            maxLength={2_000}
+            maxLength={MAX_AGENT_PROMPT_LENGTH}
             aria-describedby={error ? "agent-error" : "agent-hint"}
             aria-invalid={Boolean(error) || undefined}
             rows={4}
@@ -219,7 +236,9 @@ export default function AgentPage() {
           />
           <p id="agent-hint" className="flex justify-between gap-3 text-xs text-muted">
             <span>AI Agent prepares a form for you to review. It never submits a transaction.</span>
-            <span className="shrink-0">{prompt.length}/2000</span>
+            <span className="shrink-0">
+              {prompt.length}/{MAX_AGENT_PROMPT_LENGTH}
+            </span>
           </p>
         </div>
         {!isSignedIn ? (
@@ -254,6 +273,7 @@ export default function AgentPage() {
               onClick={() => {
                 setPrompt(example);
                 setError(null);
+                mascot.current?.bounce();
               }}
             >
               {example}
@@ -439,13 +459,13 @@ function EarnIntentPanel({
           placeholder="Enter an amount"
         />
       </div>
-      <Button type="button" className="w-full" size="lg" disabled>
-        {isDeposit ? "Deposit unavailable" : "Withdraw unavailable"}
+      <Button asChild className="w-full" size="lg">
+        <Link href="/earn">{isDeposit ? "Deposit on Earn" : "Withdraw on Earn"}</Link>
       </Button>
       <p className="text-sm text-muted" role="status">
         {isDeposit
-          ? "Earn deposits stay disabled until the vault accepts USDG deposits."
-          : "Withdraw and redeem stay closed until the app can verify a Sandia account receipt."}
+          ? "Finish this deposit on Earn."
+          : "Finish this withdrawal on Earn. Max redeems the full position."}
       </p>
       <p className="text-xs text-muted">
         Steakhouse USDG is a vault investment. Review the vault disclosures before depositing.

@@ -1,17 +1,28 @@
 export const STEAKHOUSE_USDG_VAULT = "0xBeEff033F34C046626B8D0A041844C5d1A5409dd" as const;
 
-export function vaultDepositGate(input: { asset: string; usdg: string; maxDeposit: bigint }): {
-  depositEnabled: boolean;
+export type VaultGate = {
+  enabled: boolean;
   reason?: string;
-} {
-  if (input.asset.toLowerCase() !== input.usdg.toLowerCase()) {
-    return { depositEnabled: false, reason: "Vault asset is not USDG" };
+};
+
+/** Deposit is allowed when this account can send USDG and receive vault shares. */
+export function vaultDepositGate(input: {
+  canSendAssets: boolean;
+  canReceiveShares: boolean;
+}): VaultGate {
+  if (!input.canSendAssets || !input.canReceiveShares) {
+    return { enabled: false, reason: "This account can't deposit into the vault." };
   }
-  if (input.maxDeposit <= BigInt(0)) {
-    return {
-      depositEnabled: false,
-      reason: "Deposits are closed right now.",
-    };
+  return { enabled: true };
+}
+
+/** Withdraw and redeem are allowed when this account can burn shares and receive USDG. */
+export function vaultExitGate(input: {
+  canSendShares: boolean;
+  canReceiveAssets: boolean;
+}): VaultGate {
+  if (!input.canSendShares || !input.canReceiveAssets) {
+    return { enabled: false, reason: "This account can't withdraw from the vault." };
   }
-  return { depositEnabled: true };
+  return { enabled: true };
 }
