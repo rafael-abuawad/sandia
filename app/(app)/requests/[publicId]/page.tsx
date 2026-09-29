@@ -63,9 +63,11 @@ function RequestSignedOut() {
   return (
     <div className="pr-page pr-page--narrow text-center">
       <h1 className="pr-display text-2xl">Payment request</h1>
-      <p className="text-sm text-muted">Sign in with the creator account to manage this request.</p>
-      <div className="flex justify-center">
+      <div className="flex flex-col items-center gap-3">
         <LoginButton />
+        <p className="text-center text-sm text-muted">
+          Sign in with the creator account to manage this request.
+        </p>
       </div>
     </div>
   );

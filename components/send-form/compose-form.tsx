@@ -57,9 +57,9 @@ function SendComposeFooter({
 }) {
   if (!isConnected) {
     return (
-      <div className="flex flex-col items-stretch gap-3">
-        <p className="text-sm text-muted">Sign in to send USDG.</p>
+      <div className="flex flex-col items-center gap-3">
         <LoginButton />
+        <p className="text-center text-sm text-muted">Sign in to send USDG.</p>
       </div>
     );
   }

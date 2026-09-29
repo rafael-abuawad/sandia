@@ -135,9 +135,11 @@ export function CreateRequestForm({
         error={<FieldError id={errorId} message={error} />}
         footer={
           !isSignedIn ? (
-            <div className="flex flex-col items-stretch gap-3">
-              <p className="text-sm text-muted">Sign in with email to create a request.</p>
+            <div className="flex flex-col items-center gap-3">
               <LoginButton />
+              <p className="text-center text-sm text-muted">
+                Sign in with email to create a request.
+              </p>
             </div>
           ) : (
             <Button type="submit" className="w-full" size="lg" disabled={submitting || !hasAmount}>

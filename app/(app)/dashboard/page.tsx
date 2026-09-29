@@ -27,9 +27,9 @@ export default function DashboardPage() {
     return (
       <div className="pr-page pr-page--narrow text-center">
         <h1 className="pr-display text-2xl">Your requests</h1>
-        <p className="text-sm text-muted">Sign in to manage payment requests.</p>
-        <div className="flex justify-center">
+        <div className="flex flex-col items-center gap-3">
           <LoginButton />
+          <p className="text-center text-sm text-muted">Sign in to manage payment requests.</p>
         </div>
       </div>
     );

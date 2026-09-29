@@ -742,13 +742,13 @@ function EarnActionFooter({
 
   if (!isSignedIn) {
     return (
-      <div className="flex flex-col items-stretch gap-3">
-        <p className="text-sm text-muted">
+      <div className="flex flex-col items-center gap-3">
+        <LoginButton />
+        <p className="text-center text-sm text-muted">
           {mode === "deposit"
             ? "Sign in to deposit into the vault."
             : "Sign in to withdraw from the vault."}
         </p>
-        <LoginButton />
       </div>
     );
   }

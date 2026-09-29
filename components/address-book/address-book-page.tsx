@@ -219,9 +219,11 @@ function AddressBookContacts({
 
   if (!isSignedIn) {
     return (
-      <div className="pr-panel pr-panel--padded space-y-4">
-        <p className="text-sm text-muted">Sign in to view and edit your address book.</p>
+      <div className="pr-panel pr-panel--padded flex flex-col items-center gap-3">
         <LoginButton />
+        <p className="text-center text-sm text-muted">
+          Sign in to view and edit your address book.
+        </p>
       </div>
     );
   }

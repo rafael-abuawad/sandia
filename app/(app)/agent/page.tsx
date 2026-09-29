@@ -242,9 +242,9 @@ export default function AgentPage() {
           </p>
         </div>
         {!isSignedIn ? (
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm text-muted">Sign in to prepare an operation.</p>
+          <div className="flex flex-col items-center gap-3">
             <LoginButton />
+            <p className="text-center text-sm text-muted">Sign in to prepare an operation.</p>
           </div>
         ) : (
           <Button type="submit" size="lg" className="w-full" disabled={loading || operationLoading}>
