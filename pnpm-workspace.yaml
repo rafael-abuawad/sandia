@@ -8,7 +8,6 @@ allowBuilds:
   sharp: true
   unrs-resolver: true
   utf-8-validate: false
-  workerd: true
 # Supply-chain hardening (react-doctor/require-pnpm-hardening)
 # minimumReleaseAge: 10080
 minimumReleaseAge: 0

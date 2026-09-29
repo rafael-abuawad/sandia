@@ -32,5 +32,3 @@ const nextConfig: NextConfig = {
 void imageLoader;
 
 export default nextConfig;
-
-import("@opennextjs/cloudflare").then((m) => m.initOpenNextCloudflareForDev());
