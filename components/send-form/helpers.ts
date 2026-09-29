@@ -1,5 +1,6 @@
 import { isAddress } from "viem";
 import { parseUsdToMicros } from "@/lib/money";
+import { MAX_SEND_RECIPIENTS } from "@/lib/send/calls";
 import {
   newRecipientRow,
   type RecipientRow,
@@ -79,6 +80,9 @@ export function buildReviewPayload(
 
   if (rows.length < 2) {
     throw new Error("Massive send needs at least two recipients");
+  }
+  if (rows.length > MAX_SEND_RECIPIENTS) {
+    throw new Error(`A batch can include at most ${MAX_SEND_RECIPIENTS} recipients`);
   }
 
   const recipients: ReviewRecipient[] = [];

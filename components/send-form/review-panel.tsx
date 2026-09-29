@@ -5,47 +5,42 @@ import { Button } from "@/components/ui/button";
 import { FieldError } from "@/components/ui/field-error";
 import { formatUsdFromMicros } from "@/lib/money";
 import { truncateAddress } from "@/components/send-form/helpers";
+import { SendSummaryDetails } from "@/components/send-form/summary-details";
 import type { ReviewPayload } from "@/components/send-form/state";
 
 export function SendReviewPanel({
   review,
   error,
+  blocker,
   confirming,
+  canConfirm,
   onBack,
   onConfirm,
 }: {
   review: ReviewPayload;
   error: string | null;
+  blocker: string | null;
   confirming: boolean;
+  canConfirm: boolean;
   onBack: () => void;
   onConfirm: () => void;
 }) {
   const errorId = useId();
+  const blockerId = useId();
 
   return (
     <div className="space-y-5">
       <section className="pr-panel pr-panel--padded space-y-4">
         <div>
           <h2 className="pr-section-title">Review send</h2>
-          <p className="mt-1 text-sm text-muted">Confirm details before the demo mock completes.</p>
+          <p className="mt-1 text-sm text-muted">
+            {review.mode === "massive"
+              ? "Robinhood Chain · USDG. This batch is one send after you approve USDG for the total. Sandia covers the network fees."
+              : "Robinhood Chain · USDG. This is a direct transfer. Sandia covers the network fee."}
+          </p>
         </div>
 
-        <dl className="space-y-2 text-sm">
-          <div className="flex justify-between gap-4">
-            <dt className="text-muted">Mode</dt>
-            <dd className="font-medium capitalize">{review.mode}</dd>
-          </div>
-          <div className="flex justify-between gap-4">
-            <dt className="text-muted">Recipients</dt>
-            <dd className="font-medium">{review.recipients.length}</dd>
-          </div>
-          <div className="flex justify-between gap-4">
-            <dt className="text-muted">Total</dt>
-            <dd className="pr-mono font-medium">
-              {formatUsdFromMicros(review.totalUsdMicros)} USDG
-            </dd>
-          </div>
-        </dl>
+        <SendSummaryDetails review={review} />
 
         <ul className="space-y-2 border-t border-border pt-3">
           {review.recipients.map((r) => (
@@ -63,6 +58,11 @@ export function SendReviewPanel({
       </section>
 
       <FieldError id={errorId} message={error} />
+      {blocker && !confirming && !error ? (
+        <p id={blockerId} className="text-sm text-muted" role="status">
+          {blocker}
+        </p>
+      ) : null}
 
       <div className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-10 flex gap-3 bg-[color-mix(in_srgb,var(--background)_92%,transparent)] py-3 backdrop-blur-sm md:static md:bg-transparent md:p-0 md:backdrop-blur-none">
         <Button
@@ -74,8 +74,16 @@ export function SendReviewPanel({
         >
           Back
         </Button>
-        <Button type="button" className="flex-1" disabled={confirming} onClick={onConfirm}>
-          {confirming ? "Sending…" : "Confirm (demo)"}
+        <Button
+          type="button"
+          className="flex-1"
+          disabled={confirming || !canConfirm}
+          aria-describedby={
+            !canConfirm && blocker && !error ? blockerId : error ? errorId : undefined
+          }
+          onClick={onConfirm}
+        >
+          {confirming ? "Sending…" : "Confirm send"}
         </Button>
       </div>
     </div>

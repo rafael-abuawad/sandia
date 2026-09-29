@@ -1,9 +1,12 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, type Ref } from "react";
 import Image from "next/image";
 import { encode } from "uqr";
 import { cn } from "@/lib/utils";
+
+const SHARE_PX = 1024;
+const SHARE_MARGIN = 0.04;
 
 const FINDER = 7;
 const DOT_R = 0.4;
@@ -36,7 +39,15 @@ function Finder({ x, y }: { x: number; y: number }) {
   );
 }
 
-export function PaymentQr({ value, className }: { value: string; className?: string }) {
+export function PaymentQr({
+  value,
+  className,
+  ref,
+}: {
+  value: string;
+  className?: string;
+  ref?: Ref<SVGSVGElement>;
+}) {
   const qr = useMemo(() => encode(value, { ecc: "H", boostEcc: true, border: 0 }), [value]);
   const dim = qr.size;
   const arena = Math.max(9, Math.floor(dim * 0.22));
@@ -72,6 +83,7 @@ export function PaymentQr({ value, className }: { value: string; className?: str
     >
       <div className="relative">
         <svg
+          ref={ref}
           viewBox={`0 0 ${dim} ${dim}`}
           className="block h-auto w-full max-w-full"
           role="img"
@@ -94,4 +106,62 @@ export function PaymentQr({ value, className }: { value: string; className?: str
       </div>
     </div>
   );
+}
+
+function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = document.createElement("img");
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("Could not draw the QR code"));
+    image.src = src;
+  });
+}
+
+/** Rasterize the on-screen QR, with the center logo, into a shareable PNG. */
+export async function paymentQrToPngFile(svg: SVGSVGElement): Promise<File> {
+  const clone = svg.cloneNode(true) as SVGSVGElement;
+  clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+  clone.setAttribute("width", String(SHARE_PX));
+  clone.setAttribute("height", String(SHARE_PX));
+  clone.style.color = "#000";
+  for (const el of clone.querySelectorAll("*")) {
+    if (el.getAttribute("fill") === "currentColor") el.setAttribute("fill", "#000");
+    if (el.getAttribute("stroke") === "currentColor") el.setAttribute("stroke", "#000");
+  }
+
+  const xml = new XMLSerializer().serializeToString(clone);
+  const svgUrl = URL.createObjectURL(new Blob([xml], { type: "image/svg+xml;charset=utf-8" }));
+
+  try {
+    const [qrImage, logo] = await Promise.all([loadImage(svgUrl), loadImage("/logo.svg")]);
+    const canvas = document.createElement("canvas");
+    canvas.width = SHARE_PX;
+    canvas.height = SHARE_PX;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Could not draw the QR code");
+
+    const margin = Math.round(SHARE_PX * SHARE_MARGIN);
+    const qrBox = SHARE_PX - margin * 2;
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, SHARE_PX, SHARE_PX);
+    ctx.drawImage(qrImage, margin, margin, qrBox, qrBox);
+
+    const logoBox = qrBox * 0.22;
+    const aspect = logo.naturalWidth / logo.naturalHeight || 1;
+    const logoWidth = aspect >= 1 ? logoBox : logoBox * aspect;
+    const logoHeight = aspect >= 1 ? logoBox / aspect : logoBox;
+    const logoX = margin + (qrBox - logoWidth) / 2;
+    const logoY = margin + (qrBox - logoHeight) / 2;
+    ctx.drawImage(logo, logoX, logoY, logoWidth, logoHeight);
+
+    const blob = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob((encoded) => {
+        if (encoded) resolve(encoded);
+        else reject(new Error("Could not draw the QR code"));
+      }, "image/png");
+    });
+    return new File([blob], "payment-qr.png", { type: "image/png" });
+  } finally {
+    URL.revokeObjectURL(svgUrl);
+  }
 }

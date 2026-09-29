@@ -3,6 +3,9 @@
 import Image from "next/image";
 import Link from "next/link";
 import { use, useCallback, useEffect, useMemo, useState } from "react";
+import { useAction } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import { ROBINHOOD_USDG } from "@/lib/destination";
 import { ArrowLeft, ChevronDown, ExternalLink, Info } from "lucide-react";
 import type { StockQuote, StockToken } from "@/lib/rhj/client";
 import { explorerTokenUrl } from "@/lib/rhj/client";
@@ -14,11 +17,11 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { PriceChart } from "@/components/stocks/price-chart";
+import { userFacingError } from "@/lib/user-facing-error";
 
-export function StockDetail({ params }: { params: Promise<{ symbol: string }> }) {
-  const { symbol: rawSymbol } = use(params);
-  const symbol = decodeURIComponent(rawSymbol).toUpperCase();
+const TRADE_UNAVAILABLE = "Trading is unavailable until a quote shows liquidity.";
 
+function useStockDetail(symbol: string) {
   const [asset, setAsset] = useState<StockToken | null>(null);
   const [quote, setQuote] = useState<StockQuote | null>(null);
   const [loading, setLoading] = useState(true);
@@ -27,6 +30,10 @@ export function StockDetail({ params }: { params: Promise<{ symbol: string }> })
   const [side, setSide] = useState<"buy" | "sell">("buy");
   const [unit, setUnit] = useState<"usd" | "shares">("usd");
   const [ticketAmount, setTicketAmount] = useState("");
+  const probeQuote = useAction(api.zerox.probeQuote);
+  const [tradeReason, setTradeReason] = useState<string | null>(
+    "Checking whether 0x can execute this token.",
+  );
 
   const load = useCallback(async () => {
     setError(null);
@@ -48,6 +55,21 @@ export function StockDetail({ params }: { params: Promise<{ symbol: string }> })
         return;
       }
       setAsset(found);
+      try {
+        const probe = await probeQuote({
+          sellToken: ROBINHOOD_USDG.address,
+          buyToken: found.contractAddress,
+          sellAmount: "1000000",
+          taker: "0x0000000000000000000000000000000000000001",
+        });
+        setTradeReason(
+          probe.ok && probe.liquidityAvailable
+            ? null
+            : userFacingError(probe.reason ?? "", TRADE_UNAVAILABLE),
+        );
+      } catch (probeError) {
+        setTradeReason(userFacingError(probeError, TRADE_UNAVAILABLE));
+      }
 
       if (quoteRes.ok) {
         const quoteJson = (await quoteRes.json()) as { quote: StockQuote };
@@ -56,11 +78,11 @@ export function StockDetail({ params }: { params: Promise<{ symbol: string }> })
         setQuote(null);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load token");
+      setError(userFacingError(err, "This stock could not be loaded."));
     } finally {
       setLoading(false);
     }
-  }, [symbol]);
+  }, [symbol, probeQuote]);
 
   useEffect(() => {
     void load();
@@ -78,27 +100,99 @@ export function StockDetail({ params }: { params: Promise<{ symbol: string }> })
     return { shares: n, usd: n * mid };
   }, [ticketAmount, unit, quote?.mid]);
 
-  if (loading) {
+  return {
+    asset,
+    quote,
+    loading,
+    error,
+    logoBroken,
+    setLogoBroken,
+    side,
+    setSide,
+    unit,
+    setUnit,
+    ticketAmount,
+    setTicketAmount,
+    tradeReason,
+    estimate,
+  };
+}
+
+export function StockDetail({ params }: { params: Promise<{ symbol: string }> }) {
+  const { symbol: rawSymbol } = use(params);
+  const symbol = decodeURIComponent(rawSymbol).toUpperCase();
+  const detail = useStockDetail(symbol);
+
+  if (detail.loading) {
     return <p className="text-sm text-muted">Loading {symbol}…</p>;
   }
 
-  if (error && !asset) {
-    return (
-      <div className="pr-page">
-        <Link
-          href="/stocks"
-          className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-foreground"
-        >
-          <ArrowLeft className="size-4" strokeWidth={1.5} aria-hidden />
-          Back to stocks
-        </Link>
-        <p className="text-sm text-danger">{error}</p>
-      </div>
-    );
+  if (detail.error && !detail.asset) {
+    return <StockDetailError error={detail.error} />;
   }
 
-  if (!asset) return null;
+  if (!detail.asset) return null;
 
+  return (
+    <StockDetailLoaded
+      asset={detail.asset}
+      quote={detail.quote}
+      logoBroken={detail.logoBroken}
+      onLogoError={() => detail.setLogoBroken(true)}
+      side={detail.side}
+      onSideChange={detail.setSide}
+      unit={detail.unit}
+      onUnitChange={detail.setUnit}
+      ticketAmount={detail.ticketAmount}
+      onTicketAmountChange={detail.setTicketAmount}
+      tradeReason={detail.tradeReason}
+      estimate={detail.estimate}
+    />
+  );
+}
+
+function StockDetailError({ error }: { error: string }) {
+  return (
+    <div className="pr-page">
+      <Link
+        href="/stocks"
+        className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-foreground"
+      >
+        <ArrowLeft className="size-4" strokeWidth={1.5} aria-hidden />
+        Back to stocks
+      </Link>
+      <p className="text-sm text-danger">{error}</p>
+    </div>
+  );
+}
+
+function StockDetailLoaded({
+  asset,
+  quote,
+  logoBroken,
+  onLogoError,
+  side,
+  onSideChange,
+  unit,
+  onUnitChange,
+  ticketAmount,
+  onTicketAmountChange,
+  tradeReason,
+  estimate,
+}: {
+  asset: StockToken;
+  quote: StockQuote | null;
+  logoBroken: boolean;
+  onLogoError: () => void;
+  side: "buy" | "sell";
+  onSideChange: (side: "buy" | "sell") => void;
+  unit: "usd" | "shares";
+  onUnitChange: (unit: "usd" | "shares") => void;
+  ticketAmount: string;
+  onTicketAmountChange: (value: string) => void;
+  tradeReason: string | null;
+  estimate: { shares: number; usd: number } | null;
+}) {
   const explorerUrl = explorerTokenUrl(asset.contractAddress);
   const halted = Boolean(quote?.isTradingHalt);
 
@@ -112,34 +206,12 @@ export function StockDetail({ params }: { params: Promise<{ symbol: string }> })
         Back
       </Link>
 
-      <div className="flex items-start gap-3">
-        {asset.logoUrl && !logoBroken ? (
-          <Image
-            src={asset.logoUrl}
-            alt=""
-            width={40}
-            height={40}
-            className="size-10 shrink-0 rounded-full ring-1 ring-border"
-            unoptimized
-            onError={() => setLogoBroken(true)}
-          />
-        ) : (
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-panel text-xs font-bold uppercase text-muted ring-1 ring-border">
-            {asset.symbol.slice(0, 2)}
-          </span>
-        )}
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <h1 className="pr-display text-xl">{asset.symbol}</h1>
-            {halted ? (
-              <Badge variant="danger">Halted</Badge>
-            ) : (
-              <Badge variant="success">Open</Badge>
-            )}
-          </div>
-          <p className="truncate text-sm text-muted">{asset.shortName}</p>
-        </div>
-      </div>
+      <StockDetailHeader
+        asset={asset}
+        logoBroken={logoBroken}
+        onLogoError={onLogoError}
+        halted={halted}
+      />
 
       <div>
         <p className="pr-display pr-money text-4xl tracking-tight sm:text-5xl">
@@ -192,82 +264,175 @@ export function StockDetail({ params }: { params: Promise<{ symbol: string }> })
         </div>
       </details>
 
-      <div className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-10 space-y-3 rounded-[var(--radius-xl)] border border-border bg-[color-mix(in_srgb,var(--panel-solid)_94%,transparent)] p-4 backdrop-blur-md md:static md:bottom-auto">
-        <div className="grid grid-cols-2 gap-2" role="group" aria-label="Order side">
-          <Button
-            type="button"
-            variant="outline"
-            aria-pressed={side === "buy"}
-            onClick={() => setSide("buy")}
-            className={
-              side === "buy"
-                ? "border-green-600 bg-green-600 text-white hover:bg-green-700 hover:text-white"
-                : "border-green-600/40 text-green-700 hover:bg-green-50 hover:text-green-800"
-            }
-          >
-            Buy
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            aria-pressed={side === "sell"}
-            onClick={() => setSide("sell")}
-            className={
-              side === "sell"
-                ? "border-red-600 bg-red-600 text-white hover:bg-red-700 hover:text-white"
-                : "border-red-600/40 text-red-700 hover:bg-red-50 hover:text-red-800"
-            }
-          >
-            Sell
-          </Button>
-        </div>
+      <StockTradeTicket
+        symbol={asset.symbol}
+        halted={halted}
+        side={side}
+        onSideChange={onSideChange}
+        unit={unit}
+        onUnitChange={onUnitChange}
+        ticketAmount={ticketAmount}
+        onTicketAmountChange={onTicketAmountChange}
+        tradeReason={tradeReason}
+        estimate={estimate}
+      />
+    </div>
+  );
+}
+
+function StockDetailHeader({
+  asset,
+  logoBroken,
+  onLogoError,
+  halted,
+}: {
+  asset: StockToken;
+  logoBroken: boolean;
+  onLogoError: () => void;
+  halted: boolean;
+}) {
+  return (
+    <div className="flex items-start gap-3">
+      {asset.logoUrl && !logoBroken ? (
+        <Image
+          src={asset.logoUrl}
+          alt=""
+          width={40}
+          height={40}
+          className="size-10 shrink-0 rounded-full ring-1 ring-border"
+          unoptimized
+          onError={onLogoError}
+        />
+      ) : (
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-panel text-xs font-bold uppercase text-muted ring-1 ring-border">
+          {asset.symbol.slice(0, 2)}
+        </span>
+      )}
+      <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <Switch
-            id="amount-in-shares"
-            checked={unit === "shares"}
-            onCheckedChange={(checked) => setUnit(checked ? "shares" : "usd")}
-            aria-label="Amount in shares"
-          />
-          <Label htmlFor="amount-in-shares" className="font-medium">
-            Amount in shares
-          </Label>
-          <Tooltip>
-            <TooltipTrigger
-              type="button"
-              className="inline-flex size-6 items-center justify-center rounded-md text-muted hover:bg-foreground/5 hover:text-foreground"
-              aria-label="About amount unit"
-            >
-              <Info className="size-3.5" strokeWidth={1.5} aria-hidden />
-            </TooltipTrigger>
-            <TooltipContent side="top" className="max-w-xs">
-              Off: enter a USD amount. On: enter a share quantity. The preview uses the current mid
-              quote.
-            </TooltipContent>
-          </Tooltip>
+          <h1 className="pr-display text-xl">{asset.symbol}</h1>
+          {halted ? <Badge variant="danger">Halted</Badge> : <Badge variant="success">Open</Badge>}
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="stock-amount">{unit === "usd" ? "Amount in USD" : "Shares"}</Label>
-          <Input
-            id="stock-amount"
-            inputMode="decimal"
-            value={ticketAmount}
-            onChange={(e) => setTicketAmount(e.target.value)}
-            placeholder={unit === "usd" ? "0.00" : "0"}
-          />
-          <p className="text-xs text-muted">
-            {estimate
-              ? unit === "usd"
-                ? `≈ ${estimate.shares.toLocaleString("en-US", { maximumFractionDigits: 6 })} shares at mid`
-                : `≈ ${formatUsdPrice(estimate.usd)} at mid`
-              : "Enter an amount to preview the fill."}
-          </p>
-        </div>
-        <Button type="button" className="w-full" size="lg" disabled>
-          {halted
-            ? "Trading halted"
-            : `${side === "buy" ? "Buy" : "Sell"} ${asset.symbol} · coming soon`}
+        <p className="truncate text-sm text-muted">{asset.shortName}</p>
+      </div>
+    </div>
+  );
+}
+
+export function StockTradeTicket({
+  symbol,
+  halted,
+  side,
+  onSideChange,
+  unit,
+  onUnitChange,
+  ticketAmount,
+  onTicketAmountChange,
+  tradeReason,
+  estimate,
+  embeddedPresentation = false,
+}: {
+  symbol: string;
+  halted: boolean;
+  side: "buy" | "sell";
+  onSideChange: (side: "buy" | "sell") => void;
+  unit: "usd" | "shares";
+  onUnitChange: (unit: "usd" | "shares") => void;
+  ticketAmount: string;
+  onTicketAmountChange: (value: string) => void;
+  tradeReason: string | null;
+  estimate: { shares: number; usd: number } | null;
+  embeddedPresentation?: boolean;
+}) {
+  const preview = estimate
+    ? unit === "usd"
+      ? `≈ ${estimate.shares.toLocaleString("en-US", { maximumFractionDigits: 6 })} shares at mid`
+      : `≈ ${formatUsdPrice(estimate.usd)} at mid`
+    : "Enter an amount to preview the fill.";
+
+  return (
+    <div
+      className={
+        embeddedPresentation
+          ? "space-y-3 rounded-[var(--radius-xl)] border border-border bg-panel p-4"
+          : "sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-10 space-y-3 rounded-[var(--radius-xl)] border border-border bg-[color-mix(in_srgb,var(--panel-solid)_94%,transparent)] p-4 backdrop-blur-md md:static md:bottom-auto"
+      }
+    >
+      <div className="grid grid-cols-2 gap-2" role="group" aria-label="Order side">
+        <Button
+          type="button"
+          variant="outline"
+          aria-pressed={side === "buy"}
+          onClick={() => onSideChange("buy")}
+          className={
+            side === "buy"
+              ? "border-green-600 bg-green-600 text-white hover:bg-green-700 hover:text-white"
+              : "border-green-600/40 text-green-700 hover:bg-green-50 hover:text-green-800"
+          }
+        >
+          Buy
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          aria-pressed={side === "sell"}
+          onClick={() => onSideChange("sell")}
+          className={
+            side === "sell"
+              ? "border-red-600 bg-red-600 text-white hover:bg-red-700 hover:text-white"
+              : "border-red-600/40 text-red-700 hover:bg-red-50 hover:text-red-800"
+          }
+        >
+          Sell
         </Button>
       </div>
+      <div className="flex items-center gap-2">
+        <Switch
+          id="amount-in-shares"
+          checked={unit === "shares"}
+          onCheckedChange={(checked) => onUnitChange(checked ? "shares" : "usd")}
+          aria-label="Amount in shares"
+        />
+        <Label htmlFor="amount-in-shares" className="font-medium">
+          Amount in shares
+        </Label>
+        <Tooltip>
+          <TooltipTrigger
+            type="button"
+            className="inline-flex size-6 items-center justify-center rounded-md text-muted hover:bg-foreground/5 hover:text-foreground"
+            aria-label="About amount unit"
+          >
+            <Info className="size-3.5" strokeWidth={1.5} aria-hidden />
+          </TooltipTrigger>
+          <TooltipContent side="top" className="max-w-xs">
+            Off: enter a USD amount. On: enter a share quantity. The preview uses the current mid
+            quote.
+          </TooltipContent>
+        </Tooltip>
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="stock-amount">{unit === "usd" ? "Amount in USD" : "Shares"}</Label>
+        <Input
+          id="stock-amount"
+          inputMode="decimal"
+          value={ticketAmount}
+          onChange={(e) => onTicketAmountChange(e.target.value)}
+          placeholder={unit === "usd" ? "0.00" : "0"}
+        />
+        <p className="text-xs text-muted">{preview}</p>
+      </div>
+      {tradeReason && !halted && tradeReason !== TRADE_UNAVAILABLE ? (
+        <p className="text-sm text-muted" role="status">
+          {tradeReason}
+        </p>
+      ) : null}
+      <Button type="button" className="w-full" size="lg" disabled>
+        {halted ? "Trading halted" : `${side === "buy" ? "Buy" : "Sell"} ${symbol}`}
+      </Button>
+      <p className="text-xs text-muted">
+        The execution price is a 0x quote, not the Robinhood mid. The mid is a reference only. Buy
+        and sell stay off until a firm quote reports liquidity.
+      </p>
     </div>
   );
 }

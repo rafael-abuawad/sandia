@@ -32,6 +32,19 @@ export function PayAttemptsList({ attempts }: { attempts: Attempt[] }) {
   );
 }
 
+function unavailableCopy(status: string | undefined): string {
+  switch (status?.toLowerCase()) {
+    case "cancelled":
+      return "This request was cancelled and can no longer be paid.";
+    case "expired":
+      return "This request expired and can no longer be paid.";
+    case "failed":
+      return "This request failed and can no longer be paid.";
+    default:
+      return "This request can no longer be paid.";
+  }
+}
+
 export function PayTerminalStatus({
   kind,
   statusLabel,
@@ -44,7 +57,7 @@ export function PayTerminalStatus({
   if (kind === "completed") {
     return (
       <section className="pr-inset pr-inset--success p-5 text-sm text-success">
-        Payment completed. Stablecoin settled on Robinhood Chain.
+        Payment complete. USDG settled on Robinhood Chain.
         {depositTxnRef && (
           <p className="mt-2 pr-mono text-xs text-muted">
             Deposit: {shortenAddress(depositTxnRef, 8)}
@@ -56,7 +69,7 @@ export function PayTerminalStatus({
 
   return (
     <section className="pr-inset pr-inset--muted p-5 text-sm text-muted">
-      This request is {statusLabel} and cannot be paid.
+      {unavailableCopy(statusLabel)}
     </section>
   );
 }

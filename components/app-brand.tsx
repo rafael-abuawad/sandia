@@ -2,7 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
-export function AppBrand({ className }: { className?: string }) {
+export function AppBrand({ className, name = "Sandia" }: { className?: string; name?: string }) {
   return (
     <Link href="/" className={cn("pr-brand inline-flex items-center gap-2", className)}>
       <Image
@@ -14,7 +14,7 @@ export function AppBrand({ className }: { className?: string }) {
         priority
         unoptimized
       />
-      Payrequest
+      {name}
     </Link>
   );
 }

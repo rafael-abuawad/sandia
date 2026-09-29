@@ -19,6 +19,7 @@ export function PriceChart({ address, symbol }: { address: string; symbol: strin
           title={`${symbol} price chart`}
           src={geckoTokenUrl(address, true)}
           className="h-[420px] w-full border-0 sm:h-[480px]"
+          sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
           allow="clipboard-write; fullscreen"
           loading="eager"
           referrerPolicy="no-referrer-when-downgrade"

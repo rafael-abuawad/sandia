@@ -6,13 +6,12 @@ export default function HomePage() {
     <div className="pr-stack pr-page--hero mx-auto">
       <section className="pr-panel pr-panel--hero pr-animate-in">
         <div className="relative max-w-2xl space-y-6">
-          <p className="pr-eyebrow pr-animate-in">Payrequest</p>
+          <p className="pr-eyebrow pr-animate-in">Sandia</p>
           <h1 className="pr-display pr-animate-in pr-animate-in-delay-1 text-3xl sm:text-5xl">
-            Request dollars. Receive stablecoins on Robinhood Chain.
+            Request dollars. Receive USDG on Robinhood Chain.
           </h1>
           <p className="pr-lede pr-animate-in pr-animate-in-delay-2">
-            Create a payment link, send funds, or settle OTC. Switch modes from the navigation to
-            get started.
+            Create a payment link or send USDG. Switch modes from the navigation to get started.
           </p>
           <div className="pr-animate-in pr-animate-in-delay-3 flex flex-wrap gap-3 pt-2">
             <Button asChild size="lg">
@@ -22,7 +21,7 @@ export default function HomePage() {
               <Link href="/send">Send USDG</Link>
             </Button>
             <Button asChild size="lg" variant="outline">
-              <Link href="/otc">View OTC</Link>
+              <Link href="/dashboard">Your requests</Link>
             </Button>
           </div>
         </div>
@@ -32,15 +31,15 @@ export default function HomePage() {
         {[
           {
             title: "Request",
-            body: "Create a USD payment link. Payers connect a wallet and bridge tokens to the recipient — no account required.",
+            body: "Create a USD payment link. Payers settle from their own chain, and USDG arrives on Robinhood Chain. No Sandia account required.",
           },
           {
             title: "Send",
             body: "Push USDG to one recipient or a batch, with a review step before anything is sent.",
           },
           {
-            title: "OTC",
-            body: "Negotiate and settle larger transfers off the public request flow.",
+            title: "Stocks and earn",
+            body: "Stock trades and vault deposits appear only after a live quote or vault call says they are open.",
           },
         ].map((item) => (
           <div key={item.title} className="pr-feature">

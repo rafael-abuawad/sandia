@@ -18,11 +18,12 @@ const TOKEN_ICONS: Record<string, string> = {
   USDT: "/assets/tokens/usdt.svg",
   DAI: "/assets/tokens/dai.svg",
   ETH: "/assets/tokens/eth.svg",
-  BNB: "/assets/chains/bsc.svg",
-  AVAX: "/assets/chains/avalanche.svg",
-  MATIC: "/assets/chains/polygon.svg",
-  POL: "/assets/chains/polygon.svg",
-  MON: "/assets/chains/monad.svg",
+  BNB: "/assets/tokens/bnb.svg",
+  AVAX: "/assets/tokens/avax.svg",
+  MATIC: "/assets/tokens/matic.svg",
+  POL: "/assets/tokens/pol.svg",
+  MON: "/assets/tokens/mon.svg",
+  CRVUSD: "/assets/tokens/crvusd.svg",
 };
 
 const CHAIN_NAME_ICONS: Record<string, string> = {

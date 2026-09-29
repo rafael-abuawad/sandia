@@ -1,22 +1,32 @@
 "use client";
 
 import Link from "next/link";
-import { useQuery } from "convex/react";
+import { usePaginatedQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { LoginButton } from "@/components/login-button";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { formatUsdFromMicros } from "@/lib/money";
 import { useSignedInWallet } from "@/lib/use-signed-in-wallet";
+import DashboardLoading from "./loading";
 
 export default function DashboardPage() {
   const { ready, isSignedIn } = useSignedInWallet();
-  const requests = useQuery(api.paymentRequests.listMine, isSignedIn ? {} : "skip");
+  const {
+    results: requests,
+    status,
+    loadMore,
+  } = usePaginatedQuery(api.paymentRequests.listMine, isSignedIn ? {} : "skip", {
+    initialNumItems: 20,
+  });
 
-  if (!ready || !isSignedIn) {
+  if (!ready) return <DashboardLoading />;
+
+  if (!isSignedIn) {
     return (
       <div className="pr-page pr-page--narrow text-center">
-        <h1 className="pr-display text-2xl">Dashboard</h1>
+        <h1 className="pr-display text-2xl">Your requests</h1>
         <p className="text-sm text-muted">Sign in to manage payment requests.</p>
         <div className="flex justify-center">
           <LoginButton />
@@ -34,9 +44,21 @@ export default function DashboardPage() {
         </Button>
       </div>
 
-      {requests === undefined && <p className="text-sm text-muted">Loading…</p>}
+      {status === "LoadingFirstPage" ? (
+        <ul className="space-y-3" role="status" aria-label="Loading" aria-busy="true">
+          {["a", "b", "c"].map((row) => (
+            <li key={row} className="pr-panel flex items-center justify-between gap-4 px-4 py-4">
+              <div className="min-w-0 space-y-1">
+                <Skeleton className="h-5 w-40" />
+                <Skeleton className="h-3 w-52" />
+              </div>
+              <Skeleton className="h-5 w-16 rounded-sm" />
+            </li>
+          ))}
+        </ul>
+      ) : null}
 
-      {requests && requests.length === 0 && (
+      {status !== "LoadingFirstPage" && requests.length === 0 && (
         <div className="pr-panel pr-panel--padded space-y-3 text-center sm:text-left">
           <p className="font-medium text-foreground">No payment requests yet</p>
           <p className="text-sm text-muted">
@@ -49,7 +71,7 @@ export default function DashboardPage() {
       )}
 
       <ul className="space-y-3">
-        {requests?.map(
+        {requests.map(
           (r: {
             _id: string;
             publicId: string;
@@ -74,6 +96,11 @@ export default function DashboardPage() {
           ),
         )}
       </ul>
+      {status === "CanLoadMore" ? (
+        <Button type="button" variant="secondary" onClick={() => loadMore(20)}>
+          Load more
+        </Button>
+      ) : null}
     </div>
   );
 }

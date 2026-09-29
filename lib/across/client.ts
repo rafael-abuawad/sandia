@@ -24,11 +24,41 @@ export type AcrossApprovalTxn = {
   data: string;
 };
 
+export type AcrossAmountCheck = {
+  token?: string;
+  spender?: string;
+  actual?: string;
+  expected?: string;
+};
+
+export type AcrossQuoteChecks = {
+  allowance?: AcrossAmountCheck;
+  balance?: AcrossAmountCheck;
+};
+
+function checkIsShort(check: AcrossAmountCheck | undefined): boolean {
+  if (check?.actual == null || check.expected == null) return false;
+  try {
+    return BigInt(check.actual) < BigInt(check.expected);
+  } catch {
+    return false;
+  }
+}
+
+/** Why an Across quote cannot be executed yet. Allowance-only gaps are fixed by the approval step. */
+export function quoteFundingGap(quote: { checks?: unknown }): "balance" | "allowance" | null {
+  if (!quote.checks || typeof quote.checks !== "object") return null;
+  const checks = quote.checks as AcrossQuoteChecks;
+  if (checkIsShort(checks.balance)) return "balance";
+  if (checkIsShort(checks.allowance)) return "allowance";
+  return null;
+}
+
 export type AcrossSwapQuote = {
   id?: string;
   crossSwapType?: string;
   approvalTxns?: AcrossApprovalTxn[];
-  checks?: unknown;
+  checks?: AcrossQuoteChecks;
   fees?: {
     total?: { amount?: string; amountUsd?: string; token?: string };
     totalMax?: { amount?: string; amountUsd?: string };

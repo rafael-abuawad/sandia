@@ -6,10 +6,14 @@ USD-denominated payment requests settled as stablecoins on **Robinhood Chain** v
 
 - Next.js App Router + React 19
 - Convex (database + backend functions)
-- Privy (wallet, Google, and email login) + wagmi/viem for on-chain reads and sends
+- Privy for Sandia accounts (email OTP and an embedded wallet) and for payer wallet connection, wagmi/viem for chain reads and sends
 - Across Swap API for quotes, approvals, bridging, and deposit tracking
 
 ## Setup
+
+After step 3 initializes Convex, configure Jev through OpenRouter. Keep this key in Convex only:
+
+    npx convex env set OPENROUTER_API_KEY <openrouter-api-key>
 
 1. Copy env template:
 
@@ -29,13 +33,26 @@ pnpm install
 npx convex dev
 ```
 
-4. Add your [Privy App ID](https://dashboard.privy.io) to `.env.local` as `NEXT_PUBLIC_PRIVY_APP_ID`, and the same value on Convex:
+4. Set the Privy app id in `.env.local`:
 
 ```bash
-npx convex env set PRIVY_APP_ID <your-privy-app-id>
+NEXT_PUBLIC_PRIVY_APP_ID=<privy-app-id>
 ```
 
-In the Privy dashboard, enable Wallet, Email, and Google login, allow `http://localhost:3000` (and your production origin), and enable embedded Ethereum wallets.
+Create a Privy app with email OTP and wallets enabled. Allow `http://localhost:3000`. On Convex, set the same app id and the wallet-claim secret:
+
+```bash
+npx convex env set PRIVY_APP_ID <same-as-NEXT_PUBLIC_PRIVY_APP_ID>
+npx convex env set SANDIA_NONCE_SECRET <secret>
+```
+
+Batch sends also need the deployed Sandia Send address in `.env.local`:
+
+```bash
+NEXT_PUBLIC_SANDIA_SEND_ADDRESS=<sandia-send-address>
+```
+
+A single recipient still transfers USDG directly. Two or more recipients approve that contract, then call `sandia_send`.
 
 5. In another terminal:
 
@@ -47,15 +64,19 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ## Product flow
 
-1. Creator signs in with a wallet (MetaMask, Rabby, etc.), Google, or email. Email/Google users get an embedded wallet automatically.
-2. Create a request: USD amount, recipient, destination stablecoin (API-driven from Across on Robinhood Chain — currently **USDG**), optional description/expiry.
+1. Creator signs in with email+OTP. Privy creates an embedded wallet, and that wallet is claimed automatically so they can create requests and send.
+2. Create a request: USD amount, optional description and expiry. The recipient is that wallet. The destination token is USDG on Robinhood Chain.
 3. Share the public `/pay/{id}` URL.
-4. Payer signs in, selects an Across-supported source chain/token, reviews quote (input, fees, min received, ETA), approves if needed, and pays.
-5. The request is marked **completed** only after Across reports `filled` and server-side checks pass (destination chain, token, recipient, amount).
+4. Payer connects an external wallet through Privy, selects an Across-supported source chain/token, reviews quote (input, fees, min received, ETA), approves if needed, and pays. Paying does not create a Sandia account.
+5. The request is marked **completed** only after a deposit receipt matches the request and Across `/deposit` reports `filled` with destination chain 4663, the request token, the snapshotted recipient, an output amount at least as large as the request, and a fill transaction. `/deposit/status` is not used as proof. A minute cron keeps checking if the payer closes the tab.
 
 ## Notes
 
 - Monetary values are stored as integer base units / USD micros — no floating-point arithmetic.
 - Destination tokens are discovered live from `GET /swap/tokens?chainId=4663` filtered to `USDC|USDT|USDG`.
-- Deposit status is polled every 10 seconds via Across `GET /deposit/status`.
-- Register an Across integrator id before production and set `NEXT_PUBLIC_ACROSS_INTEGRATOR_ID`.
+- The payer's browser also polls every 10 seconds. The server calls Across `GET /deposit` (or `/deposits`) with `ACROSS_API_KEY` on Convex, not a public env var.
+- Register an Across integrator id and set Convex `ACROSS_INTEGRATOR_ID`.
+- `/otc` redirects to `/requests/new`.
+- App accounts use the Privy embedded wallet on Robinhood Chain. The public pay page uses the same Privy wagmi provider and connects an external wallet for payment, so paying does not claim a Sandia account. WalletConnect for payers is the connector enabled in the Privy dashboard.
+- Outbound USDG sends use Privy's embedded-wallet gas sponsorship on Robinhood Chain, so the sender does not need ETH. In the Privy Dashboard, enable **Fee sponsorship → Sponsor gas fees**, add Robinhood Chain to supported chains, fund billing, and allow client-initiated sponsored transactions. Privy requires TEE wallet execution for native sponsorship. Set spending caps before enabling this in production. Batch sends sponsor both the USDG approval and the Sandia Send call.
+- Stock trading stays unavailable until a 0x quote for a real RHJ token returns `liquidityAvailable: true`. Vault deposits stay unavailable while `maxDeposit` is 0. See `docs/gates.md`.

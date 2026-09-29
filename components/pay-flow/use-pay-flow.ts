@@ -1,25 +1,33 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useReducer } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
 import {
   useAccount,
+  useBalance,
+  useReadContract,
   useSendTransaction,
   useSwitchChain,
   useWaitForTransactionReceipt,
 } from "wagmi";
-import { useAction, useMutation, useQuery } from "convex/react";
-import { type Hex, type Address, createPublicClient, http } from "viem";
+import { useAction, usePaginatedQuery, useQuery } from "convex/react";
+import { type Hex, type Address, createPublicClient, erc20Abi, http } from "viem";
 import { api } from "@/convex/_generated/api";
 import type { ChainOption, TokenOption } from "@/components/token-chain-select";
 import {
   fetchAcrossChains,
   fetchAcrossTokens,
-  quoteExactOutputWithFallback,
+  quoteFundingGap,
+  type AcrossSwapQuote,
 } from "@/lib/across/client";
 import { appChains, PAYER_CHAIN_IDS, isPayerTokenAllowed, displayTokenSymbol } from "@/lib/chains";
-import { initialPayFlowState, payFlowReducer } from "@/components/pay-flow/state";
+import { isDirectUsdgPay, isRobinhoodEthPay, ROBINHOOD_USDG } from "@/lib/destination";
+import { ethSpendBaseUnits } from "@/lib/zerox-quote";
+import { buildUsdgPaymentTransfer } from "@/lib/send/calls";
+import { initialPayFlowState, payFlowReducer, type SentPayment } from "@/components/pay-flow/state";
+import { statusLabel } from "@/components/status-badge";
+import { userFacingError } from "@/lib/user-facing-error";
 
-const CHAIN_ORDER = [1, 8453, 42161, 10, 137, 56, 43114, 143];
+const CHAIN_ORDER = [1, 8453, 42161, 10, 137, 56, 43114, 143, 4663];
 const SYMBOL_ORDER = [
   "USDC",
   "USDT",
@@ -28,6 +36,7 @@ const SYMBOL_ORDER = [
   "CRVUSD",
   "WETH",
   "ETH",
+  "USDG",
   "WBNB",
   "BNB",
   "WAVAX",
@@ -40,6 +49,14 @@ const SYMBOL_ORDER = [
   "MON",
 ];
 
+export type DirectPayBalance = "loading" | "short" | "ready" | "unavailable";
+
+const TRACKED_MESSAGE: Record<SentPayment["kind"], string> = {
+  across: "Deposit submitted. Waiting for settlement…",
+  direct: "Transfer submitted. Confirming settlement…",
+  eth: "Swap submitted. Confirming settlement…",
+};
+
 function acrossStatusCopy(status: string): string {
   switch (status) {
     case "submitted":
@@ -49,8 +66,15 @@ function acrossStatusCopy(status: string): string {
     case "filled":
       return "Payment settled on Robinhood Chain.";
     default:
-      return `Bridge status: ${status}`;
+      return `Bridge status: ${statusLabel(status)}.`;
   }
+}
+
+function settlementStatusCopy(status: string, direct: boolean): string {
+  if (!direct) return acrossStatusCopy(status);
+  if (status === "filled") return "Payment settled on Robinhood Chain.";
+  if (status === "submitted" || status === "pending") return "Confirming the USDG transfer…";
+  return `Transfer status: ${statusLabel(status)}.`;
 }
 
 async function waitForHash(hash: Hex, chainId: number) {
@@ -65,8 +89,16 @@ async function waitForHash(hash: Hex, chainId: number) {
 
 export function usePayFlow(publicId: string) {
   const request = useQuery(api.paymentRequests.getByPublicId, { publicId });
-  const attempts = useQuery(api.paymentAttempts.listByRequest, { publicId });
-  const createAttempt = useMutation(api.paymentAttempts.createAttempt);
+  const { results: attempts } = usePaginatedQuery(
+    api.paymentAttempts.listByRequest,
+    { publicId },
+    { initialNumItems: 20 },
+  );
+  const quoteSwap = useAction(api.across.quoteSwap);
+  const quoteEthToUsdg = useAction(api.zerox.quoteEthToUsdg);
+  const submitDeposit = useAction(api.across.submitDeposit);
+  const submitDirect = useAction(api.directSettlement.submitDirect);
+  const submitEthSwap = useAction(api.zerox.submitEthSwap);
   const syncStatus = useAction(api.across.syncDepositStatus);
 
   const { address, chainId, isConnected } = useAccount();
@@ -74,18 +106,21 @@ export function usePayFlow(publicId: string) {
   const { sendTransactionAsync } = useSendTransaction();
 
   const [state, dispatch] = useReducer(payFlowReducer, initialPayFlowState);
+  const quoteGeneration = useRef(0);
   const {
     chains,
     tokens,
     originChainId,
     inputToken,
     quote,
+    ethQuote,
     tradeType,
     quoteError,
     step,
     statusMsg,
     depositTxnRef,
     pendingTx,
+    unverifiedPayment,
   } = state;
 
   const { isSuccess: txSuccess, isError: txError } = useWaitForTransactionReceipt({
@@ -110,7 +145,7 @@ export function usePayFlow(publicId: string) {
     if (!originChainId) return [];
     const options: Array<TokenOption & { sortSymbol: string }> = [];
     for (const t of tokens) {
-      if (t.chainId !== originChainId || !isPayerTokenAllowed(t.symbol, t.address)) {
+      if (t.chainId !== originChainId || !isPayerTokenAllowed(t.symbol, t.address, originChainId)) {
         continue;
       }
       options.push({
@@ -133,10 +168,11 @@ export function usePayFlow(publicId: string) {
   }
 
   function onTokenChange(value: string) {
+    const direct = isDirectUsdgPay(originChainId, value);
     dispatch({
       type: "inputTokenChanged",
       token: value,
-      nextStep: isConnected && address ? "quoting" : "idle",
+      nextStep: !direct && isConnected && address ? "quoting" : "idle",
     });
   }
 
@@ -152,14 +188,17 @@ export function usePayFlow(publicId: string) {
           tokens: t.filter(
             (token) =>
               PAYER_CHAIN_IDS.has(token.chainId) &&
-              isPayerTokenAllowed(token.symbol, token.address),
+              isPayerTokenAllowed(token.symbol, token.address, token.chainId),
           ),
         });
       } catch (e) {
         if (!cancelled) {
           dispatch({
             type: "routesFailed",
-            error: e instanceof Error ? e.message : "Failed to load routes",
+            error: userFacingError(
+              e,
+              "Chains and tokens could not be loaded. Refresh and try again.",
+            ),
           });
         }
       }
@@ -181,43 +220,103 @@ export function usePayFlow(publicId: string) {
       (t) =>
         t.chainId === originChainId &&
         t.address.toLowerCase() === inputToken.toLowerCase() &&
-        isPayerTokenAllowed(t.symbol, t.address),
+        isPayerTokenAllowed(t.symbol, t.address, originChainId),
     );
     if (!stillValid) dispatch({ type: "clearInvalidToken" });
   }, [originChainId, tokens, inputToken]);
 
+  const directPay = isDirectUsdgPay(originChainId, inputToken);
+  const robinhoodEth = isRobinhoodEthPay(originChainId, inputToken);
+  const {
+    data: usdgBalance,
+    isPending: usdgBalancePending,
+    isError: usdgBalanceError,
+  } = useReadContract({
+    address: ROBINHOOD_USDG.address as Address,
+    abi: erc20Abi,
+    functionName: "balanceOf",
+    args: address ? [address] : undefined,
+    chainId: ROBINHOOD_USDG.chainId,
+    query: { enabled: Boolean(address && directPay) },
+  });
+  const {
+    data: nativeBalance,
+    isPending: ethBalancePending,
+    isError: ethBalanceError,
+  } = useBalance({
+    address,
+    chainId: ROBINHOOD_USDG.chainId,
+    query: { enabled: Boolean(address && robinhoodEth) },
+  });
+
   const refreshQuote = useCallback(async () => {
     if (!request || !address || !originChainId || !inputToken) return;
+    if (isDirectUsdgPay(originChainId, inputToken)) return;
     if (request.status !== "open" && request.status !== "pending") return;
 
+    if (isRobinhoodEthPay(originChainId, inputToken)) {
+      const generation = ++quoteGeneration.current;
+      dispatch({ type: "quoteStarted" });
+      try {
+        const raw = await quoteEthToUsdg({ publicId, taker: address });
+        if (quoteGeneration.current !== generation) return;
+        dispatch({ type: "ethQuoteSucceeded", quote: raw });
+      } catch (e) {
+        if (quoteGeneration.current !== generation) return;
+        dispatch({
+          type: "quoteFailed",
+          error: userFacingError(e, "No route is available for this token. Try another one."),
+        });
+      }
+      return;
+    }
+
+    const generation = ++quoteGeneration.current;
     dispatch({ type: "quoteStarted" });
     try {
-      const { quote: q, tradeType: tt } = await quoteExactOutputWithFallback({
-        amount: request.outputAmountBaseUnits,
-        inputToken,
-        outputToken: request.destinationTokenAddress,
-        originChainId,
-        destinationChainId: request.destinationChainId,
-        depositor: address,
-        recipient: request.recipientAddress,
-        integratorId: process.env.NEXT_PUBLIC_ACROSS_INTEGRATOR_ID,
-      });
+      let raw;
+      let tt: "exactOutput" | "minOutput" = "exactOutput";
+      try {
+        raw = await quoteSwap({
+          publicId,
+          inputToken,
+          originChainId,
+          depositor: address,
+          tradeType: "exactOutput",
+        });
+      } catch {
+        tt = "minOutput";
+        raw = await quoteSwap({
+          publicId,
+          inputToken,
+          originChainId,
+          depositor: address,
+          tradeType: "minOutput",
+        });
+      }
+      if (quoteGeneration.current !== generation) return;
+      const q = raw as AcrossSwapQuote;
       if (q.quoteExpiryTimestamp && q.quoteExpiryTimestamp * 1000 < Date.now()) {
         throw new Error("Quote expired before display — try again");
       }
       dispatch({ type: "quoteSucceeded", quote: q, tradeType: tt });
     } catch (e) {
+      if (quoteGeneration.current !== generation) return;
       dispatch({
         type: "quoteFailed",
-        error: e instanceof Error ? e.message : "No valid route",
+        error: userFacingError(e, "No route is available for this token. Try another one."),
       });
     }
-  }, [request, address, originChainId, inputToken]);
+  }, [request, address, originChainId, inputToken, publicId, quoteSwap, quoteEthToUsdg]);
 
   useEffect(() => {
     if (!isConnected || !address || !request) return;
     if (request.status !== "open" && request.status !== "pending") return;
     if (!originChainId || !inputToken) return;
+    if (isDirectUsdgPay(originChainId, inputToken)) {
+      quoteGeneration.current += 1;
+      return;
+    }
     void refreshQuote();
   }, [isConnected, address, request, originChainId, inputToken, refreshQuote]);
 
@@ -235,29 +334,39 @@ export function usePayFlow(publicId: string) {
       try {
         const result = await syncStatus({ depositTxnRef });
         if (cancelled) return;
-        if (result.acrossStatus === "filled") {
+        if (result.acrossStatus === "filled" || result.requestStatus === "completed") {
           dispatch({
             type: "paymentDone",
             message: "Payment settled on Robinhood Chain.",
           });
           return;
         }
+        if (result.attemptStatus === "failed") {
+          dispatch({
+            type: "paymentFailed",
+            message: result.reason ?? "The fill did not match this request.",
+          });
+          return;
+        }
         if (result.acrossStatus === "expired" || result.acrossStatus === "refunded") {
           dispatch({
             type: "paymentFailed",
-            message: `Transfer ${result.acrossStatus}. Funds will be refunded. You can try again.`,
+            message:
+              result.acrossStatus === "refunded"
+                ? "This transfer was refunded. You can try again."
+                : "This transfer expired. Funds will be refunded. You can try again.",
           });
           return;
         }
         dispatch({
           type: "statusChanged",
-          message: acrossStatusCopy(result.acrossStatus),
+          message: settlementStatusCopy(result.acrossStatus, directPay || robinhoodEth),
         });
       } catch (e) {
         if (!cancelled) {
           dispatch({
             type: "statusChanged",
-            message: e instanceof Error ? e.message : "Status sync failed",
+            message: userFacingError(e, "Settlement status could not be refreshed."),
           });
         }
       }
@@ -269,31 +378,14 @@ export function usePayFlow(publicId: string) {
       cancelled = true;
       clearInterval(id);
     };
-  }, [depositTxnRef, request, syncStatus]);
+  }, [depositTxnRef, request, syncStatus, directPay, robinhoodEth]);
 
   useEffect(() => {
-    if (!attempts || attempts.length === 0 || depositTxnRef) return;
-    const inflight = attempts.find(
-      (a: { depositTxnRef?: string; acrossStatus: string }) =>
-        a.depositTxnRef && (a.acrossStatus === "submitted" || a.acrossStatus === "pending"),
-    );
-    if (inflight?.depositTxnRef) {
-      dispatch({
-        type: "depositTracked",
-        depositTxnRef: inflight.depositTxnRef,
-      });
+    const saved = window.sessionStorage.getItem(`sandia-deposit:${publicId}`);
+    if (saved) {
+      dispatch({ type: "depositTracked", depositTxnRef: saved });
     }
-    const filled = attempts.find(
-      (a: { depositTxnRef?: string; acrossStatus: string }) => a.acrossStatus === "filled",
-    );
-    if (filled?.depositTxnRef) {
-      dispatch({
-        type: "depositTracked",
-        depositTxnRef: filled.depositTxnRef,
-      });
-      dispatch({ type: "paymentDone" });
-    }
-  }, [attempts, depositTxnRef]);
+  }, [publicId]);
 
   const selectedToken = useMemo(
     () =>
@@ -303,7 +395,141 @@ export function usePayFlow(publicId: string) {
     [tokens, originChainId, inputToken],
   );
 
+  async function recordSentPayment(sent: SentPayment) {
+    try {
+      await waitForHash(sent.hash, sent.chainId);
+      const tracked = sent.hash.toLowerCase();
+      if (sent.kind === "across") {
+        await submitDeposit({
+          publicId,
+          payerAddress: sent.payerAddress,
+          ...sent.details,
+          depositTxnRef: tracked,
+        });
+      } else if (sent.kind === "direct") {
+        await submitDirect({ publicId, payerAddress: sent.payerAddress, depositTxnRef: tracked });
+      } else {
+        await submitEthSwap({ publicId, payerAddress: sent.payerAddress, depositTxnRef: tracked });
+      }
+      window.sessionStorage.setItem(`sandia-deposit:${publicId}`, tracked);
+      dispatch({
+        type: "depositTracked",
+        depositTxnRef: tracked,
+        message: TRACKED_MESSAGE[sent.kind],
+      });
+    } catch (e) {
+      dispatch({
+        type: "paymentUnverified",
+        payment: sent,
+        message: `${userFacingError(e, "The payment could not be confirmed yet.")} Your payment was already sent, so don't pay again.`,
+      });
+    }
+  }
+
+  async function retryVerification() {
+    if (!unverifiedPayment) return;
+    dispatch({ type: "stepChanged", step: "tracking" });
+    dispatch({ type: "statusChanged", message: "Checking your payment…" });
+    await recordSentPayment(unverifiedPayment);
+  }
+
+  async function executeDirectPayment() {
+    if (!address || !request) return;
+    const required = /^\d+$/.test(request.outputAmountBaseUnits)
+      ? BigInt(request.outputAmountBaseUnits)
+      : null;
+    if (required === null || usdgBalance === undefined || usdgBalance < required) {
+      dispatch({
+        type: "paymentFailed",
+        message: "This wallet doesn't have enough USDG on Robinhood Chain.",
+      });
+      return;
+    }
+
+    let hash: Hex;
+    try {
+      if (chainId !== ROBINHOOD_USDG.chainId) {
+        await switchChainAsync({ chainId: ROBINHOOD_USDG.chainId });
+      }
+      dispatch({ type: "stepChanged", step: "paying" });
+      const call = buildUsdgPaymentTransfer(
+        request.recipientAddress,
+        request.outputAmountBaseUnits,
+      );
+      hash = await sendTransactionAsync({
+        to: call.to,
+        data: call.data,
+        value: call.value,
+        chainId: ROBINHOOD_USDG.chainId,
+      });
+      dispatch({ type: "pendingTxSet", hash });
+    } catch (e) {
+      dispatch({
+        type: "paymentFailed",
+        message: userFacingError(e, "Payment could not be submitted. Try again."),
+      });
+      return;
+    }
+    await recordSentPayment({
+      kind: "direct",
+      hash,
+      chainId: ROBINHOOD_USDG.chainId,
+      payerAddress: address,
+    });
+  }
+
+  async function executeEthPayment() {
+    if (!address || !request || !ethQuote) return;
+    const shown = ethSpendBaseUnits(ethQuote);
+
+    let hash: Hex;
+    try {
+      const fresh = await quoteEthToUsdg({ publicId, taker: address });
+      if (ethSpendBaseUnits(fresh) > shown) {
+        dispatch({ type: "ethQuoteSucceeded", quote: fresh });
+        dispatch({
+          type: "statusChanged",
+          message: "The ETH price moved. Review the updated amount, then pay again.",
+        });
+        return;
+      }
+
+      if (chainId !== ROBINHOOD_USDG.chainId) {
+        await switchChainAsync({ chainId: ROBINHOOD_USDG.chainId });
+      }
+      dispatch({ type: "stepChanged", step: "paying" });
+      hash = await sendTransactionAsync({
+        to: fresh.transaction.to as Address,
+        data: fresh.transaction.data as Hex,
+        value: BigInt(fresh.transaction.value),
+        gas: fresh.transaction.gas ? BigInt(fresh.transaction.gas) : undefined,
+        chainId: ROBINHOOD_USDG.chainId,
+      });
+      dispatch({ type: "pendingTxSet", hash });
+    } catch (e) {
+      dispatch({
+        type: "paymentFailed",
+        message: userFacingError(e, "Payment could not be submitted. Try again."),
+      });
+      return;
+    }
+    await recordSentPayment({
+      kind: "eth",
+      hash,
+      chainId: ROBINHOOD_USDG.chainId,
+      payerAddress: address,
+    });
+  }
+
   async function executePayment() {
+    if (directPay) {
+      await executeDirectPayment();
+      return;
+    }
+    if (robinhoodEth) {
+      await executeEthPayment();
+      return;
+    }
     if (!quote?.swapTx || !address || !request || !originChainId || !inputToken) {
       return;
     }
@@ -316,6 +542,8 @@ export function usePayFlow(publicId: string) {
       return;
     }
 
+    let hash: Hex;
+    let swapChainId: number;
     try {
       if (chainId !== originChainId) {
         await switchChainAsync({ chainId: originChainId });
@@ -344,19 +572,28 @@ export function usePayFlow(publicId: string) {
       if (chainId !== swap.chainId) {
         await switchChainAsync({ chainId: swap.chainId });
       }
-      const hash = await sendTransactionAsync({
+      hash = await sendTransactionAsync({
         to: swap.to as Address,
         data: swap.data as Hex,
         value: swap.value ? BigInt(swap.value) : undefined,
         gas: swap.gas ? BigInt(swap.gas) : undefined,
         chainId: swap.chainId,
       });
+      swapChainId = swap.chainId;
       dispatch({ type: "pendingTxSet", hash });
-      await waitForHash(hash, swap.chainId);
-
-      await createAttempt({
-        publicId,
-        payerAddress: address,
+    } catch (e) {
+      dispatch({
+        type: "paymentFailed",
+        message: userFacingError(e, "Payment could not be submitted. Try again."),
+      });
+      return;
+    }
+    await recordSentPayment({
+      kind: "across",
+      hash,
+      chainId: swapChainId,
+      payerAddress: address,
+      details: {
         originChainId,
         inputToken,
         quotedInputAmount: quote.inputAmount ?? quote.maxInputAmount ?? "0",
@@ -364,31 +601,55 @@ export function usePayFlow(publicId: string) {
         minOutputAmount: quote.minOutputAmount ?? request.outputAmountBaseUnits,
         feesJson: JSON.stringify(quote.fees ?? {}),
         quoteId: quote.id,
-        depositTxnRef: hash,
-      });
-
-      dispatch({
-        type: "depositTracked",
-        depositTxnRef: hash.toLowerCase(),
-        message: "Deposit submitted. Waiting for Across fill…",
-      });
-    } catch (e) {
-      dispatch({
-        type: "paymentFailed",
-        message: e instanceof Error ? e.message : "Payment failed",
-      });
-    }
+      },
+    });
   }
 
-  const canPay =
+  const paymentInProgress = request?.status === "pending" && !depositTxnRef;
+  const fundingGap = quote ? quoteFundingGap(quote) : null;
+  const simulationBlocked =
+    quote?.swapTx?.simulationSuccess === false && fundingGap !== "allowance";
+
+  const requiredUsdg =
+    directPay && request && /^\d+$/.test(request.outputAmountBaseUnits)
+      ? BigInt(request.outputAmountBaseUnits)
+      : null;
+  const directBalance: DirectPayBalance | null = !directPay
+    ? null
+    : usdgBalanceError
+      ? "unavailable"
+      : usdgBalancePending || usdgBalance === undefined || requiredUsdg === null
+        ? "loading"
+        : usdgBalance < requiredUsdg
+          ? "short"
+          : "ready";
+
+  const requiredEth = robinhoodEth && ethQuote ? ethSpendBaseUnits(ethQuote) : null;
+  const ethBalance: DirectPayBalance | null = !robinhoodEth
+    ? null
+    : ethBalanceError
+      ? "unavailable"
+      : ethBalancePending || nativeBalance === undefined || requiredEth === null
+        ? "loading"
+        : nativeBalance.value < requiredEth
+          ? "short"
+          : "ready";
+
+  const payStepOpen =
     !!request &&
-    (request.status === "open" || request.status === "pending") &&
-    !!quote?.swapTx &&
-    !quoteError &&
+    request.status === "open" &&
+    !paymentInProgress &&
+    !unverifiedPayment &&
     step !== "approving" &&
     step !== "paying" &&
     step !== "tracking" &&
     step !== "done";
+
+  const canPay = directPay
+    ? payStepOpen && directBalance === "ready"
+    : robinhoodEth
+      ? payStepOpen && ethBalance === "ready" && !quoteError
+      : payStepOpen && !!quote?.swapTx && !simulationBlocked && !quoteError;
 
   return {
     request,
@@ -401,10 +662,17 @@ export function usePayFlow(publicId: string) {
     step,
     quoteError,
     quote,
+    ethQuote,
     tradeType,
     selectedToken,
     chains,
+    directPay,
+    directBalance,
+    robinhoodEth,
+    ethBalance,
     canPay,
+    paymentInProgress,
+    payerAddress: address,
     statusMsg,
     pendingTx,
     txSuccess,
@@ -412,7 +680,9 @@ export function usePayFlow(publicId: string) {
     depositTxnRef,
     onChainChange,
     onTokenChange,
+    paymentSent: Boolean(unverifiedPayment),
     refreshQuote,
     executePayment,
+    retryVerification,
   };
 }

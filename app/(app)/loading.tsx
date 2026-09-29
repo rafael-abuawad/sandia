@@ -23,7 +23,7 @@ export default function Loading() {
           <div className="flex flex-wrap gap-3 pt-2">
             <Skeleton className="h-12 w-40" />
             <Skeleton className="h-12 w-32" />
-            <Skeleton className="h-12 w-28" />
+            <Skeleton className="h-12 w-36" />
           </div>
         </div>
       </section>
@@ -42,9 +42,9 @@ export default function Loading() {
           <Skeleton className="h-4 w-1/2" />
         </div>
         <div className="pr-feature space-y-2">
-          <Skeleton className="h-5 w-12" />
+          <Skeleton className="h-5 w-28" />
           <Skeleton className="h-4 w-full" />
-          <Skeleton className="h-4 w-3/4" />
+          <Skeleton className="h-4 w-4/5" />
           <Skeleton className="h-4 w-2/3" />
         </div>
       </section>

@@ -1,8 +1,8 @@
 "use client";
 
 import { LogOut } from "lucide-react";
-import { usePrivy } from "@privy-io/react-auth";
 import { LoginButton } from "@/components/login-button";
+import { useAppAuth } from "@/lib/auth-bridge";
 import { UsdgBalanceCard } from "@/components/usdg-balance-card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -13,7 +13,7 @@ type AccountPanelProps = {
 };
 
 export function AccountPanel({ className, onAfterLogout }: AccountPanelProps) {
-  const { ready, authenticated, logout } = usePrivy();
+  const { ready, authenticated, logout } = useAppAuth();
 
   async function handleLogout() {
     try {

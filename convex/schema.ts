@@ -17,6 +17,15 @@ export const acrossAttemptStatus = v.union(
   v.literal("expired"),
   v.literal("refunded"),
   v.literal("failed"),
+  v.literal("ignored_duplicate"),
+);
+
+export const settlementKind = v.union(v.literal("across"), v.literal("direct"));
+
+export const activityStatus = v.union(
+  v.literal("submitted"),
+  v.literal("filled"),
+  v.literal("failed"),
 );
 
 export default defineSchema({
@@ -24,11 +33,18 @@ export default defineSchema({
     privyDid: v.optional(v.string()),
     address: v.string(),
     email: v.optional(v.string()),
+    authIssuer: v.optional(v.string()),
+    authSubject: v.optional(v.string()),
+    smartAccountAddress: v.optional(v.string()),
+    kernelVersion: v.optional(v.string()),
+    entryPointVersion: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index("by_address", ["address"])
-    .index("by_privyDid", ["privyDid"]),
+    .index("by_privyDid", ["privyDid"])
+    .index("by_auth", ["authIssuer", "authSubject"])
+    .index("by_smartAccount", ["smartAccountAddress"]),
 
   paymentRequests: defineTable({
     publicId: v.string(),
@@ -50,7 +66,8 @@ export default defineSchema({
     .index("by_publicId", ["publicId"])
     .index("by_creator", ["creatorId"])
     .index("by_creator_address", ["creatorAddress"])
-    .index("by_status", ["status"]),
+    .index("by_status", ["status"])
+    .index("by_status_and_expiresAt", ["status", "expiresAt"]),
 
   paymentAttempts: defineTable({
     requestId: v.id("paymentRequests"),
@@ -65,11 +82,14 @@ export default defineSchema({
     depositTxnRef: v.optional(v.string()),
     fillTxnRef: v.optional(v.string()),
     acrossStatus: acrossAttemptStatus,
+    settlementKind: v.optional(settlementKind),
+    failureReason: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index("by_request", ["requestId"])
-    .index("by_depositTxnRef", ["depositTxnRef"]),
+    .index("by_depositTxnRef", ["depositTxnRef"])
+    .index("by_acrossStatus", ["acrossStatus"]),
 
   contacts: defineTable({
     userId: v.id("users"),
@@ -80,4 +100,46 @@ export default defineSchema({
   })
     .index("by_user", ["userId"])
     .index("by_user_and_address", ["userId", "address"]),
+
+  outboundTransfers: defineTable({
+    userId: v.id("users"),
+    userOpHash: v.string(),
+    bundleTxHash: v.optional(v.string()),
+    callsJson: v.string(),
+    status: activityStatus,
+    failureReason: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_status", ["status"])
+    .index("by_userOpHash", ["userOpHash"]),
+
+  swapFills: defineTable({
+    userId: v.id("users"),
+    symbol: v.string(),
+    sellToken: v.string(),
+    buyToken: v.string(),
+    sellAmount: v.string(),
+    buyAmount: v.optional(v.string()),
+    minBuyAmount: v.optional(v.string()),
+    userOpHash: v.optional(v.string()),
+    status: activityStatus,
+    failureReason: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_user", ["userId"]),
+
+  vaultActivities: defineTable({
+    userId: v.id("users"),
+    vaultAddress: v.string(),
+    kind: v.union(v.literal("deposit"), v.literal("withdraw"), v.literal("redeem")),
+    assets: v.string(),
+    shares: v.optional(v.string()),
+    userOpHash: v.optional(v.string()),
+    status: activityStatus,
+    failureReason: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_user", ["userId"]),
 });

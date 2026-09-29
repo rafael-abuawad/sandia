@@ -8,6 +8,7 @@ import type { StockQuote, StockToken } from "@/lib/rhj/client";
 import { formatSpreadPct, formatUsdPrice, formatVolume } from "@/lib/rhj/format";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { userFacingError } from "@/lib/user-facing-error";
 
 const TOP_STOCKS = 6;
 
@@ -56,7 +57,7 @@ export function StocksMarket() {
       }
       setQuotesBySymbol(map);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load markets");
+      setError(userFacingError(err, "Stock prices could not be loaded."));
     } finally {
       setLoading(false);
     }

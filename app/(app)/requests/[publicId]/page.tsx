@@ -1,13 +1,14 @@
 "use client";
 
-import { use, useEffect, useId, useState } from "react";
+import { use, useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
-import { useMutation, useQuery } from "convex/react";
-import { Check, Copy } from "lucide-react";
-import { PaymentQr } from "@/components/payment-qr";
+import { useMutation, usePaginatedQuery, useQuery } from "convex/react";
+import { Check, Copy, Share } from "lucide-react";
+import { PaymentQr, paymentQrToPngFile } from "@/components/payment-qr";
 import { LoginButton } from "@/components/login-button";
 import { useSignedInWallet } from "@/lib/use-signed-in-wallet";
 import { api } from "@/convex/_generated/api";
+import type { Doc } from "@/convex/_generated/dataModel";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { FieldError } from "@/components/ui/field-error";
@@ -17,55 +18,125 @@ import {
   InputGroupButton,
   InputGroupInput,
 } from "@/components/ui/input-group";
+import { formatDisplayDateTime } from "@/lib/format-datetime";
 import { formatTokenAmount, formatUsdFromMicros } from "@/lib/money";
+import { userFacingError } from "@/lib/user-facing-error";
+import RequestDetailLoading from "./loading";
 
 export default function RequestDetailPage({ params }: { params: Promise<{ publicId: string }> }) {
   const { publicId } = use(params);
-  const { isSignedIn } = useSignedInWallet();
+  return <RequestDetail publicId={publicId} />;
+}
+
+function RequestDetail({ publicId }: { publicId: string }) {
+  const { ready, isSignedIn } = useSignedInWallet();
   const request = useQuery(
     api.paymentRequests.getMineByPublicId,
     isSignedIn ? { publicId } : "skip",
   );
-  const attempts = useQuery(api.paymentAttempts.listByRequest, { publicId });
+  const { results: attempts } = usePaginatedQuery(
+    api.paymentAttempts.listByRequest,
+    { publicId },
+    { initialNumItems: 20 },
+  );
+
+  if (!ready) {
+    return <RequestDetailLoading />;
+  }
+
+  if (!isSignedIn) {
+    return <RequestSignedOut />;
+  }
+
+  if (request === undefined) {
+    return <RequestDetailLoading />;
+  }
+
+  if (request === null) {
+    return <RequestMissing />;
+  }
+
+  return <RequestDetailLoaded publicId={publicId} request={request} attempts={attempts} />;
+}
+
+function RequestSignedOut() {
+  return (
+    <div className="pr-page pr-page--narrow text-center">
+      <h1 className="pr-display text-2xl">Payment request</h1>
+      <p className="text-sm text-muted">Sign in with the creator account to manage this request.</p>
+      <div className="flex justify-center">
+        <LoginButton />
+      </div>
+    </div>
+  );
+}
+
+function RequestMissing() {
+  return (
+    <div className="pr-page pr-page--narrow">
+      <h1 className="pr-display text-2xl">Request not found</h1>
+      <p className="text-sm text-danger">This request is not available for this account.</p>
+    </div>
+  );
+}
+
+type AttemptRow = { _id: string; depositTxnRef?: string; acrossStatus: string };
+
+function RequestDetailLoaded({
+  publicId,
+  request,
+  attempts,
+}: {
+  publicId: string;
+  request: Doc<"paymentRequests">;
+  attempts: AttemptRow[];
+}) {
   const cancel = useMutation(api.paymentRequests.cancel);
   const errorId = useId();
   const [busy, setBusy] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [canShareQr, setCanShareQr] = useState(false);
   const [payUrl, setPayUrl] = useState(`/pay/${publicId}`);
   const payPath = `/pay/${publicId}`;
+  const qrRef = useRef<SVGSVGElement>(null);
+  const shareFileRef = useRef<File | null>(null);
+  const sharingRef = useRef(false);
+  const expiresLabel = request.expiresAt != null ? formatDisplayDateTime(request.expiresAt) : null;
 
   useEffect(() => {
     setPayUrl(`${window.location.origin}${payPath}`);
   }, [payPath]);
 
-  if (!isSignedIn) {
-    return (
-      <div className="pr-page pr-page--narrow text-center">
-        <h1 className="pr-display text-2xl">Payment request</h1>
-        <p className="text-sm text-muted">
-          Sign in with the creator account to manage this request.
-        </p>
-        <div className="flex justify-center">
-          <LoginButton />
-        </div>
-      </div>
-    );
-  }
+  useEffect(() => {
+    const svg = qrRef.current;
+    if (
+      !svg ||
+      !payUrl.startsWith("http") ||
+      typeof navigator.share !== "function" ||
+      typeof navigator.canShare !== "function"
+    ) {
+      return;
+    }
 
-  if (request === undefined) {
-    return <p className="text-sm text-muted">Loading…</p>;
-  }
+    let cancelled = false;
+    void paymentQrToPngFile(svg)
+      .then((file) => {
+        if (cancelled) return;
+        const payload: ShareData = { text: payUrl, files: [file] };
+        if (!navigator.canShare(payload)) return;
+        shareFileRef.current = file;
+        setCanShareQr(true);
+      })
+      .catch(() => {
+        if (!cancelled) setCanShareQr(false);
+      });
 
-  if (request === null) {
-    return (
-      <div className="pr-page pr-page--narrow">
-        <h1 className="pr-display text-2xl">Request not found</h1>
-        <p className="text-sm text-danger">This request is not available for this account.</p>
-      </div>
-    );
-  }
+    return () => {
+      cancelled = true;
+    };
+  }, [payUrl]);
 
   async function onCancel() {
     setBusy(true);
@@ -74,25 +145,37 @@ export default function RequestDetailPage({ params }: { params: Promise<{ public
       await cancel({ publicId });
       setConfirmCancel(false);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Unable to cancel request. Try again.");
+      setError(userFacingError(e, "Unable to cancel request. Try again."));
     } finally {
       setBusy(false);
     }
   }
 
   async function copyLink() {
-    await navigator.clipboard.writeText(payUrl);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1500);
+    try {
+      await navigator.clipboard.writeText(payUrl);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      setError("Could not copy the link. Select it and copy it manually.");
+    }
   }
 
-  const expiresLabel =
-    request.expiresAt != null
-      ? new Date(request.expiresAt).toLocaleString(undefined, {
-          dateStyle: "medium",
-          timeStyle: "short",
-        })
-      : null;
+  async function shareLink() {
+    const file = shareFileRef.current;
+    if (!file || sharingRef.current) return;
+    sharingRef.current = true;
+    setError(null);
+    try {
+      await navigator.share({ text: payUrl, files: [file] });
+    } catch (e) {
+      if (!(e instanceof DOMException && e.name === "AbortError")) {
+        setError("Could not share the payment link. Copy it instead.");
+      }
+    } finally {
+      sharingRef.current = false;
+    }
+  }
 
   return (
     <div className="pr-page pr-page--measure">
@@ -109,26 +192,28 @@ export default function RequestDetailPage({ params }: { params: Promise<{ public
         <StatusBadge status={request.status} />
       </div>
 
-      {(request.description || expiresLabel) && (
-        <dl className="space-y-1 text-sm">
-          {request.description ? (
-            <div className="flex justify-between gap-4">
-              <dt className="text-muted">Note</dt>
-              <dd className="text-right text-foreground">{request.description}</dd>
-            </div>
-          ) : null}
-          {expiresLabel ? (
-            <div className="flex justify-between gap-4">
-              <dt className="text-muted">Expires</dt>
-              <dd className="text-right text-foreground">{expiresLabel}</dd>
-            </div>
-          ) : null}
-        </dl>
-      )}
+      <dl className="space-y-1 text-sm">
+        {request.description ? (
+          <div className="flex justify-between gap-4">
+            <dt className="text-muted">Note</dt>
+            <dd className="text-right text-foreground">{request.description}</dd>
+          </div>
+        ) : null}
+        <div className="flex justify-between gap-4">
+          <dt className="text-muted">Expires</dt>
+          <dd className="text-right text-foreground">
+            {expiresLabel ?? "Stays open until paid or cancelled"}
+          </dd>
+        </div>
+        <div className="flex justify-between gap-4">
+          <dt className="text-muted">Paid to</dt>
+          <dd className="pr-mono text-right text-foreground">{request.recipientAddress}</dd>
+        </div>
+      </dl>
 
       <div className="pr-panel pr-panel--padded space-y-4">
         <p className="pr-kicker">Payment link</p>
-        <PaymentQr value={payUrl} />
+        <PaymentQr ref={qrRef} value={payUrl} />
         <InputGroup>
           <InputGroupInput
             readOnly
@@ -138,6 +223,11 @@ export default function RequestDetailPage({ params }: { params: Promise<{ public
             onFocus={(e) => e.currentTarget.select()}
           />
           <InputGroupAddon>
+            {canShareQr ? (
+              <InputGroupButton aria-label="Share payment link" onClick={() => void shareLink()}>
+                <Share className="size-4" strokeWidth={1.5} />
+              </InputGroupButton>
+            ) : null}
             <InputGroupButton
               aria-label={copied ? "Copied" : "Copy payment link"}
               onClick={() => void copyLink()}
@@ -152,7 +242,9 @@ export default function RequestDetailPage({ params }: { params: Promise<{ public
         </InputGroup>
         <div className="flex flex-wrap gap-2">
           <Button asChild size="sm" variant="outline">
-            <Link href={`/pay/${publicId}`}>Open pay page</Link>
+            <Link href={`/pay/${publicId}`} target="_blank" rel="noopener noreferrer">
+              Open pay page
+            </Link>
           </Button>
           {request.status === "open" && !confirmCancel && (
             <Button
@@ -197,11 +289,16 @@ export default function RequestDetailPage({ params }: { params: Promise<{ public
         <FieldError id={errorId} message={error} />
       </div>
 
-      {attempts && attempts.length > 0 && (
+      <p className="text-xs text-muted">
+        Settlement is checked on the server about once a minute. This page does not mark the request
+        paid by itself. The address above is the one saved when the request was created.
+      </p>
+
+      {attempts.length > 0 && (
         <div className="space-y-2">
           <h2 className="pr-section-title">Payment attempts</h2>
           <ul className="space-y-2">
-            {attempts.map((a: { _id: string; depositTxnRef?: string; acrossStatus: string }) => (
+            {attempts.map((a) => (
               <li
                 key={a._id}
                 className="pr-inset flex items-center justify-between gap-3 px-3 py-2 text-xs text-muted"

@@ -1,9 +1,9 @@
 import {
   ArrowDownLeft,
   ArrowUpRight,
-  Handshake,
-  Landmark,
+  PiggyBank,
   LineChart,
+  BrainCircuit,
   type LucideIcon,
 } from "lucide-react";
 
@@ -15,6 +15,12 @@ export type AppNavItem = {
 };
 
 export const appNavItems: AppNavItem[] = [
+  {
+    label: "AI Agent",
+    href: "/agent",
+    icon: BrainCircuit,
+    match: (pathname) => pathname.startsWith("/agent"),
+  },
   {
     label: "Request",
     href: "/requests/new",
@@ -28,16 +34,10 @@ export const appNavItems: AppNavItem[] = [
     match: (pathname) => pathname.startsWith("/send"),
   },
   {
-    label: "OTC",
-    href: "/otc",
-    icon: Handshake,
-    match: (pathname) => pathname.startsWith("/otc"),
-  },
-  {
-    label: "Lending",
-    href: "/lending",
-    icon: Landmark,
-    match: (pathname) => pathname.startsWith("/lending"),
+    label: "Earn",
+    href: "/earn",
+    icon: PiggyBank,
+    match: (pathname) => pathname.startsWith("/earn"),
   },
   {
     label: "Stocks",

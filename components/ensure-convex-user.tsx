@@ -1,37 +1,66 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { usePrivy } from "@privy-io/react-auth";
-import { useAccount } from "wagmi";
-import { useMutation } from "convex/react";
+import { getEmbeddedConnectedWallet, useWallets } from "@privy-io/react-auth";
+import { useConvexAuth, useMutation, useQuery } from "convex/react";
+import { useAccount, useSignMessage } from "wagmi";
 import { api } from "@/convex/_generated/api";
+import { walletClaimMessage } from "@/convex/lib/walletClaim";
+import { useAppAuth } from "@/lib/auth-bridge";
 
-function privyEmail(user: ReturnType<typeof usePrivy>["user"]): string | undefined {
-  if (!user) return undefined;
-  return user.email?.address ?? user.google?.email ?? undefined;
-}
-
-/** Upserts the Convex user row once Privy auth and a wallet address are ready. */
+/** Links the signed-in Privy embedded wallet to a Convex user after one claim signature. */
 export function EnsureConvexUser() {
-  const { ready, authenticated, user } = usePrivy();
+  const { ready, authenticated, email } = useAppAuth();
+  const { isAuthenticated } = useConvexAuth();
+  const { wallets } = useWallets();
   const { address } = useAccount();
+  const { signMessageAsync } = useSignMessage();
+  const issueNonce = useMutation(api.users.issueNonce);
   const storeUser = useMutation(api.users.store);
-  const lastKey = useRef<string | null>(null);
-
-  const email = privyEmail(user);
+  const me = useQuery(api.users.me, ready && authenticated && isAuthenticated ? {} : "skip");
+  const claiming = useRef(false);
+  const embeddedAddress = getEmbeddedConnectedWallet(wallets)?.address;
 
   useEffect(() => {
-    if (!ready || !authenticated || !address) return;
-    const key = `${address.toLowerCase()}:${email ?? ""}`;
-    if (lastKey.current === key) return;
-    lastKey.current = key;
+    if (!ready || !authenticated || !isAuthenticated || !address || !embeddedAddress) return;
+    if (address.toLowerCase() !== embeddedAddress.toLowerCase()) return;
+    if (me === undefined) return;
+    if (me && me.address.toLowerCase() === address.toLowerCase()) return;
+    if (claiming.current) return;
 
-    const payload = email ? { address, email } : { address };
-    void storeUser(payload).catch((error: unknown) => {
-      lastKey.current = null;
-      console.error("Failed to store Convex user", error);
-    });
-  }, [ready, authenticated, address, email, storeUser]);
+    claiming.current = true;
+    void (async () => {
+      try {
+        const nonce = await issueNonce({});
+        const signature = await signMessageAsync({ message: walletClaimMessage(nonce) });
+        await storeUser({
+          address,
+          nonce,
+          signature,
+          ...(email ? { email } : {}),
+        });
+        console.log("payment_wallet_claimed", { address });
+      } catch (error) {
+        console.error("wallet_claim_failed", {
+          address,
+          message: error instanceof Error ? error.message : "Could not confirm this wallet",
+        });
+      } finally {
+        claiming.current = false;
+      }
+    })();
+  }, [
+    ready,
+    authenticated,
+    isAuthenticated,
+    address,
+    embeddedAddress,
+    me,
+    email,
+    issueNonce,
+    storeUser,
+    signMessageAsync,
+  ]);
 
   return null;
 }
