@@ -29,6 +29,7 @@ export function userFacingError(error: unknown, fallback: string): string {
   const raw = error instanceof Error ? error.message : typeof error === "string" ? error : "";
   const message = innerMessage(raw);
   if (!message || TECHNICAL.test(message)) return fallback;
+  if (/^[A-Z0-9]+(?:_[A-Z0-9]+)+$/.test(message)) return fallback;
   for (const [pattern, replacement] of REPLACEMENTS) {
     if (pattern.test(message)) return replacement;
   }

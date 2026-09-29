@@ -3,6 +3,8 @@
 import { useId } from "react";
 import { Button } from "@/components/ui/button";
 import { FieldError } from "@/components/ui/field-error";
+import { TxLink } from "@/components/tx-link";
+import { robinhoodChain } from "@/lib/chains";
 import { formatUsdFromMicros } from "@/lib/money";
 import { truncateAddress } from "@/components/send-form/helpers";
 import { SendSummaryDetails } from "@/components/send-form/summary-details";
@@ -101,8 +103,11 @@ export function SendReviewPanel({
         >
           <p>{progressMessage}</p>
           {progress.hash ? (
-            <p className="pr-mono text-xs">
-              Transaction {progress.hash.slice(0, 10)}…{progress.hash.slice(-6)}
+            <p className="text-xs">
+              Transaction{" "}
+              <TxLink chainId={robinhoodChain.id} hash={progress.hash} className="text-xs">
+                {progress.hash.slice(0, 10)}…{progress.hash.slice(-6)}
+              </TxLink>
             </p>
           ) : null}
         </div>

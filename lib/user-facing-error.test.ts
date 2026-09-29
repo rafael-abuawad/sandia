@@ -22,6 +22,12 @@ describe("userFacingError", () => {
     );
   });
 
+  it("hides raw API error codes", () => {
+    expect(userFacingError(new Error("INPUT_INVALID"), "Trading is unavailable.")).toBe(
+      "Trading is unavailable.",
+    );
+  });
+
   it("uses the fallback when the message is still technical", () => {
     expect(userFacingError(new Error("Morpho returned 502"), "Vault unavailable.")).toBe(
       "Vault unavailable.",

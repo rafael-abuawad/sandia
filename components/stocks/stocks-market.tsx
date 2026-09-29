@@ -5,18 +5,22 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import type { StockQuote, StockToken } from "@/lib/rhj/client";
-import { formatSpreadPct, formatUsdPrice, formatVolume } from "@/lib/rhj/format";
+import { formatUsdPrice, formatVolume } from "@/lib/rhj/format";
 import { Badge } from "@/components/ui/badge";
+import {
+  StockListDesktopSkeletonRows,
+  StockListMobileSkeletonItems,
+} from "@/components/stocks/stock-skeletons";
 import { cn } from "@/lib/utils";
 import { userFacingError } from "@/lib/user-facing-error";
 
-const TOP_STOCKS = 6;
+const FEATURED_SYMBOLS = ["SPY", "NVDA", "SPCX", "GLD", "META", "GOOGL", "AAPL", "QQQ"] as const;
 
 type MarketRow = StockToken & {
   quote: StockQuote | null;
 };
 
-type SortKey = "symbol" | "price" | "spread" | "volume";
+type SortKey = "symbol" | "price" | "volume";
 type SortDir = "asc" | "desc";
 
 export function StocksMarket() {
@@ -24,64 +28,73 @@ export function StocksMarket() {
   const [quotesBySymbol, setQuotesBySymbol] = useState<Record<string, StockQuote>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [sortKey, setSortKey] = useState<SortKey>("volume");
+  const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
-  const load = useCallback(async () => {
-    setError(null);
-    try {
-      const [assetsRes, pricesRes] = await Promise.all([
-        fetch("/api/rhj/assets"),
-        fetch("/api/rhj/prices"),
-      ]);
-      if (!assetsRes.ok) {
-        const body = (await assetsRes.json().catch(() => null)) as {
-          error?: string;
-        } | null;
-        throw new Error(body?.error ?? "Failed to load stock tokens");
-      }
-      if (!pricesRes.ok) {
-        const body = (await pricesRes.json().catch(() => null)) as {
-          error?: string;
-        } | null;
-        throw new Error(body?.error ?? "Failed to load prices");
-      }
-
-      const assetsJson = (await assetsRes.json()) as { assets: StockToken[] };
-      const pricesJson = (await pricesRes.json()) as { quotes: StockQuote[] };
-
-      setAssets(assetsJson.assets ?? []);
-      const map: Record<string, StockQuote> = {};
-      for (const q of pricesJson.quotes ?? []) {
-        map[q.symbol.toUpperCase()] = q;
-      }
-      setQuotesBySymbol(map);
-    } catch (err) {
-      setError(userFacingError(err, "Stock prices could not be loaded."));
-    } finally {
-      setLoading(false);
+  const applyQuotes = useCallback((quotes: StockQuote[]) => {
+    const map: Record<string, StockQuote> = {};
+    for (const quote of quotes) {
+      map[quote.symbol.toUpperCase()] = quote;
     }
+    setQuotesBySymbol(map);
   }, []);
 
-  useEffect(() => {
-    void load();
-    const id = window.setInterval(() => void load(), 30_000);
-    return () => window.clearInterval(id);
-  }, [load]);
+  const loadAssets = useCallback(async () => {
+    const assetsRes = await fetch("/api/rhj/assets");
+    if (!assetsRes.ok) {
+      const body = (await assetsRes.json().catch(() => null)) as { error?: string } | null;
+      throw new Error(body?.error ?? "Failed to load stock tokens");
+    }
+    const assetsJson = (await assetsRes.json()) as { assets: StockToken[] };
+    setAssets(assetsJson.assets ?? []);
+  }, []);
 
-  const topRows: MarketRow[] = useMemo(() => {
-    return assets
-      .map((asset) => ({
-        ...asset,
-        quote: quotesBySymbol[asset.symbol.toUpperCase()] ?? null,
-      }))
-      .sort((a, b) => (b.quote?.dailyTradingVolume ?? -1) - (a.quote?.dailyTradingVolume ?? -1))
-      .slice(0, TOP_STOCKS);
+  const loadPrices = useCallback(async () => {
+    const pricesRes = await fetch("/api/rhj/prices");
+    if (!pricesRes.ok) {
+      const body = (await pricesRes.json().catch(() => null)) as { error?: string } | null;
+      throw new Error(body?.error ?? "Failed to load prices");
+    }
+    const pricesJson = (await pricesRes.json()) as { quotes: StockQuote[] };
+    applyQuotes(pricesJson.quotes ?? []);
+  }, [applyQuotes]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      setError(null);
+      try {
+        await Promise.all([loadAssets(), loadPrices()]);
+      } catch (err) {
+        if (!cancelled) setError(userFacingError(err, "Stock prices could not be loaded."));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    const id = window.setInterval(() => {
+      void loadPrices().catch((err) => {
+        setError(userFacingError(err, "Stock prices could not be loaded."));
+      });
+    }, 30_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [loadAssets, loadPrices]);
+
+  const featuredRows: MarketRow[] = useMemo(() => {
+    const bySymbol = new Map(assets.map((asset) => [asset.symbol.toUpperCase(), asset]));
+    return FEATURED_SYMBOLS.flatMap((symbol) => {
+      const asset = bySymbol.get(symbol);
+      if (!asset) return [];
+      return [{ ...asset, quote: quotesBySymbol[symbol] ?? null }];
+    });
   }, [assets, quotesBySymbol]);
 
   const filtered = useMemo(() => {
+    if (!sortKey) return featuredRows;
     const dir = sortDir === "asc" ? 1 : -1;
-    return [...topRows].sort((a, b) => {
+    return [...featuredRows].sort((a, b) => {
       const qa = a.quote;
       const qb = b.quote;
       switch (sortKey) {
@@ -92,11 +105,6 @@ export function StocksMarket() {
           const pb = qb?.mid ?? -1;
           return (pa - pb) * dir;
         }
-        case "spread": {
-          const sa = qa?.spreadPct ?? -1;
-          const sb = qb?.spreadPct ?? -1;
-          return (sa - sb) * dir;
-        }
         case "volume":
         default: {
           const va = qa?.dailyTradingVolume ?? -1;
@@ -105,7 +113,7 @@ export function StocksMarket() {
         }
       }
     });
-  }, [topRows, sortKey, sortDir]);
+  }, [featuredRows, sortKey, sortDir]);
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) {
@@ -120,12 +128,10 @@ export function StocksMarket() {
     <div className="space-y-5">
       <div className="space-y-2">
         <h1 className="pr-display text-2xl sm:text-3xl">Stocks</h1>
-        <p className="max-w-2xl text-sm leading-relaxed text-muted">
-          The {TOP_STOCKS} most actively traded tokenized equities on Robinhood Chain.
-        </p>
+        <p className="text-sm leading-relaxed text-muted">Prices for a short list of stocks.</p>
       </div>
 
-      <p className="text-xs text-muted">Ranked by underlying 1D volume. Quotes may lag.</p>
+      <p className="text-xs text-muted">Prices can lag the stock market by a few seconds.</p>
 
       {error && (
         <p className="text-sm text-danger" role="alert">
@@ -134,12 +140,12 @@ export function StocksMarket() {
       )}
 
       <div className="pr-panel overflow-hidden">
-        <div className="hidden overflow-x-auto md:block">
-          <table className="w-full min-w-[40rem] border-collapse text-left text-sm">
+        <div className="hidden md:block">
+          <table className="w-full border-collapse text-left text-sm">
             <thead className="sticky top-0 z-10 border-b border-border bg-[var(--panel-elevated)]">
               <tr className="pr-kicker">
                 <SortHeader
-                  label="Token"
+                  label="Stock"
                   active={sortKey === "symbol"}
                   dir={sortDir}
                   onClick={() => toggleSort("symbol")}
@@ -152,14 +158,7 @@ export function StocksMarket() {
                   align="right"
                 />
                 <SortHeader
-                  label="Spread"
-                  active={sortKey === "spread"}
-                  dir={sortDir}
-                  onClick={() => toggleSort("spread")}
-                  align="right"
-                />
-                <SortHeader
-                  label="Vol"
+                  label="Volume"
                   active={sortKey === "volume"}
                   dir={sortDir}
                   onClick={() => toggleSort("volume")}
@@ -169,16 +168,10 @@ export function StocksMarket() {
               </tr>
             </thead>
             <tbody>
-              {loading && (
-                <tr>
-                  <td colSpan={5} className="px-4 py-10 text-center text-sm text-muted">
-                    Loading markets…
-                  </td>
-                </tr>
-              )}
+              {loading && filtered.length === 0 ? <StockListDesktopSkeletonRows /> : null}
               {!loading && filtered.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-10 text-center text-sm text-muted">
+                  <td colSpan={4} className="px-4 py-10 text-center text-sm text-muted">
                     No stock tokens available.
                   </td>
                 </tr>
@@ -191,9 +184,7 @@ export function StocksMarket() {
         </div>
 
         <ul className="divide-y divide-border md:hidden">
-          {loading && (
-            <li className="px-4 py-10 text-center text-sm text-muted">Loading markets…</li>
-          )}
+          {loading && filtered.length === 0 ? <StockListMobileSkeletonItems /> : null}
           {!loading && filtered.length === 0 && (
             <li className="px-4 py-10 text-center text-sm text-muted">
               No stock tokens available.
@@ -221,7 +212,7 @@ function SortHeader({
   onClick: () => void;
   align?: "left" | "right";
 }) {
-  const sortState = active ? (dir === "asc" ? "ascending" : "descending") : "none";
+  const sortState = active ? (dir === "asc" ? "ascending" : "descending") : undefined;
   return (
     <th className={cn("px-4 py-3", align === "right" && "text-right")} aria-sort={sortState}>
       <button
@@ -253,10 +244,12 @@ function TokenCell({ row }: { row: MarketRow }) {
   return (
     <div className="flex min-w-0 items-center gap-3">
       <TokenLogo src={row.logoUrl} symbol={row.symbol} />
-      <div className="min-w-0">
-        <p className="pr-mono truncate font-semibold text-foreground">{row.symbol}</p>
-        <p className="truncate text-xs text-muted">{row.shortName}</p>
-      </div>
+      <abbr
+        title={row.shortName}
+        className="pr-mono cursor-help font-semibold text-foreground underline decoration-dotted decoration-muted/70 underline-offset-4"
+      >
+        {row.symbol}
+      </abbr>
     </div>
   );
 }
@@ -308,17 +301,12 @@ function DesktopRow({ row }: { row: MarketRow }) {
         </span>
       </td>
       <td className="px-4 py-3 text-right">
-        <span className="pr-mono whitespace-nowrap text-muted">
-          {formatSpreadPct(row.quote?.spreadPct)}
-        </span>
-      </td>
-      <td className="px-4 py-3 text-right">
         <span className="pr-mono text-foreground">
           {formatVolume(row.quote?.dailyTradingVolume)}
         </span>
       </td>
       <td className="relative z-10 px-4 py-3">
-        {halted ? <Badge variant="danger">Halted</Badge> : <Badge variant="success">Open</Badge>}
+        {halted ? <Badge variant="danger">Paused</Badge> : <Badge variant="success">Open</Badge>}
       </td>
     </tr>
   );

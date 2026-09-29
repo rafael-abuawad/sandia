@@ -1,11 +1,13 @@
 "use client";
 
 import { StatusBadge } from "@/components/status-badge";
+import { TxLink } from "@/components/tx-link";
 import { shortenAddress } from "@/lib/utils";
 
 type Attempt = {
   _id: string;
   depositTxnRef?: string;
+  originChainId: number;
   acrossStatus: string;
 };
 
@@ -21,8 +23,14 @@ export function PayAttemptsList({ attempts }: { attempts: Attempt[] }) {
             key={a._id}
             className="pr-inset flex items-center justify-between px-3 py-2 text-xs text-muted"
           >
-            <span className="pr-mono">
-              {a.depositTxnRef ? shortenAddress(a.depositTxnRef, 6) : "no tx yet"}
+            <span>
+              {a.depositTxnRef ? (
+                <TxLink chainId={a.originChainId} hash={a.depositTxnRef} className="text-xs">
+                  {shortenAddress(a.depositTxnRef, 6)}
+                </TxLink>
+              ) : (
+                "no tx yet"
+              )}
             </span>
             <StatusBadge status={a.acrossStatus} />
           </li>
@@ -49,20 +57,29 @@ export function PayTerminalStatus({
   kind,
   statusLabel,
   depositTxnRef,
+  depositChainId,
 }: {
   kind: "completed" | "unavailable";
   statusLabel?: string;
   depositTxnRef?: string | null;
+  depositChainId?: number | null;
 }) {
   if (kind === "completed") {
     return (
       <section className="pr-inset pr-inset--success p-5 text-sm text-success">
         Payment complete. USDG settled on Robinhood Chain.
-        {depositTxnRef && (
-          <p className="mt-2 pr-mono text-xs text-muted">
-            Deposit: {shortenAddress(depositTxnRef, 8)}
+        {depositTxnRef ? (
+          <p className="mt-2 text-xs text-muted">
+            Deposit:{" "}
+            {depositChainId != null ? (
+              <TxLink chainId={depositChainId} hash={depositTxnRef} className="text-xs">
+                {shortenAddress(depositTxnRef, 8)}
+              </TxLink>
+            ) : (
+              <span className="pr-mono">{shortenAddress(depositTxnRef, 8)}</span>
+            )}
           </p>
-        )}
+        ) : null}
       </section>
     );
   }

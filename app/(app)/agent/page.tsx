@@ -570,7 +570,7 @@ function AgentStockPanel({
           onUnitChange={setUnit}
           ticketAmount={amount}
           onTicketAmountChange={setAmount}
-          tradeReason="Trading stays disabled until a firm quote reports liquidity."
+          tradeReason="Buying and selling aren't available yet."
           estimate={null}
           embeddedPresentation
         />

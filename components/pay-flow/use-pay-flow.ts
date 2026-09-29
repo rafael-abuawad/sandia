@@ -26,6 +26,13 @@ import { buildUsdgPaymentTransfer } from "@/lib/send/calls";
 import { initialPayFlowState, payFlowReducer, type SentPayment } from "@/components/pay-flow/state";
 import { statusLabel } from "@/components/status-badge";
 import { userFacingError } from "@/lib/user-facing-error";
+import {
+  parseStoredSentPayment,
+  RESTORED_PAYMENT_MESSAGE,
+  trackedDepositKey,
+  unverifiedPaymentKey,
+  unverifiedPaymentMessage,
+} from "@/lib/unverified-payment";
 
 const CHAIN_ORDER = [1, 8453, 42161, 10, 137, 56, 43114, 143, 4663];
 const SYMBOL_ORDER = [
@@ -121,6 +128,7 @@ export function usePayFlow(publicId: string) {
     depositTxnRef,
     pendingTx,
     unverifiedPayment,
+    verifying,
   } = state;
 
   const { isSuccess: txSuccess, isError: txError } = useWaitForTransactionReceipt({
@@ -381,10 +389,25 @@ export function usePayFlow(publicId: string) {
   }, [depositTxnRef, request, syncStatus, directPay, robinhoodEth]);
 
   useEffect(() => {
-    const saved = window.sessionStorage.getItem(`sandia-deposit:${publicId}`);
+    const saved = window.sessionStorage.getItem(trackedDepositKey(publicId));
     if (saved) {
+      window.sessionStorage.removeItem(unverifiedPaymentKey(publicId));
       dispatch({ type: "depositTracked", depositTxnRef: saved });
+      return;
     }
+    const raw = window.sessionStorage.getItem(unverifiedPaymentKey(publicId));
+    if (!raw) return;
+    const payment = parseStoredSentPayment(raw);
+    if (!payment) {
+      window.sessionStorage.removeItem(unverifiedPaymentKey(publicId));
+      return;
+    }
+    dispatch({ type: "pendingTxSet", hash: payment.hash });
+    dispatch({
+      type: "paymentUnverified",
+      payment,
+      message: RESTORED_PAYMENT_MESSAGE,
+    });
   }, [publicId]);
 
   const selectedToken = useMemo(
@@ -395,7 +418,12 @@ export function usePayFlow(publicId: string) {
     [tokens, originChainId, inputToken],
   );
 
+  function rememberSentPayment(sent: SentPayment) {
+    window.sessionStorage.setItem(unverifiedPaymentKey(publicId), JSON.stringify(sent));
+  }
+
   async function recordSentPayment(sent: SentPayment) {
+    rememberSentPayment(sent);
     try {
       await waitForHash(sent.hash, sent.chainId);
       const tracked = sent.hash.toLowerCase();
@@ -411,25 +439,31 @@ export function usePayFlow(publicId: string) {
       } else {
         await submitEthSwap({ publicId, payerAddress: sent.payerAddress, depositTxnRef: tracked });
       }
-      window.sessionStorage.setItem(`sandia-deposit:${publicId}`, tracked);
+      window.sessionStorage.setItem(trackedDepositKey(publicId), tracked);
+      window.sessionStorage.removeItem(unverifiedPaymentKey(publicId));
       dispatch({
         type: "depositTracked",
         depositTxnRef: tracked,
         message: TRACKED_MESSAGE[sent.kind],
       });
     } catch (e) {
+      console.error("payment_verification_failed", {
+        publicId,
+        depositTxnRef: sent.hash,
+        kind: sent.kind,
+        message: e instanceof Error ? e.message : String(e),
+      });
       dispatch({
         type: "paymentUnverified",
         payment: sent,
-        message: `${userFacingError(e, "The payment could not be confirmed yet.")} Your payment was already sent, so don't pay again.`,
+        message: unverifiedPaymentMessage(e),
       });
     }
   }
 
   async function retryVerification() {
-    if (!unverifiedPayment) return;
-    dispatch({ type: "stepChanged", step: "tracking" });
-    dispatch({ type: "statusChanged", message: "Checking your payment…" });
+    if (!unverifiedPayment || verifying) return;
+    dispatch({ type: "verificationStarted" });
     await recordSentPayment(unverifiedPayment);
   }
 
@@ -640,6 +674,7 @@ export function usePayFlow(publicId: string) {
     request.status === "open" &&
     !paymentInProgress &&
     !unverifiedPayment &&
+    !verifying &&
     step !== "approving" &&
     step !== "paying" &&
     step !== "tracking" &&
@@ -681,6 +716,7 @@ export function usePayFlow(publicId: string) {
     onChainChange,
     onTokenChange,
     paymentSent: Boolean(unverifiedPayment),
+    checkingPayment: verifying,
     refreshQuote,
     executePayment,
     retryVerification,

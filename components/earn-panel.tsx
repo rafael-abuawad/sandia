@@ -18,7 +18,10 @@ import {
   vaultAbi,
   type VaultCall,
 } from "@/lib/vault-calls";
+import { TxLink } from "@/components/tx-link";
+import { robinhoodChain } from "@/lib/chains";
 import { sponsoredSendRequest } from "@/lib/send/sponsored";
+import { shortenAddress } from "@/lib/utils";
 import { userFacingError } from "@/lib/user-facing-error";
 import { LoginButton } from "@/components/login-button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -134,6 +137,7 @@ export function EarnPanel() {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [confirmedHash, setConfirmedHash] = useState<Hex | null>(null);
 
   const shareRead = useReadContract({
     address: VAULT_ADDRESS,
@@ -322,6 +326,7 @@ export function EarnPanel() {
   function clearStatus() {
     setError(null);
     setNotice(null);
+    setConfirmedHash(null);
   }
 
   async function sendSponsored(call: VaultCall): Promise<Hex> {
@@ -426,6 +431,7 @@ export function EarnPanel() {
       if (verified.status !== "filled") {
         throw new Error(verified.reason ?? "The receipt could not be checked.");
       }
+      setConfirmedHash(hash);
       setNotice(
         kind === "deposit"
           ? "Deposit confirmed."
@@ -546,6 +552,7 @@ export function EarnPanel() {
               actionName={pending ? pendingLabel : actionName}
               gateEnabled={gate.enabled}
               message={notice ?? blocker ?? description}
+              confirmedHash={confirmedHash}
             />
           }
         >
@@ -725,6 +732,7 @@ function EarnActionFooter({
   gateEnabled,
   actionName,
   message,
+  confirmedHash,
 }: {
   ready: boolean;
   isSignedIn: boolean;
@@ -735,6 +743,7 @@ function EarnActionFooter({
   gateEnabled: boolean;
   actionName: string;
   message: string;
+  confirmedHash: Hex | null;
 }) {
   if (!ready) {
     return <Skeleton className="h-11 w-full" aria-hidden />;
@@ -768,7 +777,17 @@ function EarnActionFooter({
       <Button type="submit" className="w-full" size="lg" disabled={!canSubmit}>
         {label}
       </Button>
-      <p className="text-center text-xs text-muted">{message}</p>
+      <p className="text-center text-xs text-muted">
+        {message}
+        {confirmedHash ? (
+          <>
+            {" "}
+            <TxLink chainId={robinhoodChain.id} hash={confirmedHash} className="text-xs">
+              {shortenAddress(confirmedHash, 6)}
+            </TxLink>
+          </>
+        ) : null}
+      </p>
       <p className="text-center text-xs text-muted">
         <a
           className="underline underline-offset-2"

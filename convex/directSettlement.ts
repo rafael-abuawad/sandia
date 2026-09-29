@@ -4,9 +4,10 @@ import { action } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { createPublicClient, http, type Hex } from "viem";
+import { isRobinhoodUsdgAddress, ROBINHOOD_USDG } from "../lib/destination";
 import { matchTransferToPayment, parseTransferLogs } from "./lib/transferLog";
 
-const USDG = "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168";
+const USDG = ROBINHOOD_USDG.address.toLowerCase();
 
 const robinhood = {
   id: 4663,
@@ -42,7 +43,13 @@ export const submitDirect = action({
       publicId: args.publicId,
     });
     if (!request) throw new Error("Payment request not found");
-    if (request.destinationTokenAddress.toLowerCase() !== USDG) {
+    if (!isRobinhoodUsdgAddress(request.destinationTokenAddress)) {
+      console.error("payment_deposit_rejected", {
+        publicId: args.publicId,
+        depositTxnRef: args.depositTxnRef,
+        reason: "destination is not USDG",
+        destinationTokenAddress: request.destinationTokenAddress,
+      });
       throw new Error("Same-chain pay only settles USDG");
     }
 

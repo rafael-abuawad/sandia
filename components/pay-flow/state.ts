@@ -35,6 +35,8 @@ export type PayFlowState = {
   depositTxnRef: string | null;
   pendingTx: Hex | undefined;
   unverifiedPayment: SentPayment | null;
+  /** True while Check again is confirming a payment the wallet already sent. */
+  verifying: boolean;
 };
 
 export const initialPayFlowState: PayFlowState = {
@@ -51,6 +53,7 @@ export const initialPayFlowState: PayFlowState = {
   depositTxnRef: null,
   pendingTx: undefined,
   unverifiedPayment: null,
+  verifying: false,
 };
 
 export type PayFlowAction =
@@ -82,6 +85,7 @@ export type PayFlowAction =
   | { type: "pendingTxSet"; hash: Hex }
   | { type: "paymentFailed"; message: string }
   | { type: "paymentUnverified"; payment: SentPayment; message: string }
+  | { type: "verificationStarted" }
   | { type: "paymentDone"; message?: string };
 
 export function payFlowReducer(state: PayFlowState, action: PayFlowAction): PayFlowState {
@@ -171,6 +175,7 @@ export function payFlowReducer(state: PayFlowState, action: PayFlowAction): PayF
         step: "tracking",
         statusMsg: action.message ?? state.statusMsg,
         unverifiedPayment: null,
+        verifying: false,
       };
     case "pendingTxSet":
       return { ...state, pendingTx: action.hash };
@@ -179,6 +184,7 @@ export function payFlowReducer(state: PayFlowState, action: PayFlowAction): PayF
         ...state,
         step: "error",
         statusMsg: action.message,
+        verifying: false,
       };
     case "paymentUnverified":
       return {
@@ -186,12 +192,22 @@ export function payFlowReducer(state: PayFlowState, action: PayFlowAction): PayF
         step: "error",
         statusMsg: action.message,
         unverifiedPayment: action.payment,
+        verifying: false,
+      };
+    case "verificationStarted":
+      return {
+        ...state,
+        step: "error",
+        statusMsg: "Checking your payment…",
+        verifying: true,
       };
     case "paymentDone":
       return {
         ...state,
         step: "done",
         statusMsg: action.message ?? state.statusMsg,
+        unverifiedPayment: null,
+        verifying: false,
       };
     default:
       return state;

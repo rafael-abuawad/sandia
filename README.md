@@ -46,6 +46,12 @@ npx convex env set PRIVY_APP_ID <same-as-NEXT_PUBLIC_PRIVY_APP_ID>
 npx convex env set SANDIA_NONCE_SECRET <secret>
 ```
 
+The Privy app secret stays on Convex only. Copy it from **Configuration → App settings → Basics** in the [Privy Dashboard](https://dashboard.privy.io). Privy shows it once; regenerating it invalidates the previous secret. Do not put it in `.env.local` or any `NEXT_PUBLIC_` variable. The Next.js client does not read it. Client sends authenticate with the signed-in Privy session.
+
+```bash
+npx convex env set PRIVY_APP_SECRET <app-secret>
+```
+
 Batch sends also need the deployed Sandia Send address in `.env.local`:
 
 ```bash
@@ -78,5 +84,5 @@ Open [http://localhost:3000](http://localhost:3000).
 - Register an Across integrator id and set Convex `ACROSS_INTEGRATOR_ID`.
 - `/otc` redirects to `/requests/new`.
 - App accounts use the Privy embedded wallet on Robinhood Chain. The public pay page uses the same Privy wagmi provider and connects an external wallet for payment, so paying does not claim a Sandia account. WalletConnect for payers is the connector enabled in the Privy dashboard.
-- Outbound USDG sends use Privy's embedded-wallet gas sponsorship on Robinhood Chain, so the sender does not need ETH. In the Privy Dashboard, enable **Fee sponsorship → Sponsor gas fees**, add Robinhood Chain to supported chains, fund billing, and allow client-initiated sponsored transactions. Privy requires TEE wallet execution for native sponsorship. Set spending caps before enabling this in production. Batch sends sponsor both the USDG approval and the Sandia Send call.
+- Outbound USDG sends use Privy's embedded-wallet gas sponsorship on Robinhood Chain (chain id 4663), so the sender does not need ETH. The browser calls `useSendTransaction` with `sponsor: true`; that uses the signed-in session, not the app secret. In the Privy Dashboard: enable TEE execution under **Wallets → Advanced** (do not disable automatic wallet migration), turn on **Fee sponsorship → Sponsor gas fees** (App pays; User pays does not cover Robinhood Chain), add Robinhood Chain, allow client-initiated sponsored transactions, set a spend cap, and add credits plus a payment method under **Billing → Fee sponsorship**. Store the app secret only as Convex `PRIVY_APP_SECRET`. Batch sends sponsor both the USDG approval and the Sandia Send call.
 - Stock trading stays unavailable until a 0x quote for a real RHJ token returns `liquidityAvailable: true`. Steakhouse USDG deposits, withdrawals, and redemptions are submitted from Earn. See `docs/gates.md`.

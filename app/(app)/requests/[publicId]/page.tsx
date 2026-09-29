@@ -10,6 +10,7 @@ import { useSignedInWallet } from "@/lib/use-signed-in-wallet";
 import { api } from "@/convex/_generated/api";
 import type { Doc } from "@/convex/_generated/dataModel";
 import { StatusBadge } from "@/components/status-badge";
+import { TxLink } from "@/components/tx-link";
 import { Button } from "@/components/ui/button";
 import { FieldError } from "@/components/ui/field-error";
 import {
@@ -82,7 +83,12 @@ function RequestMissing() {
   );
 }
 
-type AttemptRow = { _id: string; depositTxnRef?: string; acrossStatus: string };
+type AttemptRow = {
+  _id: string;
+  depositTxnRef?: string;
+  originChainId: number;
+  acrossStatus: string;
+};
 
 function RequestDetailLoaded({
   publicId,
@@ -305,8 +311,14 @@ function RequestDetailLoaded({
                 key={a._id}
                 className="pr-inset flex items-center justify-between gap-3 px-3 py-2 text-xs text-muted"
               >
-                <span className="pr-mono min-w-0 truncate">
-                  {a.depositTxnRef ? a.depositTxnRef.slice(0, 10) + "…" : "—"}
+                <span className="min-w-0 truncate">
+                  {a.depositTxnRef ? (
+                    <TxLink chainId={a.originChainId} hash={a.depositTxnRef} className="text-xs">
+                      {a.depositTxnRef.slice(0, 10)}…
+                    </TxLink>
+                  ) : (
+                    "—"
+                  )}
                 </span>
                 <StatusBadge status={a.acrossStatus} />
               </li>

@@ -2,7 +2,10 @@
 
 import { Button } from "@/components/ui/button";
 import { SendSummaryDetails } from "@/components/send-form/summary-details";
+import { TxLink } from "@/components/tx-link";
 import type { ReviewPayload } from "@/components/send-form/state";
+import { robinhoodChain } from "@/lib/chains";
+import { shortenAddress } from "@/lib/utils";
 
 export function SendSuccessPanel({
   review,
@@ -30,8 +33,11 @@ export function SendSuccessPanel({
         </p>
         <SendSummaryDetails review={review} />
         {transactionHash ? (
-          <p className="pr-mono break-all border-t border-border pt-3 text-xs text-muted">
-            Transaction {transactionHash}
+          <p className="border-t border-border pt-3 text-xs text-muted">
+            Transaction{" "}
+            <TxLink chainId={robinhoodChain.id} hash={transactionHash} className="text-xs">
+              {shortenAddress(transactionHash, 4)}
+            </TxLink>
           </p>
         ) : null}
         {activityError ? (

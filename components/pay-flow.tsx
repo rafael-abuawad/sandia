@@ -42,10 +42,19 @@ export function PayFlow({ publicId }: PayFlowProps) {
     onChainChange,
     onTokenChange,
     paymentSent,
+    checkingPayment,
     refreshQuote,
     executePayment,
     retryVerification,
   } = usePayFlow(publicId);
+
+  const depositAttempt = attempts?.find(
+    (attempt) =>
+      depositTxnRef &&
+      attempt.depositTxnRef &&
+      attempt.depositTxnRef.toLowerCase() === depositTxnRef.toLowerCase(),
+  );
+  const depositChainId = depositAttempt?.originChainId ?? originChainId;
 
   if (request === undefined) {
     return <PayRequestLoading />;
@@ -77,7 +86,11 @@ export function PayFlow({ publicId }: PayFlowProps) {
       />
 
       {isTerminalPaid ? (
-        <PayTerminalStatus kind="completed" depositTxnRef={depositTxnRef} />
+        <PayTerminalStatus
+          kind="completed"
+          depositTxnRef={depositTxnRef}
+          depositChainId={depositChainId}
+        />
       ) : isUnavailable ? (
         <PayTerminalStatus kind="unavailable" statusLabel={request.status} />
       ) : (
@@ -114,6 +127,7 @@ export function PayFlow({ publicId }: PayFlowProps) {
           onRefreshQuote={() => void refreshQuote()}
           onPay={() => void executePayment()}
           paymentSent={paymentSent}
+          checkingPayment={checkingPayment}
           onRetryVerification={() => void retryVerification()}
         />
       )}

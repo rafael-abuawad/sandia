@@ -26,6 +26,7 @@ import {
 import { formatDisplayDateTime } from "@/lib/format-datetime";
 import { ROBINHOOD_USDG } from "@/lib/destination";
 import { formatTokenAmount, formatTokenAmountGrouped } from "@/lib/money";
+import { TxLink } from "@/components/tx-link";
 import { shortenAddress } from "@/lib/utils";
 import type { Hex } from "viem";
 
@@ -62,6 +63,7 @@ type PayAcrossPanelProps = {
   onRefreshQuote: () => void;
   onPay: () => void;
   paymentSent: boolean;
+  checkingPayment: boolean;
   onRetryVerification: () => void;
 };
 
@@ -169,6 +171,7 @@ export function PayAcrossPanel({
   onRefreshQuote,
   onPay,
   paymentSent,
+  checkingPayment,
   onRetryVerification,
 }: PayAcrossPanelProps) {
   const errorId = useId();
@@ -238,6 +241,7 @@ export function PayAcrossPanel({
           onRefreshQuote={onRefreshQuote}
           onPay={onPay}
           paymentSent={paymentSent}
+          checkingPayment={checkingPayment}
           onRetryVerification={onRetryVerification}
         />
       ) : (
@@ -286,6 +290,7 @@ function PayAcrossConnected({
   onRefreshQuote,
   onPay,
   paymentSent,
+  checkingPayment,
   onRetryVerification,
 }: Omit<PayAcrossPanelProps, "isConnected" | "directBalance" | "ethBalance"> & {
   errorId: string;
@@ -336,11 +341,18 @@ function PayAcrossConnected({
             {statusMsg}
           </p>
           {paymentSent ? (
-            <Button variant="secondary" size="sm" onClick={onRetryVerification}>
-              Check again
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              disabled={checkingPayment}
+              onClick={onRetryVerification}
+            >
+              {checkingPayment ? "Checking…" : "Check again"}
             </Button>
           ) : (
             <Button
+              type="button"
               variant="secondary"
               size="sm"
               onClick={directPay || ethQuote || quote ? onPay : onRefreshQuote}
@@ -363,10 +375,17 @@ function PayAcrossConnected({
           {statusMsg}
         </p>
       ) : null}
-      {txSuccess || txError ? (
-        pendingTx ? (
-          <p className="pr-mono text-xs text-muted">Last tx: {shortenAddress(pendingTx, 8)}</p>
-        ) : null
+      {pendingTx && (paymentSent || txSuccess || txError) ? (
+        <p className="text-xs text-muted">
+          Last tx:{" "}
+          {originChainId != null ? (
+            <TxLink chainId={originChainId} hash={pendingTx} className="text-xs">
+              {shortenAddress(pendingTx, 8)}
+            </TxLink>
+          ) : (
+            <span className="pr-mono">{shortenAddress(pendingTx, 8)}</span>
+          )}
+        </p>
       ) : null}
     </>
   );
@@ -644,6 +663,7 @@ function PayAcrossActionBar({
         </p>
       ) : null}
       <Button
+        type="button"
         className="w-full"
         disabled={!canPay || busy}
         aria-describedby={!canPay && blocker ? blockerId : undefined}

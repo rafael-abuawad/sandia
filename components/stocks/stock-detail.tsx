@@ -3,9 +3,6 @@
 import Image from "next/image";
 import Link from "next/link";
 import { use, useCallback, useEffect, useMemo, useState } from "react";
-import { useAction } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import { ROBINHOOD_USDG } from "@/lib/destination";
 import { ArrowLeft, ChevronDown, ExternalLink, Info } from "lucide-react";
 import type { StockQuote, StockToken } from "@/lib/rhj/client";
 import { explorerTokenUrl } from "@/lib/rhj/client";
@@ -17,9 +14,11 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { PriceChart } from "@/components/stocks/price-chart";
+import { StockDetailSkeleton } from "@/components/stocks/stock-skeletons";
+import { useSignedInWallet } from "@/lib/use-signed-in-wallet";
 import { userFacingError } from "@/lib/user-facing-error";
 
-const TRADE_UNAVAILABLE = "Trading is unavailable until a quote shows liquidity.";
+const TRADE_UNAVAILABLE = "Buying and selling aren't available yet.";
 
 function useStockDetail(symbol: string) {
   const [asset, setAsset] = useState<StockToken | null>(null);
@@ -30,19 +29,21 @@ function useStockDetail(symbol: string) {
   const [side, setSide] = useState<"buy" | "sell">("buy");
   const [unit, setUnit] = useState<"usd" | "shares">("usd");
   const [ticketAmount, setTicketAmount] = useState("");
-  const probeQuote = useAction(api.zerox.probeQuote);
-  const [tradeReason, setTradeReason] = useState<string | null>(
-    "Checking whether 0x can execute this token.",
-  );
+
+  const loadQuote = useCallback(async () => {
+    const quoteRes = await fetch(`/api/rhj/prices?symbol=${encodeURIComponent(symbol)}`);
+    if (quoteRes.ok) {
+      const quoteJson = (await quoteRes.json()) as { quote: StockQuote };
+      setQuote(quoteJson.quote);
+      return;
+    }
+    setQuote(null);
+  }, [symbol]);
 
   const load = useCallback(async () => {
     setError(null);
     try {
-      const [assetsRes, quoteRes] = await Promise.all([
-        fetch("/api/rhj/assets"),
-        fetch(`/api/rhj/prices?symbol=${encodeURIComponent(symbol)}`),
-      ]);
-
+      const assetsRes = await fetch("/api/rhj/assets");
       if (!assetsRes.ok) {
         throw new Error("Failed to load stock tokens");
       }
@@ -51,44 +52,27 @@ function useStockDetail(symbol: string) {
       if (!found) {
         setAsset(null);
         setQuote(null);
-        setError("Stock token not found on Robinhood Chain.");
+        setError("This stock is not available.");
         return;
       }
       setAsset(found);
-      try {
-        const probe = await probeQuote({
-          sellToken: ROBINHOOD_USDG.address,
-          buyToken: found.contractAddress,
-          sellAmount: "1000000",
-          taker: "0x0000000000000000000000000000000000000001",
-        });
-        setTradeReason(
-          probe.ok && probe.liquidityAvailable
-            ? null
-            : userFacingError(probe.reason ?? "", TRADE_UNAVAILABLE),
-        );
-      } catch (probeError) {
-        setTradeReason(userFacingError(probeError, TRADE_UNAVAILABLE));
-      }
-
-      if (quoteRes.ok) {
-        const quoteJson = (await quoteRes.json()) as { quote: StockQuote };
-        setQuote(quoteJson.quote);
-      } else {
-        setQuote(null);
-      }
+      await loadQuote();
     } catch (err) {
       setError(userFacingError(err, "This stock could not be loaded."));
     } finally {
       setLoading(false);
     }
-  }, [symbol, probeQuote]);
+  }, [symbol, loadQuote]);
 
   useEffect(() => {
     void load();
-    const id = window.setInterval(() => void load(), 30_000);
+    const id = window.setInterval(() => {
+      void loadQuote().catch((err) => {
+        setError(userFacingError(err, "This stock could not be loaded."));
+      });
+    }, 30_000);
     return () => window.clearInterval(id);
-  }, [load]);
+  }, [load, loadQuote]);
 
   const estimate = useMemo(() => {
     const n = Number.parseFloat(ticketAmount);
@@ -113,7 +97,6 @@ function useStockDetail(symbol: string) {
     setUnit,
     ticketAmount,
     setTicketAmount,
-    tradeReason,
     estimate,
   };
 }
@@ -122,9 +105,10 @@ export function StockDetail({ params }: { params: Promise<{ symbol: string }> })
   const { symbol: rawSymbol } = use(params);
   const symbol = decodeURIComponent(rawSymbol).toUpperCase();
   const detail = useStockDetail(symbol);
+  const { ready, isSignedIn } = useSignedInWallet();
 
   if (detail.loading) {
-    return <p className="text-sm text-muted">Loading {symbol}…</p>;
+    return <StockDetailSkeleton />;
   }
 
   if (detail.error && !detail.asset) {
@@ -145,7 +129,8 @@ export function StockDetail({ params }: { params: Promise<{ symbol: string }> })
       onUnitChange={detail.setUnit}
       ticketAmount={detail.ticketAmount}
       onTicketAmountChange={detail.setTicketAmount}
-      tradeReason={detail.tradeReason}
+      tradeReason={null}
+      signedIn={ready ? isSignedIn : undefined}
       estimate={detail.estimate}
     />
   );
@@ -178,6 +163,7 @@ function StockDetailLoaded({
   ticketAmount,
   onTicketAmountChange,
   tradeReason,
+  signedIn,
   estimate,
 }: {
   asset: StockToken;
@@ -191,6 +177,7 @@ function StockDetailLoaded({
   ticketAmount: string;
   onTicketAmountChange: (value: string) => void;
   tradeReason: string | null;
+  signedIn?: boolean;
   estimate: { shares: number; usd: number } | null;
 }) {
   const explorerUrl = explorerTokenUrl(asset.contractAddress);
@@ -217,27 +204,12 @@ function StockDetailLoaded({
         <p className="pr-display pr-money text-4xl tracking-tight sm:text-5xl">
           {formatUsdPrice(quote?.mid)}
         </p>
-        <p className="mt-1 text-xs text-muted">Mid quote · not the underlying share</p>
+        <p className="mt-1 text-xs text-muted">Current price</p>
       </div>
 
       <PriceChart address={asset.contractAddress} symbol={asset.symbol} />
 
-      {quote?.dailyLow != null && quote.dailyHigh != null && quote.mid != null ? (
-        <DayRangeBar low={quote.dailyLow} high={quote.dailyHigh} current={quote.mid} />
-      ) : null}
-
-      <dl className="grid grid-cols-2 gap-4 text-sm">
-        <div>
-          <dt className="pr-kicker">Bid / Ask</dt>
-          <dd className="pr-mono mt-1 font-semibold">
-            {formatUsdPrice(quote?.bid)} / {formatUsdPrice(quote?.ask)}
-          </dd>
-        </div>
-        <div>
-          <dt className="pr-kicker">1D Volume</dt>
-          <dd className="pr-mono mt-1 font-semibold">{formatVolume(quote?.dailyTradingVolume)}</dd>
-        </div>
-      </dl>
+      <TodaySummary quote={quote} />
 
       <details className="group border-t border-border pt-4">
         <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-semibold text-foreground marker:content-none [&::-webkit-details-marker]:hidden">
@@ -249,9 +221,7 @@ function StockDetailLoaded({
           />
         </summary>
         <div className="mt-3 space-y-2 text-sm text-muted">
-          <p>
-            This token tracks {asset.shortName} on Robinhood Chain. It is not the underlying equity.
-          </p>
+          <p>This follows {asset.shortName}. It is a token, not a share of the company.</p>
           <a
             href={explorerUrl}
             target="_blank"
@@ -274,6 +244,7 @@ function StockDetailLoaded({
         ticketAmount={ticketAmount}
         onTicketAmountChange={onTicketAmountChange}
         tradeReason={tradeReason}
+        signedIn={signedIn}
         estimate={estimate}
       />
     </div>
@@ -311,7 +282,7 @@ function StockDetailHeader({
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <h1 className="pr-display text-xl">{asset.symbol}</h1>
-          {halted ? <Badge variant="danger">Halted</Badge> : <Badge variant="success">Open</Badge>}
+          {halted ? <Badge variant="danger">Paused</Badge> : <Badge variant="success">Open</Badge>}
         </div>
         <p className="truncate text-sm text-muted">{asset.shortName}</p>
       </div>
@@ -329,6 +300,7 @@ export function StockTradeTicket({
   ticketAmount,
   onTicketAmountChange,
   tradeReason,
+  signedIn,
   estimate,
   embeddedPresentation = false,
 }: {
@@ -341,14 +313,18 @@ export function StockTradeTicket({
   ticketAmount: string;
   onTicketAmountChange: (value: string) => void;
   tradeReason: string | null;
+  signedIn?: boolean;
   estimate: { shares: number; usd: number } | null;
   embeddedPresentation?: boolean;
 }) {
   const preview = estimate
     ? unit === "usd"
-      ? `≈ ${estimate.shares.toLocaleString("en-US", { maximumFractionDigits: 6 })} shares at mid`
-      : `≈ ${formatUsdPrice(estimate.usd)} at mid`
-    : "Enter an amount to preview the fill.";
+      ? `About ${estimate.shares.toLocaleString("en-US", { maximumFractionDigits: 2 })} shares`
+      : `About ${formatUsdPrice(estimate.usd)}`
+    : "Enter an amount to see an estimate.";
+  const accountNote =
+    signedIn === false ? "Sign in to buy or sell." : signedIn === true ? TRADE_UNAVAILABLE : null;
+  const note = halted ? null : (accountNote ?? tradeReason);
 
   return (
     <div
@@ -405,8 +381,7 @@ export function StockTradeTicket({
             <Info className="size-3.5" strokeWidth={1.5} aria-hidden />
           </TooltipTrigger>
           <TooltipContent side="top" className="max-w-xs">
-            Off: enter a USD amount. On: enter a share quantity. The preview uses the current mid
-            quote.
+            Leave this off to type a dollar amount. Turn it on to type a number of shares.
           </TooltipContent>
         </Tooltip>
       </div>
@@ -421,38 +396,60 @@ export function StockTradeTicket({
         />
         <p className="text-xs text-muted">{preview}</p>
       </div>
-      {tradeReason && !halted && tradeReason !== TRADE_UNAVAILABLE ? (
+      {note ? (
         <p className="text-sm text-muted" role="status">
-          {tradeReason}
+          {note}
         </p>
       ) : null}
       <Button type="button" className="w-full" size="lg" disabled>
-        {halted ? "Trading halted" : `${side === "buy" ? "Buy" : "Sell"} ${symbol}`}
+        {halted ? "Trading paused" : `${side === "buy" ? "Buy" : "Sell"} ${symbol}`}
       </Button>
-      <p className="text-xs text-muted">
-        The execution price is a 0x quote, not the Robinhood mid. The mid is a reference only. Buy
-        and sell stay off until a firm quote reports liquidity.
-      </p>
     </div>
   );
 }
 
-function DayRangeBar({ low, high, current }: { low: number; high: number; current: number }) {
-  const span = high - low;
-  const pct = span > 0 ? Math.min(100, Math.max(0, ((current - low) / span) * 100)) : 50;
+function TodaySummary({ quote }: { quote: StockQuote | null }) {
+  const low = quote?.dailyLow ?? null;
+  const high = quote?.dailyHigh ?? null;
+  const current = quote?.mid ?? null;
+  const hasRange = low !== null && high !== null && current !== null;
+
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between text-xs text-muted">
-        <span className="pr-mono">{formatUsdPrice(low)}</span>
-        <span>Day range</span>
-        <span className="pr-mono">{formatUsdPrice(high)}</span>
-      </div>
-      <div className="relative h-1 rounded-full bg-border">
-        <div
-          className="absolute top-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-foreground"
-          style={{ left: `${pct}%` }}
-        />
+    <div className="space-y-4">
+      {hasRange ? (
+        <div className="space-y-3">
+          <div className="flex items-end justify-between gap-4">
+            <div>
+              <p className="text-xs text-muted">Today&apos;s low</p>
+              <p className="pr-mono mt-1 text-sm font-semibold">{formatUsdPrice(low)}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-muted">Today&apos;s high</p>
+              <p className="pr-mono mt-1 text-sm font-semibold">{formatUsdPrice(high)}</p>
+            </div>
+          </div>
+          <div
+            className="relative h-1 rounded-full bg-border"
+            role="img"
+            aria-label={`Current price ${formatUsdPrice(current)}, between today's low of ${formatUsdPrice(low)} and high of ${formatUsdPrice(high)}`}
+          >
+            <div
+              className="absolute top-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-foreground"
+              style={{ left: `${rangePercent(low, high, current)}%` }}
+            />
+          </div>
+        </div>
+      ) : null}
+      <div>
+        <p className="pr-kicker">1D Volume</p>
+        <p className="pr-mono mt-1 font-semibold">{formatVolume(quote?.dailyTradingVolume)}</p>
       </div>
     </div>
   );
+}
+
+function rangePercent(low: number, high: number, current: number) {
+  const span = high - low;
+  if (span <= 0) return 50;
+  return Math.min(100, Math.max(0, ((current - low) / span) * 100));
 }

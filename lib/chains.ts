@@ -131,3 +131,13 @@ export function chainName(chainId: number): string {
   const found = appChains.find((c) => c.id === chainId);
   return found?.name ?? `Chain ${chainId}`;
 }
+
+const TX_HASH = /^0x[0-9a-fA-F]{64}$/;
+
+/** Block explorer URL for a transaction. Robinhood Chain uses Blockscout. */
+export function explorerTxUrl(chainId: number, hash: string): string | null {
+  if (!TX_HASH.test(hash)) return null;
+  const base = appChains.find((chain) => chain.id === chainId)?.blockExplorers?.default.url;
+  if (!base) return null;
+  return `${base}/tx/${hash}`;
+}

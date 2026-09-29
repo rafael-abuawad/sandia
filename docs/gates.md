@@ -27,4 +27,14 @@ Opening the connect modal, connecting an injected wallet, switching chain, and p
 
 ## Privy outbound send
 
-Outbound USDG sends use Privy's sponsored embedded-wallet transactions on Robinhood Chain. Privy uses a paymaster for gas, so the signed-in wallet does not need ETH. Both steps of a batch send (USDG approval and Sandia Send) request sponsorship. Live sending still requires fee sponsorship and Robinhood Chain to be enabled in the Privy Dashboard, billing configured, client-initiated sponsored transactions allowed, and TEE wallet execution. A live sponsored send and receipt have not been verified from this workspace.
+Outbound USDG sends use Privy's sponsored embedded-wallet transactions on Robinhood Chain (chain id 4663). Privy uses a paymaster for gas, so the signed-in wallet does not need ETH. Both steps of a batch send (USDG approval and Sandia Send) request sponsorship through the React SDK (`sponsor: true`), which authenticates with the signed-in Privy session. The app secret is not sent to the browser.
+
+Live sending still requires, in the Privy Dashboard for the same app as `NEXT_PUBLIC_PRIVY_APP_ID`:
+
+- An app secret under **Configuration → App settings → Basics**. Store it only as Convex `PRIVY_APP_SECRET`. Never as `NEXT_PUBLIC_`. The app does not read it yet. Regenerating it invalidates the previous secret.
+- TEE wallet execution under **Wallets → Advanced**. Leave automatic migration enabled.
+- **Fee sponsorship → Sponsor gas fees** (App pays). User pays does not include Robinhood Chain.
+- Robinhood Chain in supported chains, client-initiated sponsored transactions allowed, and a spend cap.
+- Credits and a payment method under **Billing → Fee sponsorship**.
+
+A live sponsored send and receipt have not been verified from this workspace.

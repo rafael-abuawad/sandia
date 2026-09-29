@@ -1,10 +1,28 @@
 import { describe, expect, it } from "vitest";
-import { isPayerTokenAllowed } from "./chains";
+import { base } from "viem/chains";
+import { explorerTxUrl, isPayerTokenAllowed } from "./chains";
 import { ROBINHOOD_USDG } from "./destination";
+
+const TX = "0x7dda278261f1507140f4869830f531f0923d6d2de8d04da0e1d002387ddc580b";
 
 const WETH = "0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73";
 const USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
 const ZERO = "0x0000000000000000000000000000000000000000";
+
+describe("explorerTxUrl", () => {
+  it("links Robinhood transactions to Blockscout", () => {
+    expect(explorerTxUrl(4663, TX)).toBe(`https://robinhoodchain.blockscout.com/tx/${TX}`);
+  });
+
+  it("links other payer chains to their own explorer", () => {
+    expect(explorerTxUrl(8453, TX)).toBe(`${base.blockExplorers.default.url}/tx/${TX}`);
+  });
+
+  it("returns null for a hash that is not 32 bytes", () => {
+    expect(explorerTxUrl(4663, "0xabc")).toBeNull();
+    expect(explorerTxUrl(4663, TX.slice(0, -1))).toBeNull();
+  });
+});
 
 describe("isPayerTokenAllowed", () => {
   it("limits Robinhood to WETH and USDG", () => {
