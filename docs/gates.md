@@ -13,11 +13,11 @@ Address `0xBeEff033F34C046626B8D0A041844C5d1A5409dd` on chain 4663.
 
 Morpho Vault V2 always returns 0 from `maxDeposit`, `maxWithdraw`, and `maxRedeem`. That is not a closed vault. Earn submits `deposit`, `withdraw`, and `redeem`, then checks the receipt for a `Deposit` or `Withdraw` log. The lending screen reads APY, deposits, and liquidity from the vault snapshot.
 
-## 0x stock quote
+## Stock trading
 
-`GET https://api.0x.org/swap/allowance-holder/price` for chain 4663, selling 1 USDG for RHJ token CRM (`0xd95B44124e475743a7589e68F3D74008A5536D44`), without an API key, returned HTTP 401 `No API key found in request`.
+Buy and sell on the stock ticket quote the selected asset against USDG on Robinhood Chain (4663). The app checks Uniswap v3 fee tiers 500 and 3000 and the v2 pair reserves, keeps the best amount, and protects it by 1%. Swap calldata is built in the app and submitted only to SwapRouter02 (`0xCaf681a66D020601342297493863E78C959E5cb2`). The sell token is approved to that router for the quoted amount when the allowance is short. Stock tickets do not call 0x.
 
-No firm quote was returned, so buy and sell stay unavailable. A configured `ZEROX_API_KEY` still has to return `liquidityAvailable: true` before a stock ticket can submit. `XSTOCKS_NOT_AUTHORIZED` or `TOKEN_NOT_SUPPORTED` stops the feature.
+ETH on this screen is wrapped ETH (`0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73`). A buy delivers WETH. HOOD is the Robinhood Markets token at `0x274C8C4665c0343730C78B184e560F902A8Bf200`. The ETH → USDG payment path still uses 0x and is separate from these tickets.
 
 ## Payer wallet
 

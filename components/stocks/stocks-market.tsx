@@ -6,7 +6,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import type { StockQuote, StockToken } from "@/lib/rhj/client";
 import { formatUsdPrice, formatVolume } from "@/lib/rhj/format";
+import { LISTED_CHAIN_STOCKS } from "@/lib/stocks/assets";
 import { Badge } from "@/components/ui/badge";
+import { useChainTokenStats } from "@/components/stocks/use-chain-stats";
+import { useUniswapDisplayPrices } from "@/components/stocks/use-uniswap-price";
 import {
   StockListDesktopSkeletonRows,
   StockListMobileSkeletonItems,
@@ -30,6 +33,8 @@ export function StocksMarket() {
   const [error, setError] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<SortKey | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const listedPrices = useUniswapDisplayPrices(LISTED_CHAIN_STOCKS);
+  const chainStats = useChainTokenStats(true);
 
   const applyQuotes = useCallback((quotes: StockQuote[]) => {
     const map: Record<string, StockQuote> = {};
@@ -83,18 +88,47 @@ export function StocksMarket() {
   }, [loadAssets, loadPrices]);
 
   const featuredRows: MarketRow[] = useMemo(() => {
+    const listed = new Set(LISTED_CHAIN_STOCKS.map((asset) => asset.symbol));
     const bySymbol = new Map(assets.map((asset) => [asset.symbol.toUpperCase(), asset]));
     return FEATURED_SYMBOLS.flatMap((symbol) => {
+      if (listed.has(symbol)) return [];
       const asset = bySymbol.get(symbol);
       if (!asset) return [];
       return [{ ...asset, quote: quotesBySymbol[symbol] ?? null }];
     });
   }, [assets, quotesBySymbol]);
 
+  const listedRows: MarketRow[] = useMemo(
+    () =>
+      LISTED_CHAIN_STOCKS.map((asset) => {
+        const stat = chainStats[asset.symbol];
+        return {
+          ...asset,
+          quote: {
+            symbol: asset.symbol,
+            bid: null,
+            ask: null,
+            mid: listedPrices[asset.symbol] ?? stat?.priceUsd ?? null,
+            spreadPct: null,
+            currency: "USD",
+            dailyTradingVolume: stat?.volumeUsd24h ?? null,
+            isTradingHalt: false,
+            generatedAt: null,
+            dailyHigh: null,
+            dailyLow: null,
+            contractAddress: asset.contractAddress,
+          },
+        };
+      }),
+    [chainStats, listedPrices],
+  );
+
   const filtered = useMemo(() => {
-    if (!sortKey) return featuredRows;
+    if (loading) return [];
+    const rows = [...listedRows, ...featuredRows];
+    if (!sortKey) return rows;
     const dir = sortDir === "asc" ? 1 : -1;
-    return [...featuredRows].sort((a, b) => {
+    return [...rows].sort((a, b) => {
       const qa = a.quote;
       const qb = b.quote;
       switch (sortKey) {
@@ -113,7 +147,7 @@ export function StocksMarket() {
         }
       }
     });
-  }, [featuredRows, sortKey, sortDir]);
+  }, [featuredRows, listedRows, loading, sortKey, sortDir]);
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) {

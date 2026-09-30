@@ -420,6 +420,7 @@ function OperationDialog({
               assets={stockAssets}
               error={stockError}
               onStockChange={onStockChange}
+              onPendingChange={onPendingChange}
             />
           ) : null}
         </ResponsiveDialogBody>
@@ -479,11 +480,13 @@ function AgentStockPanel({
   assets,
   error,
   onStockChange,
+  onPendingChange,
 }: {
   operation: AgentOperation;
   assets: AgentStock[];
   error: string | null;
   onStockChange: (stock: AgentStock) => void;
+  onPendingChange: (pending: boolean) => void;
 }) {
   const [query, setQuery] = useState("");
   const [side, setSide] = useState<"buy" | "sell">(
@@ -491,6 +494,36 @@ function AgentStockPanel({
   );
   const [unit, setUnit] = useState<"usd" | "shares" | null>(operation.stockUnit);
   const [amount, setAmount] = useState(operation.amount);
+  const [halted, setHalted] = useState(false);
+  const stockSymbol = operation.stock?.symbol ?? null;
+
+  useEffect(() => {
+    if (!stockSymbol) {
+      setHalted(false);
+      return;
+    }
+    let cancelled = false;
+    const loadHalt = () => {
+      void fetch(`/api/rhj/prices?symbol=${encodeURIComponent(stockSymbol)}`)
+        .then(async (response) => {
+          if (!response.ok) return false;
+          const body = (await response.json()) as { quote?: { isTradingHalt?: boolean } };
+          return Boolean(body.quote?.isTradingHalt);
+        })
+        .then((next) => {
+          if (!cancelled) setHalted(next);
+        })
+        .catch((haltError: unknown) => {
+          console.error("[stocks] halt check failed", haltError);
+        });
+    };
+    loadHalt();
+    const id = window.setInterval(loadHalt, 30_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [stockSymbol]);
   const visibleAssets = assets
     .filter((asset) =>
       [asset.symbol, asset.shortName].join(" ").toLowerCase().includes(query.toLowerCase()),
@@ -560,19 +593,18 @@ function AgentStockPanel({
           </div>
         </div>
       ) : null}
-      {unit !== null ? (
+      {unit !== null && operation.stock ? (
         <StockTradeTicket
-          symbol={operation.stock?.symbol ?? "stock"}
-          halted={false}
+          asset={operation.stock}
+          halted={halted}
           side={side}
           onSideChange={setSide}
           unit={unit}
           onUnitChange={setUnit}
           ticketAmount={amount}
           onTicketAmountChange={setAmount}
-          tradeReason="Buying and selling aren't available yet."
-          estimate={null}
           embeddedPresentation
+          onPendingChange={onPendingChange}
         />
       ) : null}
     </div>

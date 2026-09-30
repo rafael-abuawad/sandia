@@ -2,23 +2,27 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { use, useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, ChevronDown, ExternalLink, Info } from "lucide-react";
+import { use, useCallback, useEffect, useState } from "react";
+import { ArrowDown, ArrowLeft, ChevronDown, ExternalLink, Info } from "lucide-react";
 import type { StockQuote, StockToken } from "@/lib/rhj/client";
 import { explorerTokenUrl } from "@/lib/rhj/client";
 import { formatUsdPrice, formatVolume } from "@/lib/rhj/format";
+import { robinhoodChain } from "@/lib/chains";
+import { localStockBySymbol, resolveStockAsset, stockQuantityLabel } from "@/lib/stocks/assets";
+import { shortenAddress } from "@/lib/utils";
+import { userFacingError } from "@/lib/user-facing-error";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { TxLink } from "@/components/tx-link";
 import { PriceChart } from "@/components/stocks/price-chart";
 import { StockDetailSkeleton } from "@/components/stocks/stock-skeletons";
-import { useSignedInWallet } from "@/lib/use-signed-in-wallet";
-import { userFacingError } from "@/lib/user-facing-error";
-
-const TRADE_UNAVAILABLE = "Buying and selling aren't available yet.";
+import { useStockSwap } from "@/components/stocks/use-stock-swap";
+import { useChainTokenStats } from "@/components/stocks/use-chain-stats";
+import { useUniswapDisplayPrices } from "@/components/stocks/use-uniswap-price";
 
 function useStockDetail(symbol: string) {
   const [asset, setAsset] = useState<StockToken | null>(null);
@@ -42,13 +46,20 @@ function useStockDetail(symbol: string) {
 
   const load = useCallback(async () => {
     setError(null);
+    const local = localStockBySymbol(symbol);
+    if (local) {
+      setAsset(local);
+      setQuote(null);
+      setLoading(false);
+      return;
+    }
     try {
       const assetsRes = await fetch("/api/rhj/assets");
       if (!assetsRes.ok) {
         throw new Error("Failed to load stock tokens");
       }
       const assetsJson = (await assetsRes.json()) as { assets: StockToken[] };
-      const found = assetsJson.assets.find((a) => a.symbol.toUpperCase() === symbol) ?? null;
+      const found = resolveStockAsset(symbol, assetsJson.assets);
       if (!found) {
         setAsset(null);
         setQuote(null);
@@ -65,6 +76,15 @@ function useStockDetail(symbol: string) {
   }, [symbol, loadQuote]);
 
   useEffect(() => {
+    setLogoBroken(false);
+    const local = localStockBySymbol(symbol);
+    if (local) {
+      setAsset(local);
+      setQuote(null);
+      setError(null);
+      setLoading(false);
+      return;
+    }
     void load();
     const id = window.setInterval(() => {
       void loadQuote().catch((err) => {
@@ -72,17 +92,7 @@ function useStockDetail(symbol: string) {
       });
     }, 30_000);
     return () => window.clearInterval(id);
-  }, [load, loadQuote]);
-
-  const estimate = useMemo(() => {
-    const n = Number.parseFloat(ticketAmount);
-    const mid = quote?.mid;
-    if (!Number.isFinite(n) || n <= 0 || mid == null || mid <= 0) return null;
-    if (unit === "usd") {
-      return { shares: n / mid, usd: n };
-    }
-    return { shares: n, usd: n * mid };
-  }, [ticketAmount, unit, quote?.mid]);
+  }, [load, loadQuote, symbol]);
 
   return {
     asset,
@@ -97,7 +107,6 @@ function useStockDetail(symbol: string) {
     setUnit,
     ticketAmount,
     setTicketAmount,
-    estimate,
   };
 }
 
@@ -105,7 +114,6 @@ export function StockDetail({ params }: { params: Promise<{ symbol: string }> })
   const { symbol: rawSymbol } = use(params);
   const symbol = decodeURIComponent(rawSymbol).toUpperCase();
   const detail = useStockDetail(symbol);
-  const { ready, isSignedIn } = useSignedInWallet();
 
   if (detail.loading) {
     return <StockDetailSkeleton />;
@@ -129,9 +137,6 @@ export function StockDetail({ params }: { params: Promise<{ symbol: string }> })
       onUnitChange={detail.setUnit}
       ticketAmount={detail.ticketAmount}
       onTicketAmountChange={detail.setTicketAmount}
-      tradeReason={null}
-      signedIn={ready ? isSignedIn : undefined}
-      estimate={detail.estimate}
     />
   );
 }
@@ -162,9 +167,6 @@ function StockDetailLoaded({
   onUnitChange,
   ticketAmount,
   onTicketAmountChange,
-  tradeReason,
-  signedIn,
-  estimate,
 }: {
   asset: StockToken;
   quote: StockQuote | null;
@@ -176,12 +178,20 @@ function StockDetailLoaded({
   onUnitChange: (unit: "usd" | "shares") => void;
   ticketAmount: string;
   onTicketAmountChange: (value: string) => void;
-  tradeReason: string | null;
-  signedIn?: boolean;
-  estimate: { shares: number; usd: number } | null;
 }) {
+  const listed = localStockBySymbol(asset.symbol);
+  const listedPrices = useUniswapDisplayPrices(listed ? [listed] : NO_LISTED_ASSETS);
+  const chainStats = useChainTokenStats(Boolean(listed));
+  const stat = listed ? chainStats[listed.symbol] : undefined;
+  const shownQuote = listed
+    ? chainStockQuote(
+        asset,
+        listedPrices[asset.symbol] ?? stat?.priceUsd ?? null,
+        stat?.volumeUsd24h ?? null,
+      )
+    : quote;
   const explorerUrl = explorerTokenUrl(asset.contractAddress);
-  const halted = Boolean(quote?.isTradingHalt);
+  const halted = Boolean(shownQuote?.isTradingHalt);
 
   return (
     <div className="pr-page gap-6">
@@ -202,14 +212,14 @@ function StockDetailLoaded({
 
       <div>
         <p className="pr-display pr-money text-4xl tracking-tight sm:text-5xl">
-          {formatUsdPrice(quote?.mid)}
+          {formatUsdPrice(shownQuote?.mid)}
         </p>
         <p className="mt-1 text-xs text-muted">Current price</p>
       </div>
 
       <PriceChart address={asset.contractAddress} symbol={asset.symbol} />
 
-      <TodaySummary quote={quote} />
+      <TodaySummary quote={shownQuote} />
 
       <details className="group border-t border-border pt-4">
         <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-semibold text-foreground marker:content-none [&::-webkit-details-marker]:hidden">
@@ -221,7 +231,11 @@ function StockDetailLoaded({
           />
         </summary>
         <div className="mt-3 space-y-2 text-sm text-muted">
-          <p>This follows {asset.shortName}. It is a token, not a share of the company.</p>
+          <p>
+            {asset.symbol === "ETH"
+              ? "A buy delivers WETH on Robinhood Chain. It does not wrap or unwrap ETH in the wallet."
+              : `This follows ${asset.shortName}. It is a token, not a share of the company.`}
+          </p>
           <a
             href={explorerUrl}
             target="_blank"
@@ -235,7 +249,7 @@ function StockDetailLoaded({
       </details>
 
       <StockTradeTicket
-        symbol={asset.symbol}
+        asset={asset}
         halted={halted}
         side={side}
         onSideChange={onSideChange}
@@ -243,9 +257,6 @@ function StockDetailLoaded({
         onUnitChange={onUnitChange}
         ticketAmount={ticketAmount}
         onTicketAmountChange={onTicketAmountChange}
-        tradeReason={tradeReason}
-        signedIn={signedIn}
-        estimate={estimate}
       />
     </div>
   );
@@ -290,8 +301,31 @@ function StockDetailHeader({
   );
 }
 
+const NO_LISTED_ASSETS: StockToken[] = [];
+
+function chainStockQuote(
+  asset: StockToken,
+  mid: number | null,
+  dailyTradingVolume: number | null,
+): StockQuote {
+  return {
+    symbol: asset.symbol,
+    bid: null,
+    ask: null,
+    mid,
+    spreadPct: null,
+    currency: "USD",
+    dailyTradingVolume,
+    isTradingHalt: false,
+    generatedAt: null,
+    dailyHigh: null,
+    dailyLow: null,
+    contractAddress: asset.contractAddress,
+  };
+}
+
 export function StockTradeTicket({
-  symbol,
+  asset,
   halted,
   side,
   onSideChange,
@@ -299,12 +333,10 @@ export function StockTradeTicket({
   onUnitChange,
   ticketAmount,
   onTicketAmountChange,
-  tradeReason,
-  signedIn,
-  estimate,
   embeddedPresentation = false,
+  onPendingChange,
 }: {
-  symbol: string;
+  asset: Pick<StockToken, "symbol" | "contractAddress" | "tokenDecimals">;
   halted: boolean;
   side: "buy" | "sell";
   onSideChange: (side: "buy" | "sell") => void;
@@ -312,65 +344,141 @@ export function StockTradeTicket({
   onUnitChange: (unit: "usd" | "shares") => void;
   ticketAmount: string;
   onTicketAmountChange: (value: string) => void;
-  tradeReason: string | null;
-  signedIn?: boolean;
-  estimate: { shares: number; usd: number } | null;
   embeddedPresentation?: boolean;
+  onPendingChange?: (pending: boolean) => void;
 }) {
-  const preview = estimate
-    ? unit === "usd"
-      ? `About ${estimate.shares.toLocaleString("en-US", { maximumFractionDigits: 2 })} shares`
-      : `About ${formatUsdPrice(estimate.usd)}`
-    : "Enter an amount to see an estimate.";
-  const accountNote =
-    signedIn === false ? "Sign in to buy or sell." : signedIn === true ? TRADE_UNAVAILABLE : null;
-  const note = halted ? null : (accountNote ?? tradeReason);
+  const quantityLabel = stockQuantityLabel(asset.symbol);
+  const swap = useStockSwap({
+    asset,
+    side,
+    unit,
+    amount: ticketAmount,
+    halted,
+    onPendingChange,
+  });
 
   return (
-    <div
-      className={
-        embeddedPresentation
-          ? "space-y-3 rounded-[var(--radius-xl)] border border-border bg-panel p-4"
-          : "sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-10 space-y-3 rounded-[var(--radius-xl)] border border-border bg-[color-mix(in_srgb,var(--panel-solid)_94%,transparent)] p-4 backdrop-blur-md md:static md:bottom-auto"
-      }
-    >
-      <div className="grid grid-cols-2 gap-2" role="group" aria-label="Order side">
-        <Button
-          type="button"
-          variant="outline"
-          aria-pressed={side === "buy"}
-          onClick={() => onSideChange("buy")}
-          className={
-            side === "buy"
-              ? "border-green-600 bg-green-600 text-white hover:bg-green-700 hover:text-white"
-              : "border-green-600/40 text-green-700 hover:bg-green-50 hover:text-green-800"
-          }
-        >
-          Buy
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          aria-pressed={side === "sell"}
-          onClick={() => onSideChange("sell")}
-          className={
-            side === "sell"
-              ? "border-red-600 bg-red-600 text-white hover:bg-red-700 hover:text-white"
-              : "border-red-600/40 text-red-700 hover:bg-red-50 hover:text-red-800"
-          }
-        >
-          Sell
-        </Button>
-      </div>
+    <div className={ticketClassName(embeddedPresentation)}>
+      <OrderSideButtons side={side} pending={swap.pending} onSideChange={onSideChange} />
+      <QuantityField
+        symbol={asset.symbol}
+        quantityLabel={quantityLabel}
+        side={side}
+        unit={unit}
+        pending={swap.pending}
+        quoting={swap.quoting}
+        ticketAmount={ticketAmount}
+        quoteAmounts={swap.quoteAmounts}
+        onUnitChange={onUnitChange}
+        onTicketAmountChange={onTicketAmountChange}
+      />
+      <SwapStatus
+        notes={swap.notes}
+        notice={swap.notice}
+        confirmedHash={swap.confirmedHash}
+        error={swap.error}
+      />
+      <Button
+        type="button"
+        className="w-full whitespace-normal text-center"
+        size="lg"
+        disabled={swap.disabled}
+        onClick={() => void swap.submit()}
+      >
+        {swap.buttonLabel}
+      </Button>
+    </div>
+  );
+}
+
+function ticketClassName(embeddedPresentation: boolean) {
+  if (embeddedPresentation) {
+    return "space-y-3 rounded-[var(--radius-xl)] border border-border bg-panel p-4";
+  }
+  return "sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-10 space-y-3 rounded-[var(--radius-xl)] border border-border bg-[color-mix(in_srgb,var(--panel-solid)_94%,transparent)] p-4 backdrop-blur-md md:static md:bottom-auto";
+}
+
+function OrderSideButtons({
+  side,
+  pending,
+  onSideChange,
+}: {
+  side: "buy" | "sell";
+  pending: boolean;
+  onSideChange: (side: "buy" | "sell") => void;
+}) {
+  return (
+    <div className="grid grid-cols-2 gap-2" role="group" aria-label="Order side">
+      <Button
+        type="button"
+        variant="outline"
+        aria-pressed={side === "buy"}
+        disabled={pending}
+        onClick={() => onSideChange("buy")}
+        className={
+          side === "buy"
+            ? "border-green-600 bg-green-600 text-white hover:bg-green-700 hover:text-white"
+            : "border-green-600/40 text-green-700 hover:bg-green-50 hover:text-green-800"
+        }
+      >
+        Buy
+      </Button>
+      <Button
+        type="button"
+        variant="outline"
+        aria-pressed={side === "sell"}
+        disabled={pending}
+        onClick={() => onSideChange("sell")}
+        className={
+          side === "sell"
+            ? "border-red-600 bg-red-600 text-white hover:bg-red-700 hover:text-white"
+            : "border-red-600/40 text-red-700 hover:bg-red-50 hover:text-red-800"
+        }
+      >
+        Sell
+      </Button>
+    </div>
+  );
+}
+
+function QuantityField({
+  symbol,
+  quantityLabel,
+  side,
+  unit,
+  pending,
+  quoting,
+  ticketAmount,
+  quoteAmounts,
+  onUnitChange,
+  onTicketAmountChange,
+}: {
+  symbol: string;
+  quantityLabel: "shares" | "tokens";
+  side: "buy" | "sell";
+  unit: "usd" | "shares";
+  pending: boolean;
+  quoting: boolean;
+  ticketAmount: string;
+  quoteAmounts: { usdg: string; quantity: string } | null;
+  onUnitChange: (unit: "usd" | "shares") => void;
+  onTicketAmountChange: (value: string) => void;
+}) {
+  const paySymbol = side === "buy" ? "USDG" : symbol;
+  const receiveSymbol = side === "buy" ? symbol : "USDG";
+  const payEditable = (side === "buy" && unit === "usd") || (side === "sell" && unit === "shares");
+  return (
+    <>
       <div className="flex items-center gap-2">
         <Switch
-          id="amount-in-shares"
+          id="amount-in-quantity"
           checked={unit === "shares"}
           onCheckedChange={(checked) => onUnitChange(checked ? "shares" : "usd")}
-          aria-label="Amount in shares"
+          aria-label={`Amount in ${quantityLabel}`}
+          disabled={pending}
         />
-        <Label htmlFor="amount-in-shares" className="font-medium">
-          Amount in shares
+        <Label htmlFor="amount-in-quantity" className="font-medium">
+          Amount in {quantityLabel}
         </Label>
         <Tooltip>
           <TooltipTrigger
@@ -381,30 +489,145 @@ export function StockTradeTicket({
             <Info className="size-3.5" strokeWidth={1.5} aria-hidden />
           </TooltipTrigger>
           <TooltipContent side="top" className="max-w-xs">
-            Leave this off to type a dollar amount. Turn it on to type a number of shares.
+            Leave this off to type USDG. Turn it on to type {quantityLabel}. The other amount is the
+            Uniswap quote.
           </TooltipContent>
         </Tooltip>
       </div>
-      <div className="space-y-2">
-        <Label htmlFor="stock-amount">{unit === "usd" ? "Amount in USD" : "Shares"}</Label>
-        <Input
-          id="stock-amount"
-          inputMode="decimal"
-          value={ticketAmount}
-          onChange={(e) => onTicketAmountChange(e.target.value)}
-          placeholder={unit === "usd" ? "0.00" : "0"}
+      <div className="relative flex flex-col gap-1">
+        <QuoteAmount
+          id={payEditable ? "stock-amount" : "stock-quote-amount"}
+          action="Sell"
+          symbol={paySymbol}
+          quantityLabel={quantityLabel}
+          editable={payEditable}
+          pending={pending}
+          quoting={quoting}
+          typed={ticketAmount}
+          quoted={amountForSymbol(paySymbol, symbol, quoteAmounts)}
+          onChange={onTicketAmountChange}
         />
-        <p className="text-xs text-muted">{preview}</p>
+        <div className="pointer-events-none absolute inset-x-0 top-1/2 z-10 flex -translate-y-1/2 justify-center">
+          <span className="flex size-7 items-center justify-center rounded-full border border-border bg-panel text-muted">
+            <ArrowDown className="size-3.5" strokeWidth={1.5} aria-hidden />
+          </span>
+        </div>
+        <QuoteAmount
+          id={payEditable ? "stock-quote-amount" : "stock-amount"}
+          action="Buy"
+          symbol={receiveSymbol}
+          quantityLabel={quantityLabel}
+          editable={!payEditable}
+          pending={pending}
+          quoting={quoting}
+          typed={ticketAmount}
+          quoted={amountForSymbol(receiveSymbol, symbol, quoteAmounts)}
+          onChange={onTicketAmountChange}
+        />
       </div>
-      {note ? (
-        <p className="text-sm text-muted" role="status">
+    </>
+  );
+}
+
+function amountForSymbol(
+  fieldSymbol: string,
+  assetSymbol: string,
+  quoteAmounts: { usdg: string; quantity: string } | null,
+) {
+  if (!quoteAmounts) return "";
+  return fieldSymbol === assetSymbol ? quoteAmounts.quantity : quoteAmounts.usdg;
+}
+
+function QuoteAmount({
+  id,
+  action,
+  symbol,
+  quantityLabel,
+  editable,
+  pending,
+  quoting,
+  typed,
+  quoted,
+  onChange,
+}: {
+  id: string;
+  action: "Sell" | "Buy";
+  symbol: string;
+  quantityLabel: "shares" | "tokens";
+  editable: boolean;
+  pending: boolean;
+  quoting: boolean;
+  typed: string;
+  quoted: string;
+  onChange: (value: string) => void;
+}) {
+  const unitName = symbol === "USDG" ? "USDG" : quantityLabel;
+  return (
+    <div
+      className={
+        editable
+          ? "rounded-md border border-border-strong bg-panel-elevated px-3 py-2.5 focus-within:border-foreground"
+          : "rounded-md border border-border bg-foreground/[0.03] px-3 py-2.5"
+      }
+    >
+      <div className="flex items-center justify-between gap-3">
+        <Label htmlFor={id} className="text-xs font-normal text-muted">
+          {action}
+          <span className="sr-only">
+            {editable ? ` ${unitName}` : `, quoted ${unitName}, read only`}
+          </span>
+        </Label>
+        <span className="pr-mono text-xs font-semibold text-foreground">{symbol}</span>
+      </div>
+      <Input
+        id={id}
+        inputMode={editable ? "decimal" : undefined}
+        readOnly={!editable}
+        aria-readonly={editable ? undefined : true}
+        value={editable ? typed : quoted}
+        onChange={editable ? (event) => onChange(event.target.value) : undefined}
+        placeholder={editable ? "0" : quoting ? "…" : "0"}
+        disabled={pending}
+        className="mt-1 h-auto border-0 bg-transparent px-0 text-2xl font-semibold shadow-none focus-visible:ring-0 read-only:cursor-default disabled:opacity-70"
+      />
+    </div>
+  );
+}
+
+function SwapStatus({
+  notes,
+  notice,
+  confirmedHash,
+  error,
+}: {
+  notes: string[];
+  notice: string | null;
+  confirmedHash: `0x${string}` | null;
+  error: string | null;
+}) {
+  return (
+    <>
+      {notes.map((note) => (
+        <p key={note} className="text-sm text-muted" role="status">
           {note}
         </p>
+      ))}
+      {notice ? (
+        <p className="text-sm text-foreground" role="status">
+          {notice}
+        </p>
       ) : null}
-      <Button type="button" className="w-full" size="lg" disabled>
-        {halted ? "Trading paused" : `${side === "buy" ? "Buy" : "Sell"} ${symbol}`}
-      </Button>
-    </div>
+      {confirmedHash ? (
+        <TxLink chainId={robinhoodChain.id} hash={confirmedHash} className="text-xs">
+          {shortenAddress(confirmedHash, 6)}
+        </TxLink>
+      ) : null}
+      {error ? (
+        <p className="text-sm text-danger" role="alert">
+          {error}
+        </p>
+      ) : null}
+    </>
   );
 }
 

@@ -28,6 +28,7 @@ export type AgentStock = {
   name: string;
   shortName: string;
   contractAddress: string;
+  tokenDecimals: number;
 };
 export type BatchRecipientDraft = { address: string; amount: string };
 

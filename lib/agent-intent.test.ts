@@ -59,7 +59,13 @@ describe("agent intent detail extraction", () => {
 
   it("resolves a stock only against the catalog and recognizes the NVDIA typo", () => {
     const assets = [
-      { symbol: "NVDA", name: "NVIDIA Token", shortName: "NVIDIA", contractAddress: "0xabc" },
+      {
+        symbol: "NVDA",
+        name: "NVIDIA Token",
+        shortName: "NVIDIA",
+        contractAddress: "0xabc",
+        tokenDecimals: 18,
+      },
     ];
     expect(resolveStock("Swap 20 USDG to NVDIA", assets)).toEqual(assets[0]);
     expect(resolveStock("Buy AMZN", assets)).toBeNull();

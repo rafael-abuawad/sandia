@@ -24,6 +24,8 @@ export type RhjAsset = {
   logoUrl?: string;
   tradingCapabilities?: unknown;
   status: RhjAssetStatus;
+  /** ERC-20 decimals from the RHJ asset catalog. */
+  tokenDecimals?: number | string;
 };
 
 export type RhjQuote = {
@@ -53,6 +55,7 @@ export type StockToken = {
   logoUrl: string | null;
   currentMultiplier: string;
   status: RhjAssetStatus;
+  tokenDecimals: number;
 };
 
 export type StockQuote = {
@@ -80,10 +83,24 @@ export function shortTokenName(tokenName: string): string {
   return tokenName.replace(/\s*•\s*Robinhood Token\s*$/i, "").trim() || tokenName;
 }
 
+/** RHJ lists token decimals on each asset. Missing or unusable values cannot be traded. */
+export function readTokenDecimals(value: unknown): number | null {
+  const parsed =
+    typeof value === "number"
+      ? value
+      : typeof value === "string" && value.trim() !== ""
+        ? Number(value)
+        : Number.NaN;
+  if (!Number.isInteger(parsed) || parsed < 0 || parsed > 18) return null;
+  return parsed;
+}
+
 export function toStockToken(asset: RhjAsset): StockToken | null {
   const deployment = asset.deployments.find((d) => d.chainId === RHJ_CHAIN_ID);
   if (!deployment) return null;
   if (asset.status !== "ASSET_STATUS_ACTIVE") return null;
+  const tokenDecimals = readTokenDecimals(asset.tokenDecimals);
+  if (tokenDecimals === null) return null;
 
   return {
     id: asset.id,
@@ -95,6 +112,7 @@ export function toStockToken(asset: RhjAsset): StockToken | null {
     logoUrl: asset.logoUrl ?? null,
     currentMultiplier: asset.currentMultiplier,
     status: asset.status,
+    tokenDecimals,
   };
 }
 

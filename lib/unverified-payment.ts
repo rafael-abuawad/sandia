@@ -1,8 +1,13 @@
+import type { Hex } from "viem";
 import type { SentPayment } from "@/components/pay-flow/state";
 import { userFacingError } from "@/lib/user-facing-error";
 
 const HASH = /^0x[a-fA-F0-9]{64}$/;
 const ADDRESS = /^0x[a-fA-F0-9]{40}$/;
+
+function isTxHash(value: unknown): value is Hex {
+  return typeof value === "string" && HASH.test(value);
+}
 
 export function unverifiedPaymentKey(publicId: string): string {
   return `sandia-unverified:${publicId}`;
@@ -31,7 +36,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function readDetails(value: unknown): SentPayment | null {
   if (!isRecord(value)) return null;
   const { hash, chainId, payerAddress, kind } = value;
-  if (typeof hash !== "string" || !HASH.test(hash)) return null;
+  if (!isTxHash(hash)) return null;
   if (typeof payerAddress !== "string" || !ADDRESS.test(payerAddress)) return null;
   if (typeof chainId !== "number" || !Number.isInteger(chainId)) return null;
   if (kind === "direct" || kind === "eth") {
