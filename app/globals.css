@@ -433,6 +433,61 @@ samp {
   mask-image: radial-gradient(ellipse 80% 70% at 20% 20%, #000 20%, transparent 75%);
 }
 
+.pr-home-hero {
+  container-type: inline-size;
+}
+
+.pr-hero-layout {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-areas:
+    "brand logo"
+    "copy copy";
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.pr-hero-layout > .pr-eyebrow {
+  grid-area: brand;
+  justify-self: start;
+}
+
+.pr-hero-copy {
+  grid-area: copy;
+  min-width: 0;
+}
+
+.pr-hero-logo {
+  grid-area: logo;
+  width: 1.75rem;
+  pointer-events: none;
+}
+
+.pr-hero-logo-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  transform: rotate(-8deg);
+  filter: drop-shadow(0 12px 14px rgb(14 21 18 / 0.12));
+}
+
+@container (min-width: 52rem) {
+  .pr-hero-layout {
+    grid-template-areas:
+      "brand logo"
+      "copy logo";
+    grid-template-columns: minmax(0, 1fr) 10rem;
+    column-gap: 2.5rem;
+  }
+
+  .pr-hero-logo {
+    justify-self: center;
+    width: 9.25rem;
+  }
+}
+
 /* Nested surface: concentric with --radius-xl + ~16–20px padding */
 .pr-inset {
   border: 1px solid var(--border);
