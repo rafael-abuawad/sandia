@@ -58,6 +58,8 @@ Batch sends also need the deployed Sandia Send address in `.env.local`:
 NEXT_PUBLIC_SANDIA_SEND_ADDRESS=<sandia-send-address>
 ```
 
+The Sandia Send contract, deployment scripts, and contract tests live in [sandia-core](https://github.com/rafael-abuawad/sandia-core).
+
 A single recipient still transfers USDG directly. Two or more recipients approve that contract, then call `sandia_send`.
 
 5. In another terminal:

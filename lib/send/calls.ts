@@ -1,7 +1,7 @@
 import { encodeFunctionData, erc20Abi, getAddress, isAddress, type Address, type Hex } from "viem";
 import { ROBINHOOD_USDG } from "@/lib/destination";
 
-/** Matches `MAX_SEND_LENGTH` on `core/src/Send.vy`. */
+/** Matches `MAX_SEND_LENGTH` in `sandia-core/src/Send.vy`. */
 export const MAX_SEND_RECIPIENTS = 128;
 
 export const sandiaSendAbi = [
