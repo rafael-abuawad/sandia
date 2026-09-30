@@ -30,9 +30,11 @@ SelectTrigger.displayName = SelectPrimitive.Trigger.displayName;
 
 export const SelectContent = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content>
->(({ className, children, position = "popper", ...props }, ref) => (
-  <SelectPrimitive.Portal>
+  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content> & {
+    container?: React.ComponentPropsWithoutRef<typeof SelectPrimitive.Portal>["container"];
+  }
+>(({ className, children, position = "popper", container, ...props }, ref) => (
+  <SelectPrimitive.Portal container={container}>
     <SelectPrimitive.Content
       ref={ref}
       className={cn(
@@ -66,7 +68,7 @@ export const SelectItem = React.forwardRef<
     </SelectPrimitive.ItemText>
     <span className="absolute right-2 flex h-3.5 w-3.5 items-center justify-center">
       <SelectPrimitive.ItemIndicator>
-        <Check className="h-4 w-4 text-accent-ink" strokeWidth={1.5} />
+        <Check className="h-4 w-4 text-foreground" strokeWidth={1.5} />
       </SelectPrimitive.ItemIndicator>
     </span>
   </SelectPrimitive.Item>

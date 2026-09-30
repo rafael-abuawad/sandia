@@ -26,7 +26,7 @@ export function DialogOverlay({ className, ...props }: DialogPrimitive.Backdrop.
     <DialogPrimitive.Backdrop
       data-slot="dialog-overlay"
       className={cn(
-        "fixed inset-0 z-50 bg-[color-mix(in_srgb,var(--foreground)_32%,transparent)] transition-opacity duration-[var(--duration)] ease-[var(--ease-out)] data-[ending-style]:opacity-0 data-[starting-style]:opacity-0",
+        "fixed inset-0 z-50 bg-[var(--overlay)] transition-opacity duration-[var(--duration)] ease-[var(--ease-out)] data-[ending-style]:opacity-0 data-[starting-style]:opacity-0",
         className,
       )}
       {...props}

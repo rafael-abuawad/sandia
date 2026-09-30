@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTheme } from "next-themes";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { PrivyProvider } from "@privy-io/react-auth";
 import { WagmiProvider } from "@privy-io/wagmi";
@@ -25,14 +26,15 @@ function MissingEnv({ children }: { children: React.ReactNode }) {
 }
 
 export function Providers({ children }: { children: React.ReactNode }) {
+  const { resolvedTheme } = useTheme();
   const [queryClient] = useState(() => new QueryClient());
   const [convex] = useState(() => (convexUrl ? new ConvexReactClient(convexUrl) : null));
 
   if (!privyAppId) {
     return (
       <MissingEnv>
-        Set <code className="text-[var(--accent-ink)]">NEXT_PUBLIC_PRIVY_APP_ID</code> in{" "}
-        <code className="text-[var(--accent-ink)]">.env.local</code> from the{" "}
+        Set <code className="text-foreground">NEXT_PUBLIC_PRIVY_APP_ID</code> in{" "}
+        <code className="text-foreground">.env.local</code> from the{" "}
         <a
           className="underline underline-offset-2"
           href="https://dashboard.privy.io"
@@ -49,15 +51,24 @@ export function Providers({ children }: { children: React.ReactNode }) {
   if (!convex) {
     return (
       <MissingEnv>
-        Set <code className="text-[var(--accent-ink)]">NEXT_PUBLIC_CONVEX_URL</code> in{" "}
-        <code className="text-[var(--accent-ink)]">.env.local</code> after running{" "}
-        <code className="text-[var(--accent-ink)]">npx convex dev</code>.
+        Set <code className="text-foreground">NEXT_PUBLIC_CONVEX_URL</code> in{" "}
+        <code className="text-foreground">.env.local</code> after running{" "}
+        <code className="text-foreground">npx convex dev</code>.
       </MissingEnv>
     );
   }
 
   return (
-    <PrivyProvider appId={privyAppId} config={privyConfig}>
+    <PrivyProvider
+      appId={privyAppId}
+      config={{
+        ...privyConfig,
+        appearance: {
+          ...privyConfig.appearance,
+          theme: resolvedTheme === "dark" ? "dark" : "light",
+        },
+      }}
+    >
       <QueryClientProvider client={queryClient}>
         <WagmiProvider config={wagmiConfig}>
           <ConvexProviderWithAuth client={convex} useAuth={useConvexPrivyAuth}>

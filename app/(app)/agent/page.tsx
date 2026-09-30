@@ -205,7 +205,7 @@ export default function AgentPage() {
     <div className="pr-page mx-auto w-full max-w-2xl gap-8">
       <header className="space-y-3">
         <div className="flex items-center gap-3">
-          <span className="flex size-11 items-center justify-center rounded-xl bg-accent-soft text-accent-ink">
+          <span className="flex size-11 items-center justify-center rounded-xl bg-accent-soft text-accent-foreground">
             <BrainCircuit className="size-6" strokeWidth={1.5} aria-hidden />
           </span>
           <div>

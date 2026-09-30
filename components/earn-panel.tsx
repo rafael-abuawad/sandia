@@ -714,7 +714,7 @@ function TokenMark({ symbol, logoUrl }: { symbol: string; logoUrl: string | null
           onError={() => setBroken(true)}
         />
       ) : (
-        <span className="flex size-full items-center justify-center text-[9px] font-semibold uppercase text-accent-ink">
+        <span className="flex size-full items-center justify-center text-[9px] font-semibold uppercase text-foreground">
           {symbol.slice(0, 2)}
         </span>
       )}

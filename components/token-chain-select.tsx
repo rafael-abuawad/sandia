@@ -60,7 +60,7 @@ function AssetIcon({
           onError={() => setBroken(true)}
         />
       ) : (
-        <span className="flex h-full w-full items-center justify-center bg-panel text-xs font-semibold uppercase text-accent-ink">
+        <span className="flex h-full w-full items-center justify-center bg-panel text-xs font-semibold uppercase text-foreground">
           {label.slice(0, 2)}
         </span>
       )}

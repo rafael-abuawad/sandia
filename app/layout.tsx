@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Mono } from "next/font/google";
 import { Providers } from "@/components/providers";
+import { ThemeProvider } from "next-themes";
 import "./globals.css";
 
 const mono = IBM_Plex_Mono({
@@ -43,7 +44,14 @@ export default function RootLayout({
         <a href="#main" className="pr-skip-link">
           Skip to content
         </a>
-        <Providers>{children}</Providers>
+        <ThemeProvider
+          defaultTheme="light"
+          enableSystem
+          storageKey="sandia-theme"
+          disableTransitionOnChange
+        >
+          <Providers>{children}</Providers>
+        </ThemeProvider>
       </body>
     </html>
   );
