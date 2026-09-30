@@ -27,21 +27,22 @@ type ResponsiveDialogProps = {
   children: React.ReactNode;
 };
 
+const ResponsiveDialogMobileContext = React.createContext(false);
+
 export function ResponsiveDialog({ open, onOpenChange, children }: ResponsiveDialogProps) {
   const isMobile = useIsMobile();
-
-  if (isMobile) {
-    return (
-      <Drawer open={open} onOpenChange={onOpenChange}>
-        {children}
-      </Drawer>
-    );
-  }
-
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      {children}
-    </Dialog>
+    <ResponsiveDialogMobileContext value={isMobile}>
+      {isMobile ? (
+        <Drawer open={open} onOpenChange={onOpenChange}>
+          {children}
+        </Drawer>
+      ) : (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+          {children}
+        </Dialog>
+      )}
+    </ResponsiveDialogMobileContext>
   );
 }
 
@@ -54,7 +55,7 @@ export function ResponsiveDialogContent({
   children: React.ReactNode;
   showCloseButton?: boolean;
 }) {
-  const isMobile = useIsMobile();
+  const isMobile = React.useContext(ResponsiveDialogMobileContext);
 
   if (isMobile) {
     return <DrawerContent className={className}>{children}</DrawerContent>;
@@ -74,7 +75,7 @@ export function ResponsiveDialogHeader({
   className?: string;
   children: React.ReactNode;
 }) {
-  const isMobile = useIsMobile();
+  const isMobile = React.useContext(ResponsiveDialogMobileContext);
   if (isMobile) return <DrawerHeader className={className}>{children}</DrawerHeader>;
   return <DialogHeader className={className}>{children}</DialogHeader>;
 }
@@ -86,19 +87,19 @@ export function ResponsiveDialogFooter({
   className?: string;
   children: React.ReactNode;
 }) {
-  const isMobile = useIsMobile();
+  const isMobile = React.useContext(ResponsiveDialogMobileContext);
   if (isMobile) return <DrawerFooter className={className}>{children}</DrawerFooter>;
   return <DialogFooter className={className}>{children}</DialogFooter>;
 }
 
 export function ResponsiveDialogTitle({ children }: { children: React.ReactNode }) {
-  const isMobile = useIsMobile();
+  const isMobile = React.useContext(ResponsiveDialogMobileContext);
   if (isMobile) return <DrawerTitle>{children}</DrawerTitle>;
   return <DialogTitle>{children}</DialogTitle>;
 }
 
 export function ResponsiveDialogDescription({ children }: { children: React.ReactNode }) {
-  const isMobile = useIsMobile();
+  const isMobile = React.useContext(ResponsiveDialogMobileContext);
   if (isMobile) return <DrawerDescription>{children}</DrawerDescription>;
   return <DialogDescription>{children}</DialogDescription>;
 }
@@ -110,7 +111,7 @@ export function ResponsiveDialogClose({
   render: React.ReactElement;
   children?: React.ReactNode;
 }) {
-  const isMobile = useIsMobile();
+  const isMobile = React.useContext(ResponsiveDialogMobileContext);
   if (isMobile) {
     return <DrawerClose render={render}>{children}</DrawerClose>;
   }
@@ -124,7 +125,7 @@ export function ResponsiveDialogBody({
   className?: string;
   children: React.ReactNode;
 }) {
-  const isMobile = useIsMobile();
+  const isMobile = React.useContext(ResponsiveDialogMobileContext);
   return (
     <div className={isMobile ? `flex-1 overflow-y-auto px-5 pb-2 ${className ?? ""}` : className}>
       {children}

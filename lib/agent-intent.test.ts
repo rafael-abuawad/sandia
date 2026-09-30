@@ -6,10 +6,35 @@ import {
   resolveNamedContact,
   resolveStock,
 } from "./agent-intent";
+import type { AgentStock } from "./agent-intent";
 
 const contacts = [
   { name: "Marco", address: "0x0000000000000000000000000000000000000001" },
   { name: "Olivia", address: "0x0000000000000000000000000000000000000002" },
+];
+
+const stocks: AgentStock[] = [
+  {
+    symbol: "NVDA",
+    name: "NVIDIA • Robinhood Token",
+    shortName: "NVIDIA",
+    contractAddress: "0xd0601CE157Db5bdC3162BbaC2a2C8aF5320D9EEC",
+    tokenDecimals: 18,
+  },
+  {
+    symbol: "P",
+    name: "Everpure • Robinhood Token",
+    shortName: "Everpure",
+    contractAddress: "0x1Cdad396DB64BDa184d5182A97Dd9B3C62100b7D",
+    tokenDecimals: 18,
+  },
+  {
+    symbol: "F",
+    name: "Ford Motor • Robinhood Token",
+    shortName: "Ford Motor",
+    contractAddress: "0x25C288E6D899b9BC30160965aD9644c67e73bE0C",
+    tokenDecimals: 18,
+  },
 ];
 
 describe("agent intent detail extraction", () => {
@@ -69,6 +94,28 @@ describe("agent intent detail extraction", () => {
     ];
     expect(resolveStock("Swap 20 USDG to NVDIA", assets)).toEqual(assets[0]);
     expect(resolveStock("Buy AMZN", assets)).toBeNull();
+  });
+
+  it.each([
+    "Swap 1 USDG to NVIDIA",
+    "Swap 1 USDG to NVDA",
+    "Swap 1 USDG to NVDIA",
+    "swap 1 usdg to nvidia",
+    "Buy 1 share of NVIDIA",
+  ])("selects NVIDIA in a catalog with single-letter tickers for %s", (prompt) => {
+    expect(resolveStock(prompt, stocks)).toEqual(stocks[0]);
+  });
+
+  it("matches single-letter tickers only as complete words", () => {
+    expect(resolveStock("Swap 1 USDG to P", stocks)).toEqual(stocks[1]);
+    expect(resolveStock("Buy 1 share of F", stocks)).toEqual(stocks[2]);
+    expect(resolveStock("Swap 1 USDG to an unknown stock", stocks)).toBeNull();
+    expect(resolveStock("Swap 1 USDG to NVIDIAX", stocks)).toBeNull();
+  });
+
+  it("leaves multiple named stocks unresolved, including corrected names", () => {
+    expect(resolveStock("Buy NVIDIA and F for 1 USDG", stocks)).toBeNull();
+    expect(resolveStock("Buy NVDIA and F for 1 USDG", stocks)).toBeNull();
   });
 
   it("requires an explicit stock amount unit", () => {

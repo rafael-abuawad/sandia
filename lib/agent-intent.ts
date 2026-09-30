@@ -106,30 +106,18 @@ export function resolveBatchRecipients(
 }
 
 export function resolveStock(prompt: string, assets: AgentStock[]): AgentStock | null {
-  const upper = prompt.toLocaleUpperCase();
-  const candidates = assets.flatMap((asset) => {
-    const labels = [asset.symbol, asset.name, asset.shortName].filter(Boolean);
-    const matched = labels.some((label) => {
-      const normalized = label.toLocaleUpperCase();
-      return new RegExp(`(?:^|[^a-z0-9])${escapeRegExp(normalized)}(?:$|[^a-z0-9])`, "u").test(
-        upper,
-      );
-    });
-    return matched ? [asset] : [];
-  });
-  if (candidates.length === 1) return candidates[0];
-  if (candidates.length > 1) return null;
-
-  const corrected = upper.replace(/\bNVDIA\b/g, "NVIDIA");
-  const nvidia = assets.filter((asset) =>
-    [asset.symbol, asset.name, asset.shortName].some((label) =>
-      new RegExp(
-        `(?:^|[^a-z0-9])${escapeRegExp(label.toLocaleUpperCase())}(?:$|[^a-z0-9])`,
-        "u",
-      ).test(corrected),
-    ),
+  const normalizedPrompt = prompt.replace(/\bNVDIA\b/giu, "NVIDIA");
+  const candidates = assets.filter((asset) =>
+    [asset.symbol, asset.name, asset.shortName].some((label) => {
+      const normalizedLabel = label.trim();
+      if (!normalizedLabel) return false;
+      return new RegExp(
+        `(?:^|[^a-z0-9])${escapeRegExp(normalizedLabel)}(?=$|[^a-z0-9])`,
+        "iu",
+      ).test(normalizedPrompt);
+    }),
   );
-  return nvidia.length === 1 ? nvidia[0] : null;
+  return candidates.length === 1 ? candidates[0] : null;
 }
 
 export function extractStockUnit(prompt: string): "usd" | "shares" | null {

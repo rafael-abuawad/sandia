@@ -1,7 +1,7 @@
 "use client";
 
 import { useAction, useQuery } from "convex/react";
-import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowUpRight, BrainCircuit } from "lucide-react";
 import {
@@ -40,6 +40,10 @@ import {
   type IntentRouting,
 } from "@/lib/agent-intent";
 import { useSignedInWallet } from "@/lib/use-signed-in-wallet";
+
+const EarnPanel = dynamic(() =>
+  import("@/components/earn-panel").then((module) => module.EarnPanel),
+);
 
 const EXAMPLES = [
   "Send 100 USDG to Marco",
@@ -409,9 +413,11 @@ function OperationDialog({
             />
           ) : null}
           {isEarn ? (
-            <EarnIntentPanel
-              action={operation.action === "earn_withdraw" ? "earn_withdraw" : "earn_deposit"}
-              amount={operation.amount}
+            <EarnPanel
+              initialMode={operation.action === "earn_withdraw" ? "withdraw" : "deposit"}
+              initialAmount={operation.amount}
+              embeddedPresentation
+              onPendingChange={onPendingChange}
             />
           ) : null}
           {isStock ? (
@@ -437,41 +443,6 @@ function OperationDialog({
         </ResponsiveDialogFooter>
       </ResponsiveDialogContent>
     </ResponsiveDialog>
-  );
-}
-
-function EarnIntentPanel({
-  action,
-  amount,
-}: {
-  action: "earn_deposit" | "earn_withdraw";
-  amount: string;
-}) {
-  const isDeposit = action === "earn_deposit";
-  return (
-    <div className="space-y-4">
-      <div className="space-y-2">
-        <Label htmlFor="agent-earn-amount">Amount (USDG)</Label>
-        <Input
-          id="agent-earn-amount"
-          inputMode="decimal"
-          value={amount}
-          readOnly
-          placeholder="Enter an amount"
-        />
-      </div>
-      <Button asChild className="w-full" size="lg">
-        <Link href="/earn">{isDeposit ? "Deposit on Earn" : "Withdraw on Earn"}</Link>
-      </Button>
-      <p className="text-sm text-muted" role="status">
-        {isDeposit
-          ? "Finish this deposit on Earn."
-          : "Finish this withdrawal on Earn. Max redeems the full position."}
-      </p>
-      <p className="text-xs text-muted">
-        Steakhouse USDG is a vault investment. Review the vault disclosures before depositing.
-      </p>
-    </div>
   );
 }
 

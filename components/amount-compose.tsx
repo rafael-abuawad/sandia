@@ -25,6 +25,7 @@ type AmountComposeProps = {
   errorId?: string;
   inputId?: string;
   invalid?: boolean;
+  embeddedPresentation?: boolean;
 };
 
 function sanitizeAmount(raw: string): string {
@@ -63,6 +64,7 @@ export function AmountCompose({
   errorId,
   inputId,
   invalid,
+  embeddedPresentation = false,
 }: AmountComposeProps) {
   const generatedId = useId();
   const id = inputId ?? generatedId;
@@ -100,31 +102,33 @@ export function AmountCompose({
             </InputGroupAddon>
           ) : null}
         </InputGroup>
-        <ToggleGroup
-          type="single"
-          variant="outline"
-          size="sm"
-          spacing={2}
-          value={selected}
-          onValueChange={(next) => {
-            if (next) onChange(next);
-          }}
-          aria-label="Suggested amounts"
-          className="flex w-full flex-wrap gap-2"
-        >
-          {presets.map((preset) => {
-            const label = presetFormat ? presetFormat(preset) : `${prefix}${preset}`;
-            return (
-              <ToggleGroupItem
-                key={preset}
-                value={String(preset)}
-                className="min-w-[4.5rem] flex-1"
-              >
-                {label}
-              </ToggleGroupItem>
-            );
-          })}
-        </ToggleGroup>
+        {presets.length > 0 ? (
+          <ToggleGroup
+            type="single"
+            variant="outline"
+            size="sm"
+            spacing={2}
+            value={selected}
+            onValueChange={(next) => {
+              if (next) onChange(next);
+            }}
+            aria-label="Suggested amounts"
+            className="flex w-full flex-wrap gap-2"
+          >
+            {presets.map((preset) => {
+              const label = presetFormat ? presetFormat(preset) : `${prefix}${preset}`;
+              return (
+                <ToggleGroupItem
+                  key={preset}
+                  value={String(preset)}
+                  className="min-w-[4.5rem] flex-1"
+                >
+                  {label}
+                </ToggleGroupItem>
+              );
+            })}
+          </ToggleGroup>
+        ) : null}
       </div>
 
       {onDetailsClick ? (
@@ -147,7 +151,13 @@ export function AmountCompose({
 
       {error}
 
-      <div className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-10 -mx-1 bg-[color-mix(in_srgb,var(--background)_92%,transparent)] px-1 py-3 backdrop-blur-sm md:static md:bottom-auto md:bg-transparent md:p-0 md:backdrop-blur-none">
+      <div
+        className={
+          embeddedPresentation
+            ? undefined
+            : "sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-10 -mx-1 bg-[color-mix(in_srgb,var(--background)_92%,transparent)] px-1 py-3 backdrop-blur-sm md:static md:bottom-auto md:bg-transparent md:p-0 md:backdrop-blur-none"
+        }
+      >
         {footer}
       </div>
     </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { useQuery } from "@tanstack/react-query";
 import { useAction, useMutation } from "convex/react";
@@ -119,7 +119,17 @@ function unreachable(error: unknown): boolean {
   return /failed to fetch|network|timed out|http request/i.test(message);
 }
 
-export function EarnPanel() {
+export function EarnPanel({
+  initialMode = "deposit",
+  initialAmount = "",
+  embeddedPresentation = false,
+  onPendingChange,
+}: {
+  initialMode?: VaultMode;
+  initialAmount?: string;
+  embeddedPresentation?: boolean;
+  onPendingChange?: (pending: boolean) => void;
+}) {
   const { ready, address, isSignedIn } = useSignedInWallet();
   const { sendTransaction } = useSendTransaction();
   const publicClient = usePublicClient({ chainId: ROBINHOOD_USDG.chainId });
@@ -132,9 +142,10 @@ export function EarnPanel() {
     staleTime: 60_000,
     retry: 1,
   });
-  const [mode, setMode] = useState<VaultMode>("deposit");
-  const [amount, setAmount] = useState("");
+  const [mode, setMode] = useState<VaultMode>(initialMode);
+  const [amount, setAmount] = useState(initialAmount);
   const [pending, setPending] = useState(false);
+  const submitLock = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [confirmedHash, setConfirmedHash] = useState<Hex | null>(null);
@@ -343,9 +354,12 @@ export function EarnPanel() {
   }
 
   async function onSubmit() {
-    if (!canSubmit || !address || !publicClient || parsedAmount === null) return;
+    if (submitLock.current || !canSubmit || !address || !publicClient || parsedAmount === null)
+      return;
     const account = getAddress(address);
+    submitLock.current = true;
     setPending(true);
+    onPendingChange?.(true);
     clearStatus();
     try {
       let kind: "deposit" | "withdraw" | "redeem";
@@ -449,7 +463,9 @@ export function EarnPanel() {
         ),
       );
     } finally {
+      submitLock.current = false;
       setPending(false);
+      onPendingChange?.(false);
     }
   }
 
@@ -476,7 +492,11 @@ export function EarnPanel() {
     <div className="pr-page">
       <div className="space-y-2">
         <div className="flex flex-wrap items-baseline gap-2">
-          <h1 className="pr-display text-2xl">{VAULT.name}</h1>
+          {embeddedPresentation ? (
+            <p className="pr-display text-lg">{VAULT.name}</p>
+          ) : (
+            <h1 className="pr-display text-2xl">{VAULT.name}</h1>
+          )}
           <span className="text-xs font-bold uppercase tracking-[0.16em] text-muted">
             {VAULT.version}
           </span>
@@ -490,17 +510,19 @@ export function EarnPanel() {
         error={snapshotError}
       />
 
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div className="space-y-1">
-          <p className="pr-kicker">Your deposit</p>
-          <p className="pr-mono text-sm font-semibold text-foreground">{yourDeposit}</p>
+      {!embeddedPresentation ? (
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div className="space-y-1">
+            <p className="pr-kicker">Your deposit</p>
+            <p className="pr-mono text-sm font-semibold text-foreground">{yourDeposit}</p>
+          </div>
+          <Exposure
+            loading={snapshotQuery.isPending}
+            rows={snapshot?.exposure ?? []}
+            failed={Boolean(snapshotError)}
+          />
         </div>
-        <Exposure
-          loading={snapshotQuery.isPending}
-          rows={snapshot?.exposure ?? []}
-          failed={Boolean(snapshotError)}
-        />
-      </div>
+      ) : null}
 
       <form
         className="space-y-3"
@@ -509,101 +531,117 @@ export function EarnPanel() {
           void onSubmit();
         }}
       >
-        <ToggleGroup
-          type="single"
-          variant="outline"
-          size="sm"
-          spacing={2}
-          value={mode}
-          onValueChange={(next) => {
-            if (next === "deposit" || next === "withdraw") {
-              setMode(next);
-              clearStatus();
-            }
-          }}
-          aria-label="Vault action"
-          className="flex w-full gap-2"
-        >
-          <ToggleGroupItem value="deposit" className="flex-1" disabled={pending}>
-            Deposit
-          </ToggleGroupItem>
-          <ToggleGroupItem value="withdraw" className="flex-1" disabled={pending}>
-            Withdraw
-          </ToggleGroupItem>
-        </ToggleGroup>
-        <AmountCompose
-          kicker={kicker}
-          prefix="$"
-          suffix="USDG"
-          value={amount}
-          onChange={(next) => {
-            setAmount(next);
-            clearStatus();
-          }}
-          error={error ? <p className="text-sm text-danger">{error}</p> : null}
-          footer={
-            <EarnActionFooter
-              ready={ready}
-              isSignedIn={isSignedIn}
-              mode={mode}
-              pending={pending}
-              canSubmit={canSubmit}
-              hasAmount={parsedAmount !== null}
-              actionName={pending ? pendingLabel : actionName}
-              gateEnabled={gate.enabled}
-              message={notice ?? blocker ?? description}
-              confirmedHash={confirmedHash}
-            />
-          }
-        >
-          <div className="flex items-center justify-between gap-2 text-xs text-muted">
-            <p>≈ {formatUsdFromAmount(amount)}</p>
-            <Button
-              type="button"
-              variant="ghost"
+        <fieldset disabled={pending} className="space-y-3">
+          {!embeddedPresentation ? (
+            <ToggleGroup
+              type="single"
+              variant="outline"
               size="sm"
-              onClick={() => {
-                if (mode === "deposit") {
-                  setAmount(balanceExact ? balanceExact : "0");
-                } else if (positionAssets !== undefined) {
-                  setAmount(formatTokenAmount(positionAssets.toString(), ROBINHOOD_USDG.decimals));
+              spacing={2}
+              value={mode}
+              onValueChange={(next) => {
+                if (next === "deposit" || next === "withdraw") {
+                  setMode(next);
+                  clearStatus();
                 }
-                clearStatus();
               }}
-              disabled={
-                pending ||
-                !isSignedIn ||
-                (mode === "deposit"
-                  ? balanceLoading || !balanceExact
-                  : positionAssets === undefined)
-              }
+              aria-label="Vault action"
+              className="flex w-full gap-2"
             >
-              Max
-            </Button>
-          </div>
-          <AvailableBalance
-            isSignedIn={isSignedIn}
-            loading={mode === "deposit" ? balanceLoading : positionLoading}
-            display={
-              mode === "deposit"
-                ? balanceDisplay
-                : positionAssets === undefined
-                  ? null
-                  : formatTokenAmountGrouped(positionAssets.toString(), ROBINHOOD_USDG.decimals)
+              <ToggleGroupItem value="deposit" className="flex-1" disabled={pending}>
+                Deposit
+              </ToggleGroupItem>
+              <ToggleGroupItem value="withdraw" className="flex-1" disabled={pending}>
+                Withdraw
+              </ToggleGroupItem>
+            </ToggleGroup>
+          ) : null}
+          <AmountCompose
+            kicker={kicker}
+            prefix="$"
+            suffix="USDG"
+            presets={embeddedPresentation ? [] : undefined}
+            embeddedPresentation={embeddedPresentation}
+            value={amount}
+            onChange={(next) => {
+              setAmount(next);
+              clearStatus();
+            }}
+            error={
+              error ? (
+                <p className="text-sm text-danger" role="alert">
+                  {error}
+                </p>
+              ) : null
             }
-            label={mode === "deposit" ? "Available" : "In vault"}
-          />
-          <div className="space-y-2">
-            <Label>Vault</Label>
-            <TokenChainChip
-              tokenSymbol={ROBINHOOD_USDG.symbol}
-              tokenLogoUrl={ROBINHOOD_USDG.logoUrl}
-              chainName={`Steakhouse · ${ROBINHOOD_USDG.chainName}`}
-              chainLogoUrl={ROBINHOOD_USDG.chainLogoUrl}
-              chainId={ROBINHOOD_USDG.chainId}
+            footer={
+              <EarnActionFooter
+                ready={ready}
+                isSignedIn={isSignedIn}
+                mode={mode}
+                pending={pending}
+                canSubmit={canSubmit}
+                hasAmount={parsedAmount !== null}
+                actionName={pending ? pendingLabel : actionName}
+                gateEnabled={gate.enabled}
+                message={notice ?? blocker ?? description}
+                confirmedHash={confirmedHash}
+              />
+            }
+          >
+            <div className="flex items-center justify-between gap-2 text-xs text-muted">
+              <p>≈ {formatUsdFromAmount(amount)}</p>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  if (mode === "deposit") {
+                    setAmount(balanceExact ? balanceExact : "0");
+                  } else if (positionAssets !== undefined) {
+                    setAmount(
+                      formatTokenAmount(positionAssets.toString(), ROBINHOOD_USDG.decimals),
+                    );
+                  }
+                  clearStatus();
+                }}
+                disabled={
+                  pending ||
+                  !isSignedIn ||
+                  (mode === "deposit"
+                    ? balanceLoading || !balanceExact
+                    : positionAssets === undefined)
+                }
+              >
+                Max
+              </Button>
+            </div>
+            <AvailableBalance
+              isSignedIn={isSignedIn}
+              loading={mode === "deposit" ? balanceLoading : positionLoading}
+              display={
+                mode === "deposit"
+                  ? balanceDisplay
+                  : positionAssets === undefined
+                    ? null
+                    : formatTokenAmountGrouped(positionAssets.toString(), ROBINHOOD_USDG.decimals)
+              }
+              label={mode === "deposit" ? "Available" : "In vault"}
             />
-          </div>
-        </AmountCompose>
+            {!embeddedPresentation ? (
+              <div className="space-y-2">
+                <Label>Vault</Label>
+                <TokenChainChip
+                  tokenSymbol={ROBINHOOD_USDG.symbol}
+                  tokenLogoUrl={ROBINHOOD_USDG.logoUrl}
+                  chainName={`Steakhouse · ${ROBINHOOD_USDG.chainName}`}
+                  chainLogoUrl={ROBINHOOD_USDG.chainLogoUrl}
+                  chainId={ROBINHOOD_USDG.chainId}
+                />
+              </div>
+            ) : null}
+          </AmountCompose>
+        </fieldset>
       </form>
     </div>
   );
