@@ -45,7 +45,7 @@ export default function RootLayout({
           Skip to content
         </a>
         <ThemeProvider
-          defaultTheme="light"
+          defaultTheme="system"
           enableSystem
           storageKey="sandia-theme"
           disableTransitionOnChange

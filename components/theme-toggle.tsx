@@ -20,7 +20,7 @@ export function ThemeToggle() {
 
   return (
     <Select
-      value={theme ?? "light"}
+      value={theme ?? "system"}
       onValueChange={setTheme}
       onOpenChange={(open) => {
         if (open) setContainer(triggerRef.current?.closest("dialog") ?? null);
