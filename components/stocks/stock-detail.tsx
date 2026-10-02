@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { use, useCallback, useEffect, useState } from "react";
+import { use, useCallback, useEffect, useId, useState } from "react";
 import { ArrowDown, ArrowLeft, ChevronDown, ExternalLink, Info } from "lucide-react";
 import type { StockQuote, StockToken } from "@/lib/rhj/client";
 import { explorerTokenUrl } from "@/lib/rhj/client";
@@ -347,6 +347,8 @@ export function StockTradeTicket({
   embeddedPresentation?: boolean;
   onPendingChange?: (pending: boolean) => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
+  const contentId = useId();
   const quantityLabel = stockQuantityLabel(asset.symbol);
   const swap = useStockSwap({
     asset,
@@ -359,43 +361,73 @@ export function StockTradeTicket({
 
   return (
     <div className={ticketClassName(embeddedPresentation)}>
-      <OrderSideButtons side={side} pending={swap.pending} onSideChange={onSideChange} />
-      <QuantityField
-        symbol={asset.symbol}
-        quantityLabel={quantityLabel}
-        side={side}
-        unit={unit}
-        pending={swap.pending}
-        quoting={swap.quoting}
-        ticketAmount={ticketAmount}
-        quoteAmounts={swap.quoteAmounts}
-        onUnitChange={onUnitChange}
-        onTicketAmountChange={onTicketAmountChange}
-      />
-      <SwapStatus
-        notes={swap.notes}
-        notice={swap.notice}
-        confirmedHash={swap.confirmedHash}
-        error={swap.error}
-      />
-      <Button
-        type="button"
-        className="w-full whitespace-normal text-center"
-        size="lg"
-        disabled={swap.disabled}
-        onClick={() => void swap.submit()}
+      {!embeddedPresentation ? (
+        <button
+          type="button"
+          aria-expanded={expanded}
+          aria-controls={contentId}
+          onClick={() => setExpanded((open) => !open)}
+          className="flex min-h-11 w-full items-center justify-between gap-3 rounded-md text-sm font-semibold text-foreground focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-foreground md:hidden"
+        >
+          <span>Trade {asset.symbol}</span>
+          <span className="flex items-center gap-2 text-muted">
+            <span className="text-xs font-medium">{expanded ? "Collapse" : "Buy / Sell"}</span>
+            <ChevronDown
+              className={expanded ? "size-4" : "size-4 rotate-180"}
+              strokeWidth={2}
+              aria-hidden
+            />
+          </span>
+        </button>
+      ) : null}
+      <div
+        id={contentId}
+        className={
+          embeddedPresentation
+            ? "space-y-3"
+            : expanded
+              ? "mt-3 space-y-3 md:mt-0"
+              : "hidden space-y-3 md:block"
+        }
       >
-        {swap.buttonLabel}
-      </Button>
+        <OrderSideButtons side={side} pending={swap.pending} onSideChange={onSideChange} />
+        <QuantityField
+          symbol={asset.symbol}
+          quantityLabel={quantityLabel}
+          side={side}
+          unit={unit}
+          pending={swap.pending}
+          quoting={swap.quoting}
+          ticketAmount={ticketAmount}
+          quoteAmounts={swap.quoteAmounts}
+          onUnitChange={onUnitChange}
+          onTicketAmountChange={onTicketAmountChange}
+        />
+        <SwapStatus
+          notes={swap.notes}
+          notice={swap.notice}
+          confirmedHash={swap.confirmedHash}
+          error={swap.error}
+        />
+        <Button
+          type="button"
+          className="w-full whitespace-normal text-center"
+          size="lg"
+          disabled={swap.disabled}
+          onClick={() => void swap.submit()}
+        >
+          {swap.buttonLabel}
+        </Button>
+      </div>
     </div>
   );
 }
 
 function ticketClassName(embeddedPresentation: boolean) {
   if (embeddedPresentation) {
-    return "space-y-3 rounded-[var(--radius-xl)] border border-border bg-panel p-4";
+    return "rounded-[var(--radius-xl)] border border-border bg-panel p-4";
   }
-  return "sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-10 space-y-3 rounded-[var(--radius-xl)] border border-border bg-[color-mix(in_srgb,var(--panel-solid)_94%,transparent)] p-4 backdrop-blur-md md:static md:bottom-auto";
+  return "sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-10 rounded-[var(--radius-xl)] border border-border bg-[color-mix(in_srgb,var(--panel-solid)_94%,transparent)] p-4 backdrop-blur-md md:static md:bottom-auto";
 }
 
 function OrderSideButtons({
