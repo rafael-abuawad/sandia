@@ -1,9 +1,9 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
 import { use, useCallback, useEffect, useId, useState } from "react";
-import { ArrowDown, ArrowLeft, ChevronDown, ExternalLink, Info } from "lucide-react";
+import { ArrowDown, ChevronDown, ExternalLink, Info } from "lucide-react";
+import { Breadcrumbs, stockBreadcrumbItems } from "@/components/breadcrumbs";
 import type { StockQuote, StockToken } from "@/lib/rhj/client";
 import { explorerTokenUrl } from "@/lib/rhj/client";
 import { formatUsdPrice, formatVolume } from "@/lib/rhj/format";
@@ -116,11 +116,11 @@ export function StockDetail({ params }: { params: Promise<{ symbol: string }> })
   const detail = useStockDetail(symbol);
 
   if (detail.loading) {
-    return <StockDetailSkeleton />;
+    return <StockDetailSkeleton symbol={symbol} />;
   }
 
   if (detail.error && !detail.asset) {
-    return <StockDetailError error={detail.error} />;
+    return <StockDetailError symbol={symbol} error={detail.error} />;
   }
 
   if (!detail.asset) return null;
@@ -141,16 +141,10 @@ export function StockDetail({ params }: { params: Promise<{ symbol: string }> })
   );
 }
 
-function StockDetailError({ error }: { error: string }) {
+function StockDetailError({ symbol, error }: { symbol: string; error: string }) {
   return (
     <div className="pr-page">
-      <Link
-        href="/stocks"
-        className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-foreground"
-      >
-        <ArrowLeft className="size-4" strokeWidth={1.5} aria-hidden />
-        Back to stocks
-      </Link>
+      <Breadcrumbs items={stockBreadcrumbItems(symbol)} />
       <p className="text-sm text-danger">{error}</p>
     </div>
   );
@@ -195,13 +189,7 @@ function StockDetailLoaded({
 
   return (
     <div className="pr-page gap-6">
-      <Link
-        href="/stocks"
-        className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-foreground"
-      >
-        <ArrowLeft className="size-4" strokeWidth={1.5} aria-hidden />
-        Back
-      </Link>
+      <Breadcrumbs items={stockBreadcrumbItems(asset.symbol)} />
 
       <StockDetailHeader
         asset={asset}

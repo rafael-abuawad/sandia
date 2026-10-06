@@ -15,9 +15,9 @@ export function PayRequestLoading() {
         unoptimized
         className="h-24 w-auto"
       />
-      <p className="mt-5 pr-display text-center text-2xl text-foreground sm:text-3xl">
+      <h1 className="mt-5 pr-display text-center text-2xl text-foreground sm:text-3xl">
         Loading payment request…
-      </p>
+      </h1>
       <div
         aria-hidden
         className="mt-8 w-full space-y-5 rounded-xl border border-dashed border-foreground/25 p-4 sm:p-6"

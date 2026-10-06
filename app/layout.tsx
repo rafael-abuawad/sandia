@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Mono } from "next/font/google";
 import { Providers } from "@/components/providers";
+import { siteOrigin } from "@/lib/seo";
 import { ThemeProvider } from "next-themes";
 import "./globals.css";
 
@@ -11,9 +12,22 @@ const mono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Sandia",
+  metadataBase: siteOrigin(),
+  title: {
+    default: "Sandia",
+    template: "%s · Sandia",
+  },
   description:
-    "Create USD payment requests and receive stablecoins on Robinhood Chain via Across Protocol.",
+    "Create a USD payment link or send USDG. Payers settle from their own chain, and USDG arrives on Robinhood Chain.",
+  applicationName: "Sandia",
+  openGraph: {
+    siteName: "Sandia",
+    type: "website",
+    locale: "en_US",
+  },
+  twitter: {
+    card: "summary_large_image",
+  },
 };
 
 export const viewport: Viewport = {
@@ -35,6 +49,8 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
+        <link rel="preconnect" href="https://api.fontshare.com" />
+        <link rel="preconnect" href="https://cdn.fontshare.com" crossOrigin="anonymous" />
         <link
           href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&f[]=clash-display@500,600,700&display=swap"
           rel="stylesheet"

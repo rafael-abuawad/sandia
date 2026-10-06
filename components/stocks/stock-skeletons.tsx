@@ -1,3 +1,4 @@
+import { Breadcrumbs, stockBreadcrumbItems } from "@/components/breadcrumbs";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const LIST_ROWS = 8;
@@ -87,10 +88,10 @@ export function StocksMarketSkeleton() {
   );
 }
 
-export function StockDetailSkeleton() {
+export function StockDetailSkeleton({ symbol }: { symbol?: string }) {
   return (
     <div className="pr-page gap-6" role="status" aria-label="Loading stock" aria-busy="true">
-      <Skeleton className="h-4 w-16" />
+      <Breadcrumbs items={stockBreadcrumbItems(symbol)} />
 
       <div className="flex items-start gap-3">
         <Skeleton className="size-10 shrink-0 rounded-full" />

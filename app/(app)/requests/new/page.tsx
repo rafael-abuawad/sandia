@@ -1,5 +1,14 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { CreateRequestForm } from "@/components/create-request-form";
+import { pageMetadata } from "@/lib/seo";
+
+export const metadata: Metadata = pageMetadata({
+  title: "New payment request",
+  description:
+    "Create a Sandia payment link. The payer settles from their chain and you receive USDG on Robinhood Chain.",
+  path: "/requests/new",
+});
 
 export default function NewRequestPage() {
   return (
