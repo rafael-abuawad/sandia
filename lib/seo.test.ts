@@ -22,6 +22,7 @@ describe("publicSitemapPaths", () => {
   it("lists product pages and leaves account pages out", () => {
     const paths = publicSitemapPaths();
     expect(paths).toContain("/");
+    expect(paths).toContain("/about");
     expect(paths).toContain("/requests/new");
     expect(paths).toContain("/send");
     expect(paths).toContain("/earn");

@@ -3,7 +3,7 @@ import { LOCAL_CHAIN_STOCKS } from "@/lib/stocks/assets";
 
 export const SITE_NAME = "Sandia";
 
-const PUBLIC_PAGES = ["/", "/requests/new", "/send", "/earn", "/stocks"] as const;
+const PUBLIC_PAGES = ["/", "/about", "/requests/new", "/send", "/earn", "/stocks"] as const;
 
 /** URLs that describe the product. Account and payment-link URLs stay out. */
 export function publicSitemapPaths(): string[] {
