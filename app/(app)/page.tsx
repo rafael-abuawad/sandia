@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { author } from "@/lib/author";
 import { jsonLdScript, pageMetadata } from "@/lib/seo";
 
 export const metadata: Metadata = pageMetadata({
@@ -135,13 +134,7 @@ export default function HomePage() {
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdScript(homeFaqJsonLd) }} />
       </section>
 
-      <p className="text-sm text-muted">
-        Sandia is built by{" "}
-        <Link href={author.path} className="text-foreground underline underline-offset-2">
-          {author.name}
-        </Link>
-        .
-      </p>
+      <footer className="text-sm text-muted">Sandia © 2026</footer>
     </div>
   );
 }
