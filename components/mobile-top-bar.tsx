@@ -12,7 +12,7 @@ export function MobileTopBar() {
 
   return (
     <>
-      <header className="pr-mobile-top sticky top-0 z-40 flex min-h-14 items-center justify-between border-b border-border bg-[color-mix(in_srgb,var(--panel-solid)_90%,transparent)] px-4 pb-0 pt-[env(safe-area-inset-top)] backdrop-blur-md md:hidden">
+      <header className="pr-mobile-top sticky inset-bs-0 z-40 flex min-h-14 items-center justify-between border-be border-border bg-[color-mix(in_oklch,var(--panel-solid)_90%,transparent)] px-4 pbe-0 pbs-[env(safe-area-inset-top)] backdrop-blur-md md:hidden">
         <div className="flex h-14 w-full items-center justify-between">
           <AppBrand />
           <Button

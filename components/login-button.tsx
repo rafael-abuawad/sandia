@@ -28,7 +28,7 @@ export function LoginButton() {
   if (authenticated && failed) {
     return (
       <div className="w-full space-y-2">
-        <p className="text-center text-xs text-muted md:text-left">
+        <p className="text-center text-xs text-muted md:text-start">
           Wallet setup didn&apos;t finish.
         </p>
         <Button type="button" className="w-full" onClick={retry}>
@@ -75,7 +75,7 @@ function WalletAddress({ address }: { address: string }) {
         type="button"
         variant="ghost"
         size="icon-sm"
-        className="absolute right-1 text-muted hover:text-foreground"
+        className="absolute inset-e-1 text-muted hover:text-foreground"
         aria-label={copied ? "Address copied" : "Copy address"}
         onClick={() => void copyAddress()}
       >

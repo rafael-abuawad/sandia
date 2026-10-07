@@ -190,12 +190,12 @@ function ContactPickerList({
   }
 
   return (
-    <ul className="divide-y divide-border overflow-hidden rounded-md border border-border">
+    <ul className="divide-y divide-border overflow-clip rounded-md border border-border">
       {sorted.map((contact) => (
         <li key={contact._id}>
           <button
             type="button"
-            className="flex w-full items-center justify-between gap-3 px-3 py-3 text-left hover:bg-foreground/[0.03]"
+            className="flex w-full items-center justify-between gap-3 px-3 py-3 text-start hover:bg-foreground/[0.03] active:bg-foreground/5"
             aria-label={`Select ${contact.name}, ${shortenAddress(contact.address, 6)}`}
             onClick={() => onSelect(contact.address)}
           >
@@ -248,7 +248,7 @@ export function AddressBookButton({
         <span
           aria-hidden
           className={cn(
-            "absolute top-1 right-1 size-2 rounded-full bg-logo-cyan",
+            "absolute inset-bs-1 inset-e-1 size-2 rounded-full bg-logo-cyan",
             "ring-2 ring-panel-elevated",
           )}
         />

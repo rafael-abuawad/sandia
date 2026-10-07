@@ -5,7 +5,7 @@ const LIST_ROWS = 8;
 
 export function StockListDesktopSkeletonRows() {
   return Array.from({ length: LIST_ROWS }, (_, index) => (
-    <tr key={index} className="border-b border-border last:border-b-0">
+    <tr key={index} className="border-be border-border last:border-be-0">
       <td className="px-4 py-3">
         <div className="flex items-center gap-3">
           <Skeleton className="size-9 shrink-0 rounded-full" />
@@ -13,10 +13,10 @@ export function StockListDesktopSkeletonRows() {
         </div>
       </td>
       <td className="px-4 py-3">
-        <Skeleton className="ml-auto h-4 w-16" />
+        <Skeleton className="ms-auto h-4 w-16" />
       </td>
       <td className="px-4 py-3">
-        <Skeleton className="ml-auto h-4 w-12" />
+        <Skeleton className="ms-auto h-4 w-12" />
       </td>
       <td className="px-4 py-3">
         <Skeleton className="h-5 w-14 rounded-sm" />
@@ -40,17 +40,17 @@ export function StockListMobileSkeletonItems() {
 export function StockListDesktopSkeleton() {
   return (
     <div className="hidden md:block">
-      <table className="w-full border-collapse text-left text-sm">
-        <thead className="border-b border-border bg-[var(--panel-elevated)]">
+      <table className="w-full border-collapse text-start text-sm">
+        <thead className="border-be border-border bg-[var(--panel-elevated)]">
           <tr>
             <th className="px-4 py-3">
               <Skeleton className="h-3 w-12" />
             </th>
             <th className="px-4 py-3">
-              <Skeleton className="ml-auto h-3 w-10" />
+              <Skeleton className="ms-auto h-3 w-10" />
             </th>
             <th className="px-4 py-3">
-              <Skeleton className="ml-auto h-3 w-14" />
+              <Skeleton className="ms-auto h-3 w-14" />
             </th>
             <th className="px-4 py-3">
               <Skeleton className="h-3 w-12" />
@@ -80,7 +80,7 @@ export function StocksMarketSkeleton() {
         <Skeleton className="h-8 w-28 sm:h-9" />
         <Skeleton className="h-4 w-full" />
       </div>
-      <div className="pr-panel overflow-hidden">
+      <div className="pr-panel overflow-clip">
         <StockListDesktopSkeleton />
         <StockListMobileSkeleton />
       </div>
@@ -118,8 +118,8 @@ export function StockDetailSkeleton({ symbol }: { symbol?: string }) {
             <Skeleton className="h-5 w-16" />
           </div>
           <div className="space-y-2">
-            <Skeleton className="ml-auto h-3 w-20" />
-            <Skeleton className="ml-auto h-5 w-16" />
+            <Skeleton className="ms-auto h-3 w-20" />
+            <Skeleton className="ms-auto h-5 w-16" />
           </div>
         </div>
         <Skeleton className="h-1 w-full rounded-full" />

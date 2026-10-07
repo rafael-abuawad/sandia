@@ -8,7 +8,7 @@ export default function Loading() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 space-y-1">
           <Skeleton className="h-8 w-32" />
-          <Skeleton className="mt-1 h-4 w-52" />
+          <Skeleton className="mbs-1 h-4 w-52" />
         </div>
         <Skeleton className="h-5 w-16 rounded-sm" />
       </div>

@@ -50,12 +50,5 @@ export function pageMetadata({
     description,
     alternates: path ? { canonical: path } : undefined,
     robots: { index, follow: true },
-    openGraph: {
-      title,
-      description,
-      url: path,
-      siteName: SITE_NAME,
-      type: "website",
-    },
   };
 }

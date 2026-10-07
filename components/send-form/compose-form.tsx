@@ -218,7 +218,7 @@ export function SendComposeForm({
             openBook={openBook}
           />
           <FieldError id={errorId} message={error} />
-          <div className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-10 -mx-1 bg-[color-mix(in_srgb,var(--background)_92%,transparent)] px-1 py-3 backdrop-blur-sm md:static md:bottom-auto md:bg-transparent md:p-0 md:backdrop-blur-none">
+          <div className="sticky inset-be-[calc(4.5rem+env(safe-area-inset-bottom))] z-10 -mx-1 bg-[color-mix(in_oklch,var(--background)_92%,transparent)] px-1 py-3 backdrop-blur-sm md:static md:inset-be-auto md:bg-transparent md:p-0 md:backdrop-blur-none">
             {footer}
           </div>
         </>

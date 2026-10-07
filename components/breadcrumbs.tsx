@@ -43,7 +43,10 @@ export function Breadcrumbs({ items }: { items: BreadcrumbItem[] }) {
                   {item.label}
                 </span>
               ) : (
-                <Link href={item.href} className="underline-offset-2 hover:text-foreground hover:underline">
+                <Link
+                  href={item.href}
+                  className="underline-offset-2 hover:text-foreground hover:underline"
+                >
                   {item.label}
                 </Link>
               )}
@@ -51,7 +54,10 @@ export function Breadcrumbs({ items }: { items: BreadcrumbItem[] }) {
           );
         })}
       </ol>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdScript(jsonLd) }} />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: jsonLdScript(jsonLd) }}
+      />
     </nav>
   );
 }

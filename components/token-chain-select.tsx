@@ -45,7 +45,7 @@ function AssetIcon({
   const [broken, setBroken] = useState(false);
   return (
     <div
-      className="shrink-0 overflow-hidden rounded-full bg-[var(--panel-elevated)] ring-1 ring-border"
+      className="shrink-0 overflow-clip rounded-full bg-[var(--panel-elevated)] ring-1 ring-border"
       style={{ width: size, height: size }}
       aria-hidden
     >

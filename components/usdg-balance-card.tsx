@@ -96,7 +96,7 @@ export function UsdgBalanceCard({ className }: UsdgBalanceCardProps) {
     <div className={cn("pr-inset pr-inset--accent", className)}>
       <button
         type="button"
-        className="flex w-full items-start gap-2.5 rounded-[inherit] px-3 py-3 text-left transition-colors hover:bg-foreground/5"
+        className="flex w-full items-start gap-2.5 rounded-[inherit] px-3 py-3 text-start transition-colors hover:bg-foreground/5 active:bg-foreground/10"
         aria-expanded={expanded}
         aria-controls={breakdownId}
         aria-label={expanded ? "Hide USDG balance breakdown" : "Show USDG balance breakdown"}
@@ -107,57 +107,65 @@ export function UsdgBalanceCard({ className }: UsdgBalanceCardProps) {
           alt=""
           width={28}
           height={28}
-          className="mt-0.5 size-7 shrink-0 rounded-full ring-1 ring-border"
+          className="mbs-0.5 size-7 shrink-0 rounded-full ring-1 ring-border"
           unoptimized
         />
         <span className="min-w-0 flex-1">
           <span className="pr-kicker block">{ROBINHOOD_USDG.symbol}</span>
           <span
-            className="pr-money mt-1 block truncate text-xl font-semibold leading-none tracking-tight text-foreground"
+            className="pr-money mbs-1 block truncate text-xl font-semibold leading-none tracking-tight text-foreground"
             aria-live="polite"
           >
             {balances.totalLabel}
           </span>
-          <span className="mt-1.5 block text-xs text-muted">{balances.caption}</span>
+          <span className="mbs-1.5 block text-xs text-muted">{balances.caption}</span>
         </span>
         <ChevronDown
-          className={cn("mt-0.5 size-3.5 shrink-0 text-muted", expanded && "rotate-180")}
+          className={cn("mbs-0.5 size-3.5 shrink-0 text-muted", expanded && "rotate-180")}
           strokeWidth={1.5}
           aria-hidden
         />
       </button>
-      <div id={breakdownId} hidden={!expanded} className="mx-3 border-t border-border pb-3 pt-3">
+      <div id={breakdownId} hidden={!expanded} className="mx-3 border-bs border-border pbe-3 pbs-3">
         <dl className="space-y-3 text-xs">
           <div className="flex items-start gap-2">
-            <Wallet className="mt-0.5 size-3.5 shrink-0 text-muted" strokeWidth={1.5} aria-hidden />
+            <Wallet
+              className="mbs-0.5 size-3.5 shrink-0 text-muted"
+              strokeWidth={1.5}
+              aria-hidden
+            />
             <div className="min-w-0 flex-1">
               <dt className="font-medium text-foreground">Wallet USDG</dt>
-              <dd className="mt-0.5 text-muted">Available to send</dd>
+              <dd className="mbs-0.5 text-muted">Available to send</dd>
               <dd
-                className="pr-money mt-1 break-all text-sm font-semibold text-foreground"
+                className="pr-money mbs-1 break-all text-sm font-semibold text-foreground"
                 aria-live="polite"
               >
                 {balances.walletLabel}
-                <span className="ml-1 text-xs font-normal text-muted">USDG</span>
+                <span className="ms-1 text-xs font-normal text-muted">USDG</span>
               </dd>
             </div>
           </div>
           <div className="flex items-start gap-2">
-            <Sprout className="mt-0.5 size-3.5 shrink-0 text-muted" strokeWidth={1.5} aria-hidden />
+            <Sprout
+              className="mbs-0.5 size-3.5 shrink-0 text-muted"
+              strokeWidth={1.5}
+              aria-hidden
+            />
             <div className="min-w-0 flex-1">
               <dt className="font-medium text-foreground">Steakhouse vault</dt>
-              <dd className="mt-0.5 text-muted">Deposited · includes yield</dd>
+              <dd className="mbs-0.5 text-muted">Deposited · includes yield</dd>
               <dd
-                className="pr-money mt-1 break-all text-sm font-semibold text-foreground"
+                className="pr-money mbs-1 break-all text-sm font-semibold text-foreground"
                 aria-live="polite"
               >
                 {balances.vaultLabel}
-                <span className="ml-1 text-xs font-normal text-muted">USDG</span>
+                <span className="ms-1 text-xs font-normal text-muted">USDG</span>
               </dd>
             </div>
           </div>
         </dl>
-        <p className="mt-3 text-[11px] text-muted">Robinhood Chain</p>
+        <p className="mbs-3 text-[11px] text-muted">Robinhood Chain</p>
       </div>
     </div>
   );

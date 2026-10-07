@@ -12,7 +12,7 @@ export function AppChrome({ children }: { children: React.ReactNode }) {
       <main
         id="main"
         tabIndex={-1}
-        className="pr-shell min-w-0 flex-1 py-8 pb-[calc(4.5rem+env(safe-area-inset-bottom))] sm:py-10 md:pb-10"
+        className="pr-shell min-w-0 flex-1 py-8 pbe-[calc(4.5rem+env(safe-area-inset-bottom))] sm:py-10 md:pbe-10"
       >
         {children}
       </main>

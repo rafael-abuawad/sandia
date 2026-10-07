@@ -101,7 +101,7 @@ export function PaymentQr({
           width={128}
           height={128}
           unoptimized
-          className="pointer-events-none absolute top-1/2 left-1/2 size-[22%] -translate-x-1/2 -translate-y-1/2"
+          className="pointer-events-none absolute inset-bs-1/2 inset-s-1/2 size-[22%] -translate-x-1/2 -translate-y-1/2"
         />
       </div>
     </div>

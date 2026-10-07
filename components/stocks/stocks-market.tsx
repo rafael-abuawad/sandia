@@ -173,10 +173,10 @@ export function StocksMarket() {
         </p>
       )}
 
-      <div className="pr-panel overflow-hidden">
+      <div className="pr-panel overflow-clip">
         <div className="hidden md:block">
-          <table className="w-full border-collapse text-left text-sm">
-            <thead className="sticky top-0 z-10 border-b border-border bg-[var(--panel-elevated)]">
+          <table className="w-full border-collapse text-start text-sm">
+            <thead className="sticky inset-bs-0 z-10 border-be border-border bg-[var(--panel-elevated)]">
               <tr className="pr-kicker">
                 <SortHeader
                   label="Stock"
@@ -248,7 +248,7 @@ function SortHeader({
 }) {
   const sortState = active ? (dir === "asc" ? "ascending" : "descending") : undefined;
   return (
-    <th className={cn("px-4 py-3", align === "right" && "text-right")} aria-sort={sortState}>
+    <th className={cn("px-4 py-3", align === "right" && "text-end")} aria-sort={sortState}>
       <button
         type="button"
         onClick={onClick}
@@ -316,7 +316,7 @@ function DesktopRow({ row }: { row: MarketRow }) {
   return (
     <tr
       className={cn(
-        "relative border-b border-border last:border-b-0 transition-[background-color] duration-[var(--duration)] ease-[var(--ease-out)] hover:bg-foreground/[0.03]",
+        "relative border-be border-border last:border-be-0 transition-[background-color] duration-[var(--duration)] ease-[var(--ease-out)] hover:bg-foreground/[0.03]",
         halted && "opacity-60",
       )}
     >
@@ -329,12 +329,12 @@ function DesktopRow({ row }: { row: MarketRow }) {
           <TokenCell row={row} />
         </Link>
       </td>
-      <td className="px-4 py-3 text-right">
+      <td className="px-4 py-3 text-end">
         <span className="pr-mono font-semibold text-foreground">
           {formatUsdPrice(row.quote?.mid)}
         </span>
       </td>
-      <td className="px-4 py-3 text-right">
+      <td className="px-4 py-3 text-end">
         <span className="pr-mono text-foreground">
           {formatVolume(row.quote?.dailyTradingVolume)}
         </span>
@@ -358,7 +358,7 @@ function MobileRow({ row }: { row: MarketRow }) {
         )}
       >
         <TokenCell row={row} />
-        <div className="shrink-0 text-right">
+        <div className="shrink-0 text-end">
           <p className="pr-mono font-semibold text-foreground">{formatUsdPrice(row.quote?.mid)}</p>
         </div>
       </Link>

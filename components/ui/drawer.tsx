@@ -44,14 +44,14 @@ export function DrawerContent({ className, children, ...props }: DrawerPrimitive
         <DrawerPrimitive.Popup
           data-slot="drawer-content"
           className={cn(
-            "flex max-h-[calc(100dvh-6rem)] w-full flex-col rounded-t-[var(--radius-xl)] border border-border bg-panel-elevated pb-[env(safe-area-inset-bottom)] shadow-md duration-[var(--duration)] ease-[var(--ease-out)] data-[ending-style]:translate-y-4 data-[ending-style]:opacity-0 data-[starting-style]:translate-y-4 data-[starting-style]:opacity-0",
+            "flex max-h-[calc(100dvh-6rem)] w-full flex-col rounded-t-[var(--radius-xl)] border border-border bg-panel-elevated pbe-[env(safe-area-inset-bottom)] shadow-md transition-[opacity,translate] duration-[var(--duration)] ease-[var(--ease-out)] data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 motion-safe:data-[ending-style]:translate-y-4 motion-safe:data-[starting-style]:translate-y-4",
             className,
           )}
           {...props}
         >
           <div
             aria-hidden
-            className="mx-auto mt-3 mb-1 h-1 w-10 shrink-0 rounded-full bg-border-strong"
+            className="mx-auto mbs-3 mbe-1 h-1 w-10 shrink-0 rounded-full bg-border-strong"
           />
           {children}
         </DrawerPrimitive.Popup>
@@ -64,7 +64,7 @@ export function DrawerHeader({ className, ...props }: React.ComponentProps<"div"
   return (
     <div
       data-slot="drawer-header"
-      className={cn("flex flex-col gap-1.5 px-5 pt-3 pb-2 text-left", className)}
+      className={cn("flex flex-col gap-1.5 px-5 pbs-3 pbe-2 text-start", className)}
       {...props}
     />
   );
@@ -74,7 +74,7 @@ export function DrawerFooter({ className, ...props }: React.ComponentProps<"div"
   return (
     <div
       data-slot="drawer-footer"
-      className={cn("mt-auto flex flex-col gap-2 px-5 py-4", className)}
+      className={cn("mbs-auto flex flex-col gap-2 px-5 py-4", className)}
       {...props}
     />
   );

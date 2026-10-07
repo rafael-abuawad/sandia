@@ -48,7 +48,7 @@ export function AccountPanel({ className, onAfterLogout }: AccountPanelProps) {
     <>
       <div className={cn("space-y-3", className)}>
         <UsdgBalanceCard />
-        <div className="space-y-2 border-t border-border pt-3">
+        <div className="space-y-2 border-bs border-border pbs-3">
           <div className="flex justify-center md:justify-start">
             <LoginButton />
           </div>
@@ -94,7 +94,7 @@ export function AccountPanel({ className, onAfterLogout }: AccountPanelProps) {
             </p>
           ) : null}
         </div>
-        <div className="mt-5 flex gap-2">
+        <div className="mbs-5 flex gap-2">
           <Button
             ref={cancelRef}
             type="button"

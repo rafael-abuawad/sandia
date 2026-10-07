@@ -46,7 +46,7 @@ export function DialogContent({
       <DialogPrimitive.Popup
         data-slot="dialog-content"
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 gap-4 rounded-[var(--radius-xl)] border border-border bg-panel-elevated p-5 shadow-md duration-[var(--duration)] ease-[var(--ease-out)] data-[ending-style]:scale-95 data-[ending-style]:opacity-0 data-[starting-style]:scale-95 data-[starting-style]:opacity-0",
+          "fixed inset-bs-1/2 inset-s-1/2 z-50 grid w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 gap-4 rounded-[var(--radius-xl)] border border-border bg-panel-elevated p-5 shadow-md transition-[opacity,scale] duration-[var(--duration)] ease-[var(--ease-out)] data-[ending-style]:opacity-0 data-[starting-style]:opacity-0 motion-safe:data-[ending-style]:scale-95 motion-safe:data-[starting-style]:scale-95",
           className,
         )}
         {...props}
@@ -55,7 +55,7 @@ export function DialogContent({
         {showCloseButton ? (
           <DialogPrimitive.Close
             data-slot="dialog-close"
-            className="absolute top-3 right-3 rounded-md p-1 text-muted transition-[color,background-color] duration-[var(--duration)] ease-[var(--ease-out)] hover:bg-foreground/5 hover:text-foreground"
+            className="absolute inset-bs-3 inset-e-3 rounded-md p-1 text-muted transition-[color,background-color] duration-[var(--duration)] ease-[var(--ease-out)] hover:bg-foreground/5 hover:text-foreground active:bg-foreground/10 active:text-foreground after:absolute after:inset-[min(0px,calc((100%_-_44px)/2))] after:content-['']"
             aria-label="Close"
           >
             <X className="size-4" strokeWidth={1.5} />
@@ -70,7 +70,7 @@ export function DialogHeader({ className, ...props }: React.ComponentProps<"div"
   return (
     <div
       data-slot="dialog-header"
-      className={cn("flex flex-col gap-1.5 pr-8 text-left", className)}
+      className={cn("flex flex-col gap-1.5 pe-8 text-start", className)}
       {...props}
     />
   );

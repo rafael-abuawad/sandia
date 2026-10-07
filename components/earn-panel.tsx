@@ -717,7 +717,7 @@ function Exposure({
               ))}
             </span>
           </TooltipTrigger>
-          <TooltipContent side="top" className="w-64 px-3 py-2 text-left [text-wrap:wrap]">
+          <TooltipContent side="top" className="w-64 px-3 py-2 text-start [text-wrap:wrap]">
             <ul className="space-y-2">
               {rows.map((row) => (
                 <li key={row.symbol} className="flex items-center justify-between gap-3">
@@ -740,7 +740,7 @@ function TokenMark({ symbol, logoUrl }: { symbol: string; logoUrl: string | null
   const [broken, setBroken] = useState(false);
   const src = logoUrl || resolveTokenIcon(symbol);
   return (
-    <span className="relative size-7 overflow-hidden rounded-full bg-panel-elevated ring-2 ring-background">
+    <span className="relative size-7 overflow-clip rounded-full bg-panel-elevated ring-2 ring-background">
       {src && !broken ? (
         <Image
           src={src}

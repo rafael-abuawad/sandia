@@ -69,7 +69,7 @@ export default function HomePage() {
             <p className="pr-lede pr-animate-in pr-animate-in-delay-2">
               Create a payment link or send USDG. Switch modes from the navigation to get started.
             </p>
-            <div className="pr-animate-in pr-animate-in-delay-3 flex flex-wrap gap-3 pt-2">
+            <div className="pr-animate-in pr-animate-in-delay-3 flex flex-wrap gap-3 pbs-2">
               <Button asChild size="lg">
                 <Link href="/requests/new">Create a request</Link>
               </Button>
@@ -108,9 +108,13 @@ export default function HomePage() {
           <div key={item.title} className="pr-feature">
             <h2 className="pr-feature-title">{item.title}</h2>
             <p>{item.body}</p>
-            <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1">
+            <div className="mbs-3 flex flex-wrap gap-x-4 gap-y-1">
               {item.links.map((link) => (
-                <Link key={link.href} href={link.href} className="text-foreground underline underline-offset-2">
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className="text-foreground underline underline-offset-2"
+                >
                   {link.label}
                 </Link>
               ))}
@@ -131,7 +135,10 @@ export default function HomePage() {
             </div>
           ))}
         </div>
-        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdScript(homeFaqJsonLd) }} />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: jsonLdScript(homeFaqJsonLd) }}
+        />
       </section>
 
       <footer className="text-sm text-muted">Sandia © 2026</footer>

@@ -202,23 +202,23 @@ function StockDetailLoaded({
         <p className="pr-display pr-money text-4xl tracking-tight sm:text-5xl">
           {formatUsdPrice(shownQuote?.mid)}
         </p>
-        <p className="mt-1 text-xs text-muted">Current price</p>
+        <p className="mbs-1 text-xs text-muted">Current price</p>
       </div>
 
       <PriceChart address={asset.contractAddress} symbol={asset.symbol} />
 
       <TodaySummary quote={shownQuote} />
 
-      <details className="group border-t border-border pt-4">
+      <details className="group border-bs border-border pbs-4">
         <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-semibold text-foreground marker:content-none [&::-webkit-details-marker]:hidden">
           About this token
           <ChevronDown
-            className="size-4 text-muted transition-transform duration-[var(--duration)] ease-[var(--ease-out)] group-open:rotate-180"
+            className="size-4 text-muted motion-safe:transition-transform duration-[var(--duration)] ease-[var(--ease-out)] group-open:rotate-180"
             strokeWidth={1.5}
             aria-hidden
           />
         </summary>
-        <div className="mt-3 space-y-2 text-sm text-muted">
+        <div className="mbs-3 space-y-2 text-sm text-muted">
           <p>
             {asset.symbol === "ETH"
               ? "A buy delivers WETH on Robinhood Chain. It does not wrap or unwrap ETH in the wallet."
@@ -374,7 +374,7 @@ export function StockTradeTicket({
           embeddedPresentation
             ? "space-y-3"
             : expanded
-              ? "mt-3 space-y-3 md:mt-0"
+              ? "mbs-3 space-y-3 md:mbs-0"
               : "hidden space-y-3 md:block"
         }
       >
@@ -415,7 +415,7 @@ function ticketClassName(embeddedPresentation: boolean) {
   if (embeddedPresentation) {
     return "rounded-[var(--radius-xl)] border border-border bg-panel p-4";
   }
-  return "sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-10 rounded-[var(--radius-xl)] border border-border bg-[color-mix(in_srgb,var(--panel-solid)_94%,transparent)] p-4 backdrop-blur-md md:static md:bottom-auto";
+  return "sticky inset-be-[calc(4.5rem+env(safe-area-inset-bottom))] z-10 rounded-[var(--radius-xl)] border border-border bg-[color-mix(in_oklch,var(--panel-solid)_94%,transparent)] p-4 backdrop-blur-md md:static md:inset-be-auto";
 }
 
 function OrderSideButtons({
@@ -503,7 +503,7 @@ function QuantityField({
         <Tooltip>
           <TooltipTrigger
             type="button"
-            className="inline-flex size-6 items-center justify-center rounded-md text-muted hover:bg-foreground/5 hover:text-foreground"
+            className="relative inline-flex size-6 items-center justify-center rounded-md text-muted hover:bg-foreground/5 hover:text-foreground active:bg-foreground/10 active:text-foreground after:absolute after:inset-[min(0px,calc((100%_-_44px)/2))] after:content-['']"
             aria-label="About amount unit"
           >
             <Info className="size-3.5" strokeWidth={1.5} aria-hidden />
@@ -527,7 +527,7 @@ function QuantityField({
           quoted={amountForSymbol(paySymbol, symbol, quoteAmounts)}
           onChange={onTicketAmountChange}
         />
-        <div className="pointer-events-none absolute inset-x-0 top-1/2 z-10 flex -translate-y-1/2 justify-center">
+        <div className="pointer-events-none absolute inset-x-0 inset-bs-1/2 z-10 flex -translate-y-1/2 justify-center">
           <span className="flex size-7 items-center justify-center rounded-full border border-border bg-panel text-muted">
             <ArrowDown className="size-3.5" strokeWidth={1.5} aria-hidden />
           </span>
@@ -608,7 +608,7 @@ function QuoteAmount({
         onChange={editable ? (event) => onChange(event.target.value) : undefined}
         placeholder={editable ? "0" : quoting ? "…" : "0"}
         disabled={pending}
-        className="mt-1 h-auto border-0 bg-transparent px-0 text-2xl font-semibold shadow-none focus-visible:ring-0 read-only:cursor-default disabled:opacity-70"
+        className="mbs-1 h-auto border-0 bg-transparent px-0 text-2xl font-semibold shadow-none focus-visible:ring-0 read-only:cursor-default disabled:opacity-70"
       />
     </div>
   );
@@ -664,11 +664,11 @@ function TodaySummary({ quote }: { quote: StockQuote | null }) {
           <div className="flex items-end justify-between gap-4">
             <div>
               <p className="text-xs text-muted">Today&apos;s low</p>
-              <p className="pr-mono mt-1 text-sm font-semibold">{formatUsdPrice(low)}</p>
+              <p className="pr-mono mbs-1 text-sm font-semibold">{formatUsdPrice(low)}</p>
             </div>
-            <div className="text-right">
+            <div className="text-end">
               <p className="text-xs text-muted">Today&apos;s high</p>
-              <p className="pr-mono mt-1 text-sm font-semibold">{formatUsdPrice(high)}</p>
+              <p className="pr-mono mbs-1 text-sm font-semibold">{formatUsdPrice(high)}</p>
             </div>
           </div>
           <div
@@ -677,7 +677,7 @@ function TodaySummary({ quote }: { quote: StockQuote | null }) {
             aria-label={`Current price ${formatUsdPrice(current)}, between today's low of ${formatUsdPrice(low)} and high of ${formatUsdPrice(high)}`}
           >
             <div
-              className="absolute top-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-foreground"
+              className="absolute inset-bs-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-foreground"
               style={{ left: `${rangePercent(low, high, current)}%` }}
             />
           </div>
@@ -685,7 +685,7 @@ function TodaySummary({ quote }: { quote: StockQuote | null }) {
       ) : null}
       <div>
         <p className="pr-kicker">1D Volume</p>
-        <p className="pr-mono mt-1 font-semibold">{formatVolume(quote?.dailyTradingVolume)}</p>
+        <p className="pr-mono mbs-1 font-semibold">{formatVolume(quote?.dailyTradingVolume)}</p>
       </div>
     </div>
   );

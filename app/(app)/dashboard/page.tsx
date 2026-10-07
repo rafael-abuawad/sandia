@@ -59,7 +59,7 @@ export default function DashboardPage() {
       ) : null}
 
       {status !== "LoadingFirstPage" && requests.length === 0 && (
-        <div className="pr-panel pr-panel--padded space-y-3 text-center sm:text-left">
+        <div className="pr-panel pr-panel--padded space-y-3 text-center sm:text-start">
           <p className="font-medium text-foreground">No payment requests yet</p>
           <p className="text-sm text-muted">
             Create a USD payment link so payers can settle from their own chain.
@@ -82,7 +82,7 @@ export default function DashboardPage() {
             <li key={r._id}>
               <Link
                 href={`/requests/${r.publicId}`}
-                className="pr-panel flex items-center justify-between gap-4 px-4 py-4 transition-[border-color] duration-[var(--duration)] ease-[var(--ease-out)] hover:border-border-strong"
+                className="pr-panel flex items-center justify-between gap-4 px-4 py-4 transition-[border-color] duration-[var(--duration)] ease-[var(--ease-out)] hover:border-border-strong active:border-border-strong"
               >
                 <div className="min-w-0 space-y-1">
                   <p className="pr-money font-medium text-foreground">

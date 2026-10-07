@@ -69,7 +69,7 @@ export function PayTerminalStatus({
       <section className="pr-inset pr-inset--success p-5 text-sm text-success">
         Payment complete. USDG settled on Robinhood Chain.
         {depositTxnRef ? (
-          <p className="mt-2 text-xs text-muted">
+          <p className="mbs-2 text-xs text-muted">
             Deposit:{" "}
             {depositChainId != null ? (
               <TxLink chainId={depositChainId} hash={depositTxnRef} className="text-xs">

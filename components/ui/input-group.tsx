@@ -10,7 +10,7 @@ export function InputGroup({ className, ...props }: React.ComponentProps<"div">)
       data-slot="input-group"
       role="group"
       className={cn(
-        "flex h-11 w-full items-stretch overflow-hidden rounded-md border border-border-strong bg-panel-elevated sm:h-10",
+        "flex h-11 w-full items-stretch overflow-clip rounded-md border border-border-strong bg-panel-elevated sm:h-10",
         className,
       )}
       {...props}
@@ -24,7 +24,7 @@ export const InputGroupInput = React.forwardRef<HTMLInputElement, React.Componen
       ref={ref}
       data-slot="input-group-control"
       className={cn(
-        "min-w-0 flex-1 bg-transparent px-3 text-sm text-foreground placeholder:text-subtle outline-none shadow-none focus-visible:outline-none focus-visible:shadow-none disabled:cursor-not-allowed disabled:opacity-50",
+        "min-w-0 flex-1 bg-transparent px-3 text-sm text-foreground placeholder:text-subtle outline-hidden shadow-none focus-visible:shadow-none disabled:cursor-not-allowed disabled:opacity-50",
         className,
       )}
       {...props}
@@ -43,8 +43,8 @@ export function InputGroupAddon({
       data-slot="input-group-addon"
       className={cn(
         "flex items-center",
-        align === "inline-start" && "order-first pl-1",
-        align === "inline-end" && "order-last pr-1",
+        align === "inline-start" && "order-first ps-1",
+        align === "inline-end" && "order-last pe-1",
         className,
       )}
       {...props}

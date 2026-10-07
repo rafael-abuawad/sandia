@@ -43,7 +43,7 @@ export function ThemeToggle() {
       <SelectContent container={container} align="end" side="top" aria-label="Theme">
         {themeOptions.map(({ value, label, icon: Icon }) => (
           <SelectItem key={value} value={value}>
-            <Icon className="mr-2 size-4" strokeWidth={1.5} aria-hidden />
+            <Icon className="me-2 size-4" strokeWidth={1.5} aria-hidden />
             {label}
           </SelectItem>
         ))}

@@ -192,7 +192,7 @@ function RequestDetailLoaded({
           <h1 className="pr-display pr-money text-3xl">
             ${formatUsdFromMicros(request.amountUsdMicros)}
           </h1>
-          <p className="mt-1 text-sm text-muted">
+          <p className="mbs-1 text-sm text-muted">
             {formatTokenAmount(request.outputAmountBaseUnits, request.destinationTokenDecimals)}{" "}
             {request.destinationTokenSymbol}
           </p>
@@ -204,18 +204,18 @@ function RequestDetailLoaded({
         {request.description ? (
           <div className="flex justify-between gap-4">
             <dt className="text-muted">Note</dt>
-            <dd className="text-right text-foreground">{request.description}</dd>
+            <dd className="text-end text-foreground">{request.description}</dd>
           </div>
         ) : null}
         <div className="flex justify-between gap-4">
           <dt className="text-muted">Expires</dt>
-          <dd className="text-right text-foreground">
+          <dd className="text-end text-foreground">
             {expiresLabel ?? "Stays open until paid or cancelled"}
           </dd>
         </div>
         <div className="flex justify-between gap-4">
           <dt className="text-muted">Paid to</dt>
-          <dd className="pr-mono text-right text-foreground">{request.recipientAddress}</dd>
+          <dd className="pr-mono text-end text-foreground">{request.recipientAddress}</dd>
         </div>
       </dl>
 

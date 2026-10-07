@@ -181,7 +181,7 @@ export function AgentMascot({
           </svg>
         </div>
       </div>
-      <div className="pr-mascot-shadow mt-2 h-2 w-16 rounded-full bg-foreground/10 blur-[3px]" />
+      <div className="pr-mascot-shadow mbs-2 h-2 w-16 rounded-full bg-foreground/10 blur-[3px]" />
     </div>
   );
 }

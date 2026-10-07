@@ -4,7 +4,8 @@ import { pageMetadata } from "@/lib/seo";
 
 export const metadata: Metadata = pageMetadata({
   title: "Send",
-  description: "Send USDG to one address or a batch, and review the transfer before it is submitted.",
+  description:
+    "Send USDG to one address or a batch, and review the transfer before it is submitted.",
   path: "/send",
 });
 

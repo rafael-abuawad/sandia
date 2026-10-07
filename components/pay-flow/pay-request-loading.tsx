@@ -15,12 +15,12 @@ export function PayRequestLoading() {
         unoptimized
         className="h-24 w-auto"
       />
-      <h1 className="mt-5 pr-display text-center text-2xl text-foreground sm:text-3xl">
+      <h1 className="mbs-5 pr-display text-center text-2xl text-foreground sm:text-3xl">
         Loading payment request…
       </h1>
       <div
         aria-hidden
-        className="mt-8 w-full space-y-5 rounded-xl border border-dashed border-foreground/25 p-4 sm:p-6"
+        className="mbs-8 w-full space-y-5 rounded-xl border border-dashed border-foreground/25 p-4 sm:p-6"
       >
         <div className="flex items-start justify-between gap-3">
           <div className="space-y-2">

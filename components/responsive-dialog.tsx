@@ -127,7 +127,7 @@ export function ResponsiveDialogBody({
 }) {
   const isMobile = React.useContext(ResponsiveDialogMobileContext);
   return (
-    <div className={isMobile ? `flex-1 overflow-y-auto px-5 pb-2 ${className ?? ""}` : className}>
+    <div className={isMobile ? `flex-1 overflow-y-auto px-5 pbe-2 ${className ?? ""}` : className}>
       {children}
     </div>
   );

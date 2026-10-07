@@ -30,7 +30,7 @@ export function PayRequestSummary({
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="pr-kicker">Payment request</p>
-          <h1 className="mt-1 pr-display pr-money text-3xl text-foreground">
+          <h1 className="mbs-1 pr-display pr-money text-3xl text-foreground">
             ${formatUsdFromMicros(amountUsdMicros)}
           </h1>
         </div>

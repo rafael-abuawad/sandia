@@ -12,12 +12,12 @@ export function AppSidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="pr-sidebar hidden w-56 shrink-0 flex-col border-r md:sticky md:top-0 md:flex md:h-svh md:self-start md:overflow-y-auto">
+    <aside className="pr-sidebar hidden w-56 shrink-0 flex-col border-e md:sticky md:inset-bs-0 md:flex md:h-svh md:self-start md:overflow-y-auto">
       <div className="flex h-16 items-center px-4">
         <AppBrand />
       </div>
 
-      <nav aria-label="Primary" className="flex flex-1 flex-col gap-1 px-3 pb-4">
+      <nav aria-label="Primary" className="flex flex-1 flex-col gap-1 px-3 pbe-4">
         {appNavItems.map(({ label, href, icon: Icon, match }) => {
           const active = match(pathname);
           return (
@@ -50,7 +50,7 @@ export function AppSidebar() {
         </Link>
       </nav>
 
-      <div className="mt-auto px-3 pb-3 pt-1">
+      <div className="mbs-auto px-3 pbe-3 pbs-1">
         <AccountPanel />
       </div>
     </aside>

@@ -1,6 +1,15 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/* Hover only where a fine pointer can hover, so a tap never leaves it stuck. */
+@custom-variant hover {
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      @slot;
+    }
+  }
+}
+
 /* --------------------------------------------------------------------------
    Sandia — "Daylight Settlement"
    Cool bone canvas · deep ink · one mint signal · quiet motion
@@ -30,8 +39,8 @@
   /* Lines & focus */
   --border: #d2dbd4;
   --border-strong: #b4c0b8;
-  --ring: color-mix(in srgb, var(--accent-ink) 42%, var(--accent));
-  --shadow-focus: 0 0 0 3px color-mix(in srgb, var(--accent) 40%, rgb(14 21 18 / 0.28));
+  --ring: color-mix(in oklch, var(--accent-ink) 42%, var(--accent));
+  --shadow-focus: 0 0 0 3px color-mix(in oklch, var(--accent) 40%, rgb(14 21 18 / 0.28));
 
   /* Semantic — text on *-soft fills meets ~4.5:1 */
   --danger: #b33a2a;
@@ -77,7 +86,7 @@
   --page-form: 32rem;
   --page-measure: 36rem;
   --page-wide: 48rem;
-  --gutter: clamp(1rem, 3vw, 1.5rem);
+  --gutter: clamp(1rem, 0.667rem + 1.667vw, 1.5rem);
 }
 
 [data-theme="dark"] {
@@ -162,8 +171,23 @@
 
 html {
   height: 100%;
-  scroll-behavior: smooth;
+  interpolate-size: allow-keywords;
+  text-wrap: pretty;
+  overflow-wrap: break-word;
   -webkit-text-size-adjust: 100%;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+h1,
+h2,
+h3,
+h4 {
+  text-wrap: balance;
 }
 
 body {
@@ -214,6 +238,12 @@ button {
   cursor: pointer;
 }
 
+button,
+a,
+[role="button"] {
+  touch-action: manipulation;
+}
+
 code,
 kbd,
 samp {
@@ -222,7 +252,8 @@ samp {
 }
 
 :focus-visible {
-  outline: none;
+  /* Transparent, not none, so forced-colors mode can repaint the ring. */
+  outline: 2px solid transparent;
   box-shadow: var(--shadow-focus);
 }
 
@@ -244,17 +275,23 @@ samp {
 
 .pr-skip-link {
   position: absolute;
-  left: var(--gutter);
-  top: 0.75rem;
+  inset-inline-start: var(--gutter);
+  inset-block-start: 0.75rem;
   z-index: 100;
-  padding: 0.5rem 0.85rem;
+  padding-block: 0.5rem;
+  padding-inline: 0.85rem;
   border-radius: var(--radius);
   background: var(--accent);
   color: var(--accent-ink);
   font-size: 0.875rem;
   font-weight: 600;
   transform: translateY(-150%);
-  transition: transform var(--duration) var(--ease-out);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .pr-skip-link {
+    transition: transform var(--duration) var(--ease-out);
+  }
 }
 
 .pr-skip-link:focus {
@@ -305,7 +342,8 @@ samp {
   color: var(--accent-ink);
   background: var(--accent);
   display: inline-block;
-  padding: 0.35rem 0.65rem;
+  padding-block: 0.35rem;
+  padding-inline: 0.65rem;
   border-radius: 999px;
 }
 
@@ -372,12 +410,12 @@ samp {
 .pr-stack {
   display: flex;
   flex-direction: column;
-  gap: clamp(2.5rem, 5vw, 4rem);
+  gap: clamp(2.5rem, 1rem + 3.75vw, 4rem);
 }
 
 .pr-grid-3 {
   display: grid;
-  gap: clamp(1.25rem, 3vw, 2rem);
+  gap: clamp(1.25rem, 0.5rem + 1.875vw, 2rem);
 }
 
 @media (min-width: 640px) {
@@ -392,7 +430,7 @@ samp {
 
 .pr-panel {
   position: relative;
-  overflow: hidden;
+  overflow: clip;
   border: 1px solid var(--border);
   border-radius: var(--radius-xl);
   background: var(--panel);
@@ -402,13 +440,7 @@ samp {
 }
 
 .pr-panel--padded {
-  padding: 1rem;
-}
-
-@media (min-width: 640px) {
-  .pr-panel--padded {
-    padding: 1.25rem;
-  }
+  padding: clamp(1rem, 0.75rem + 1.25vw, 1.25rem);
 }
 
 .pr-panel--elevated {
@@ -417,7 +449,8 @@ samp {
 }
 
 .pr-panel--hero {
-  padding: clamp(2rem, 5vw, 4rem) clamp(1.25rem, 4vw, 3rem);
+  padding-block: clamp(2rem, 1rem + 4vw, 4rem);
+  padding-inline: clamp(1.25rem, 0.5rem + 3vw, 3rem);
 }
 
 .pr-panel--hero::after {
@@ -501,18 +534,18 @@ samp {
 }
 
 .pr-inset--danger {
-  border-color: color-mix(in srgb, var(--danger) 30%, var(--border));
+  border-color: color-mix(in oklch, var(--danger) 30%, var(--border));
   background: var(--danger-soft);
 }
 
 .pr-inset--success {
-  border-color: color-mix(in srgb, var(--success) 30%, var(--border));
+  border-color: color-mix(in oklch, var(--success) 30%, var(--border));
   background: var(--success-soft);
 }
 
 .pr-inset--muted {
   border-color: var(--border);
-  background: color-mix(in srgb, var(--foreground) 4%, transparent);
+  background: color-mix(in oklch, var(--foreground) 4%, transparent);
 }
 
 .pr-feature {
@@ -521,7 +554,7 @@ samp {
 
 .pr-feature h2,
 .pr-feature .pr-feature-title {
-  margin: 0 0 0.5rem;
+  margin-block: 0 0.5rem;
   font-family: var(--font-display);
   font-size: 1.125rem;
   font-weight: 600;
@@ -541,10 +574,10 @@ samp {
 
 .pr-header {
   position: sticky;
-  top: 0;
+  inset-block-start: 0;
   z-index: 40;
-  border-bottom: 1px solid var(--border);
-  background: color-mix(in srgb, var(--background) 82%, var(--panel-elevated));
+  border-block-end: 1px solid var(--border);
+  background: color-mix(in oklch, var(--background) 82%, var(--panel-elevated));
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
 }
@@ -563,13 +596,19 @@ samp {
   transition: color var(--duration) var(--ease-out);
 }
 
-.pr-nav-link:hover {
+.pr-nav-link:active {
   color: var(--foreground);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .pr-nav-link:hover {
+    color: var(--foreground);
+  }
 }
 
 .pr-sidebar {
   border-color: var(--border);
-  background: color-mix(in srgb, var(--panel-solid) 90%, transparent);
+  background: color-mix(in oklch, var(--panel-solid) 90%, transparent);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
 }
@@ -596,7 +635,8 @@ html:not([data-theme="dark"]) .pr-theme-dark {
   align-items: center;
   gap: 0.5rem;
   border-radius: var(--radius);
-  padding: 0.625rem 0.75rem;
+  padding-block: 0.625rem;
+  padding-inline: 0.75rem;
   color: var(--muted);
   font-size: 0.875rem;
   font-weight: 500;
@@ -605,9 +645,16 @@ html:not([data-theme="dark"]) .pr-theme-dark {
     background-color var(--duration) var(--ease-out);
 }
 
-.pr-nav-item:hover {
+.pr-nav-item:active {
   color: var(--foreground);
-  background: color-mix(in srgb, var(--foreground) 4%, transparent);
+  background: color-mix(in oklch, var(--foreground) 8%, transparent);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .pr-nav-item:hover {
+    color: var(--foreground);
+    background: color-mix(in oklch, var(--foreground) 4%, transparent);
+  }
 }
 
 .pr-nav-item[data-active="true"],
@@ -618,7 +665,7 @@ html:not([data-theme="dark"]) .pr-theme-dark {
 
 .pr-label {
   display: block;
-  margin-bottom: 0.4rem;
+  margin-block-end: 0.4rem;
   color: var(--foreground);
   font-size: 0.8125rem;
   font-weight: 600;
@@ -626,7 +673,7 @@ html:not([data-theme="dark"]) .pr-theme-dark {
 }
 
 .pr-help {
-  margin: 0.4rem 0 0;
+  margin-block: 0.4rem 0;
   color: var(--subtle);
   font-size: 0.75rem;
   line-height: 1.45;
@@ -654,26 +701,6 @@ html:not([data-theme="dark"]) .pr-theme-dark {
   to {
     opacity: 1;
   }
-}
-
-.pr-animate-in {
-  animation: pr-rise var(--duration-slow) var(--ease-out) both;
-}
-
-.pr-animate-in-delay-1 {
-  animation-delay: 80ms;
-}
-
-.pr-animate-in-delay-2 {
-  animation-delay: 160ms;
-}
-
-.pr-animate-in-delay-3 {
-  animation-delay: 240ms;
-}
-
-.pr-animate-fade {
-  animation: pr-fade var(--duration-slow) var(--ease-out) both;
 }
 
 /* Agent mascot. Eye offsets are in the logo's local SVG units, not screen pixels. */
@@ -722,6 +749,10 @@ html:not([data-theme="dark"]) .pr-theme-dark {
   }
 }
 
+.pr-animate-fade {
+  animation: pr-fade var(--duration-slow) var(--ease-out) both;
+}
+
 .pr-mascot {
   --mascot-look-y: 0px;
 }
@@ -734,56 +765,80 @@ html:not([data-theme="dark"]) .pr-theme-dark {
   --mascot-look-y: 110px;
 }
 
-.pr-mascot-float {
-  animation: pr-mascot-float 4.8s ease-in-out infinite;
-}
-
-.pr-mascot-shadow {
-  animation: pr-mascot-shadow 4.8s ease-in-out infinite;
-}
-
 .pr-mascot-body {
   transform-origin: 50% 100%;
 }
 
 .pr-mascot-look {
   transform: translateY(var(--mascot-look-y));
-  transition: transform 360ms var(--ease-out);
-}
-
-.pr-mascot[data-mood="thinking"] .pr-mascot-think {
-  animation: pr-mascot-think 1.6s ease-in-out infinite;
 }
 
 .pr-mascot-eye {
   transform-box: fill-box;
   transform-origin: center;
-  animation: pr-mascot-blink 5.2s ease-in-out infinite;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  html {
-    scroll-behavior: auto;
+/* Movement is opt-in: none of it runs when the reader asks for reduced motion. */
+@media (prefers-reduced-motion: no-preference) {
+  .pr-animate-in {
+    animation: pr-rise var(--duration-slow) var(--ease-out) both;
   }
 
-  .pr-animate-in,
-  .pr-animate-in-delay-1,
-  .pr-animate-in-delay-2,
-  .pr-animate-in-delay-3,
-  .pr-animate-fade,
-  .pr-mascot-float,
-  .pr-mascot-shadow,
-  .pr-mascot-eye,
-  .pr-mascot[data-mood="thinking"] .pr-mascot-think {
-    animation: none;
+  .pr-animate-in-delay-1 {
+    animation-delay: 80ms;
+  }
+
+  .pr-animate-in-delay-2 {
+    animation-delay: 160ms;
+  }
+
+  .pr-animate-in-delay-3 {
+    animation-delay: 240ms;
+  }
+
+  .pr-mascot-float {
+    animation: pr-mascot-float 4.8s ease-in-out infinite;
+  }
+
+  .pr-mascot-shadow {
+    animation: pr-mascot-shadow 4.8s ease-in-out infinite;
   }
 
   .pr-mascot-look {
-    transition: none;
+    transition: transform 360ms var(--ease-out);
   }
 
+  .pr-mascot[data-mood="thinking"] .pr-mascot-think {
+    animation: pr-mascot-think 1.6s ease-in-out infinite;
+  }
+
+  .pr-mascot-eye {
+    animation: pr-mascot-blink 5.2s ease-in-out infinite;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pr-animate-fade,
   .animate-pulse {
     animation: none;
+  }
+}
+
+/* Disclosures open and close by height; padding belongs on the content inside. */
+details::details-content {
+  height: 0;
+  overflow: clip;
+}
+
+details[open]::details-content {
+  height: auto;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  details::details-content {
+    transition:
+      height var(--duration) var(--ease-out),
+      content-visibility var(--duration) allow-discrete;
   }
 }
 

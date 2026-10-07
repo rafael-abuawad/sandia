@@ -61,16 +61,16 @@ export function PayQuoteDetails({
         </span>
       </div>
 
-      <details className="group border-t border-border text-sm">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-muted marker:content-none hover:bg-foreground/[0.03] hover:text-foreground [&::-webkit-details-marker]:hidden">
+      <details className="group border-bs border-border text-sm">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-muted marker:content-none hover:bg-foreground/[0.03] hover:text-foreground active:bg-foreground/5 [&::-webkit-details-marker]:hidden">
           <span className="group-open:hidden">Show quote details</span>
           <span className="hidden group-open:inline">Hide quote details</span>
           <ChevronDown
-            className="h-4 w-4 shrink-0 transition-transform duration-[var(--duration)] ease-[var(--ease-out)] group-open:rotate-180"
+            className="h-4 w-4 shrink-0 motion-safe:transition-transform duration-[var(--duration)] ease-[var(--ease-out)] group-open:rotate-180"
             strokeWidth={1.5}
           />
         </summary>
-        <div className="space-y-2 border-t border-border px-4 py-3">
+        <div className="space-y-2 border-bs border-border px-4 py-3">
           <div className="flex justify-between gap-3 text-muted">
             <span>Min received</span>
             <span className="flex items-center gap-2 text-foreground">
@@ -117,9 +117,9 @@ export function PayQuoteDetails({
           )}
           <div className="flex justify-between text-muted">
             <span>Route</span>
-            <span className="text-right text-foreground">{tradeTypeLabel(tradeType)}</span>
+            <span className="text-end text-foreground">{tradeTypeLabel(tradeType)}</span>
           </div>
-          <p className="pt-1 text-xs text-muted">
+          <p className="pbs-1 text-xs text-muted">
             This route converts your tokens into USDG on Robinhood Chain. Quotes are not cached and
             may change every block.
           </p>

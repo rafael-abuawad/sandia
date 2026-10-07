@@ -94,7 +94,7 @@ export function AmountCompose({
             onChange={(e) => onChange(sanitizeAmount(e.target.value))}
             aria-invalid={invalid || undefined}
             aria-describedby={invalid && errorId ? errorId : undefined}
-            className={cn("pr-money", prefix && "pl-0")}
+            className={cn("pr-money", prefix && "ps-0")}
           />
           {suffix ? (
             <InputGroupAddon className="pointer-events-none px-3 text-xs font-semibold text-muted">
@@ -135,12 +135,12 @@ export function AmountCompose({
         <button
           type="button"
           onClick={onDetailsClick}
-          className="pr-panel flex min-h-14 w-full items-center justify-between gap-3 px-4 py-3 text-left transition-[border-color] duration-[var(--duration)] ease-[var(--ease-out)] hover:border-border-strong"
+          className="pr-panel flex min-h-14 w-full items-center justify-between gap-3 px-4 py-3 text-start transition-[border-color] duration-[var(--duration)] ease-[var(--ease-out)] hover:border-border-strong active:border-border-strong"
         >
           <span className="min-w-0">
             <span className="block text-sm font-semibold text-foreground">{detailsLabel}</span>
             {detailsHint ? (
-              <span className="mt-0.5 block truncate text-xs text-muted">{detailsHint}</span>
+              <span className="mbs-0.5 block truncate text-xs text-muted">{detailsHint}</span>
             ) : null}
           </span>
           <ChevronRight className="size-5 shrink-0 text-muted" strokeWidth={1.5} aria-hidden />
@@ -155,7 +155,7 @@ export function AmountCompose({
         className={
           embeddedPresentation
             ? undefined
-            : "sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-10 -mx-1 bg-[color-mix(in_srgb,var(--background)_92%,transparent)] px-1 py-3 backdrop-blur-sm md:static md:bottom-auto md:bg-transparent md:p-0 md:backdrop-blur-none"
+            : "sticky inset-be-[calc(4.5rem+env(safe-area-inset-bottom))] z-10 -mx-1 bg-[color-mix(in_oklch,var(--background)_92%,transparent)] px-1 py-3 backdrop-blur-sm md:static md:inset-be-auto md:bg-transparent md:p-0 md:backdrop-blur-none"
         }
       >
         {footer}

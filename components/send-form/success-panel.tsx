@@ -33,7 +33,7 @@ export function SendSuccessPanel({
         </p>
         <SendSummaryDetails review={review} />
         {transactionHash ? (
-          <p className="border-t border-border pt-3 text-xs text-muted">
+          <p className="border-bs border-border pbs-3 text-xs text-muted">
             Transaction{" "}
             <TxLink chainId={robinhoodChain.id} hash={transactionHash} className="text-xs">
               {shortenAddress(transactionHash, 4)}

@@ -197,7 +197,7 @@ function AddressBookContacts({
   if (!ready || (isSignedIn && contacts === undefined)) {
     return (
       <div
-        className="overflow-hidden rounded-md border border-border"
+        className="overflow-clip rounded-md border border-border"
         role="status"
         aria-label="Loading"
         aria-busy="true"
@@ -205,7 +205,7 @@ function AddressBookContacts({
         {["a", "b", "c"].map((row) => (
           <div
             key={row}
-            className="flex items-center gap-3 border-b border-border px-3 py-3 last:border-b-0"
+            className="flex items-center gap-3 border-be border-border px-3 py-3 last:border-be-0"
           >
             <div className="min-w-0 flex-1 space-y-2">
               <Skeleton className="h-4 w-28" />
@@ -238,7 +238,7 @@ function AddressBookContacts({
   }
 
   return (
-    <ul className="divide-y divide-border overflow-hidden rounded-md border border-border bg-panel-elevated">
+    <ul className="divide-y divide-border overflow-clip rounded-md border border-border bg-panel-elevated">
       {sorted.map((contact) => (
         <li key={contact._id} className="flex items-center gap-3 px-3 py-3">
           <div className="min-w-0 flex-1">

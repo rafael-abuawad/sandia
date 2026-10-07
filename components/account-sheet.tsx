@@ -33,10 +33,10 @@ export function AccountSheet({ open, onOpenChange, id }: AccountSheetProps) {
       ref={dialogRef}
       id={id}
       aria-labelledby={titleId}
-      className="pr-account-sheet fixed inset-x-0 bottom-0 m-0 mt-auto w-full max-w-none rounded-t-[var(--radius-xl)] border border-border bg-panel-elevated p-0 text-foreground shadow-md open:flex open:flex-col"
+      className="pr-account-sheet fixed inset-x-0 inset-be-0 m-0 mbs-auto w-full max-w-none rounded-t-[var(--radius-xl)] border border-border bg-panel-elevated p-0 text-foreground shadow-md open:flex open:flex-col"
       onClose={() => onOpenChange(false)}
     >
-      <div className="flex items-center justify-between border-b border-border px-4 py-3">
+      <div className="flex items-center justify-between border-be border-border px-4 py-3">
         <h2 id={titleId} className="pr-section-title">
           Account
         </h2>
@@ -50,10 +50,10 @@ export function AccountSheet({ open, onOpenChange, id }: AccountSheetProps) {
           <X className="size-4" strokeWidth={1.5} aria-hidden />
         </Button>
       </div>
-      <div className="px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4">
+      <div className="px-4 pbe-[max(1rem,env(safe-area-inset-bottom))] pbs-4">
         <Link
           href="/address-book"
-          className="pr-nav-item mb-2 w-full justify-start"
+          className="pr-nav-item mbe-2 w-full justify-start"
           onClick={() => onOpenChange(false)}
         >
           <BookUser className="size-4 shrink-0" strokeWidth={1.5} aria-hidden />
@@ -61,7 +61,7 @@ export function AccountSheet({ open, onOpenChange, id }: AccountSheetProps) {
         </Link>
         <Link
           href="/dashboard"
-          className="pr-nav-item mb-2 w-full justify-start"
+          className="pr-nav-item mbe-2 w-full justify-start"
           onClick={() => onOpenChange(false)}
         >
           <List className="size-4 shrink-0" strokeWidth={1.5} aria-hidden />
@@ -69,7 +69,7 @@ export function AccountSheet({ open, onOpenChange, id }: AccountSheetProps) {
         </Link>
         <Link
           href="/activity"
-          className="pr-nav-item mb-3 w-full justify-start"
+          className="pr-nav-item mbe-3 w-full justify-start"
           onClick={() => onOpenChange(false)}
         >
           <History className="size-4 shrink-0" strokeWidth={1.5} aria-hidden />

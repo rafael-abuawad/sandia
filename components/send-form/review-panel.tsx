@@ -70,7 +70,7 @@ export function SendReviewPanel({
       <section className="pr-panel pr-panel--padded space-y-4">
         <div>
           <h2 className="pr-section-title">Review send</h2>
-          <p className="mt-1 text-sm text-muted">
+          <p className="mbs-1 text-sm text-muted">
             {review.mode === "massive"
               ? "Robinhood Chain · USDG. This batch is one send after you approve USDG for the total. Sandia covers the network fees."
               : "Robinhood Chain · USDG. This is a direct transfer. Sandia covers the network fee."}
@@ -79,7 +79,7 @@ export function SendReviewPanel({
 
         <SendSummaryDetails review={review} />
 
-        <ul className="space-y-2 border-t border-border pt-3">
+        <ul className="space-y-2 border-bs border-border pbs-3">
           {review.recipients.map((r) => (
             <li
               key={`${r.address}-${r.amountUsdMicros}`}
@@ -123,7 +123,7 @@ export function SendReviewPanel({
         </div>
       ) : null}
 
-      <div className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-10 flex gap-3 bg-[color-mix(in_srgb,var(--background)_92%,transparent)] py-3 backdrop-blur-sm md:static md:bg-transparent md:p-0 md:backdrop-blur-none">
+      <div className="sticky inset-be-[calc(4.5rem+env(safe-area-inset-bottom))] z-10 flex gap-3 bg-[color-mix(in_oklch,var(--background)_92%,transparent)] py-3 backdrop-blur-sm md:static md:bg-transparent md:p-0 md:backdrop-blur-none">
         <Button
           type="button"
           variant="outline"

@@ -319,7 +319,7 @@ export default function AgentPage() {
                 key={actionName}
                 type="button"
                 variant="outline"
-                className="h-auto min-h-12 justify-between whitespace-normal text-left"
+                className="h-auto min-h-12 justify-between whitespace-normal text-start"
                 onClick={() => void openOperation(actionName as IntentAction, prompt)}
               >
                 <span>{ACTION_LABELS[actionName]}</span>
@@ -381,14 +381,14 @@ function OperationDialog({
   const isStock = operation.action === "stock_buy" || operation.action === "stock_sell";
   return (
     <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
-      <ResponsiveDialogContent className="flex max-h-[90dvh] flex-col overflow-hidden sm:max-w-xl">
+      <ResponsiveDialogContent className="flex max-h-[90dvh] flex-col overflow-clip sm:max-w-xl">
         <ResponsiveDialogHeader className="shrink-0">
           <ResponsiveDialogTitle>{title}</ResponsiveDialogTitle>
           <ResponsiveDialogDescription>
             Check the details and complete the operation in the form below.
           </ResponsiveDialogDescription>
         </ResponsiveDialogHeader>
-        <ResponsiveDialogBody className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 pb-4">
+        <ResponsiveDialogBody className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 pbe-4">
           {operation.ambiguousRecipient ? (
             <p className="rounded-md border border-border p-3 text-sm text-muted" role="status">
               More than one saved contact has this name. Choose the right recipient in the address
@@ -430,7 +430,7 @@ function OperationDialog({
             />
           ) : null}
         </ResponsiveDialogBody>
-        <ResponsiveDialogFooter className="shrink-0 border-t border-border bg-panel-elevated pt-4">
+        <ResponsiveDialogFooter className="shrink-0 border-bs border-border bg-panel-elevated pbs-4">
           <Button
             type="button"
             variant="secondary"
@@ -522,7 +522,7 @@ function AgentStockPanel({
                 <Button
                   type="button"
                   variant="outline"
-                  className="h-auto w-full justify-start py-2 text-left"
+                  className="h-auto w-full justify-start py-2 text-start"
                   onClick={() => onStockChange(asset)}
                 >
                   <span className="pr-mono w-16 shrink-0">{asset.symbol}</span>
@@ -538,7 +538,7 @@ function AgentStockPanel({
       ) : (
         <div className="rounded-md border border-border px-3 py-2 text-sm">
           <span className="pr-mono font-semibold">{operation.stock.symbol}</span>
-          <span className="ml-2 text-muted">{operation.stock.shortName}</span>
+          <span className="ms-2 text-muted">{operation.stock.shortName}</span>
         </div>
       )}
       {unit === null ? (

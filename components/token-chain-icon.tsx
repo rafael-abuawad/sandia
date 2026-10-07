@@ -56,7 +56,7 @@ export function TokenChainIcon({
       aria-hidden
     >
       <div
-        className="overflow-hidden rounded-full bg-[var(--panel-elevated)] ring-1 ring-border"
+        className="overflow-clip rounded-full bg-[var(--panel-elevated)] ring-1 ring-border"
         style={{ width: dims.token, height: dims.token }}
       >
         {tokenSrc && !tokenBroken ? (
@@ -74,7 +74,7 @@ export function TokenChainIcon({
         )}
       </div>
       <div
-        className="absolute -right-0.5 -bottom-0.5 overflow-hidden rounded-full bg-background ring-2 ring-[var(--panel-elevated)]"
+        className="absolute -inset-e-0.5 -inset-be-0.5 overflow-clip rounded-full bg-background ring-2 ring-[var(--panel-elevated)]"
         style={{ width: dims.badge, height: dims.badge }}
         title={chainName}
       >

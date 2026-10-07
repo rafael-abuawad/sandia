@@ -12,7 +12,7 @@ function geckoTokenUrl(address: string): string {
 export function PriceChart({ address, symbol }: { address: string; symbol: string }) {
   return (
     <div className="space-y-2">
-      <div className="overflow-hidden rounded-[var(--radius-lg)] border border-border bg-panel-elevated">
+      <div className="overflow-clip rounded-[var(--radius-lg)] border border-border bg-panel-elevated">
         <iframe
           title={`${symbol} price chart`}
           src={geckoTokenUrl(address)}

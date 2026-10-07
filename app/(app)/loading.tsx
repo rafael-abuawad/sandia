@@ -20,7 +20,7 @@ export default function Loading() {
             <Skeleton className="h-4 w-full" />
             <Skeleton className="h-4 w-4/5" />
           </div>
-          <div className="flex flex-wrap gap-3 pt-2">
+          <div className="flex flex-wrap gap-3 pbs-2">
             <Skeleton className="h-12 w-40" />
             <Skeleton className="h-12 w-32" />
             <Skeleton className="h-12 w-36" />

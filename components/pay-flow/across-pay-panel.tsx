@@ -499,14 +499,14 @@ function PayEthDetails({
           </span>
         </span>
       </div>
-      <div className="flex items-center justify-between gap-3 border-t border-border px-4 py-3 text-sm">
+      <div className="flex items-center justify-between gap-3 border-bs border-border px-4 py-3 text-sm">
         <span className="text-muted">Recipient receives</span>
         <span className="pr-money font-semibold text-foreground">
           {formatTokenAmount(outputAmountBaseUnits, destinationTokenDecimals)}{" "}
           {destinationTokenSymbol}
         </span>
       </div>
-      <p className="border-t border-border px-4 py-3 text-xs text-muted">
+      <p className="border-bs border-border px-4 py-3 text-xs text-muted">
         ETH swaps to USDG on Robinhood Chain. The USDG goes to the person who created this request.
         The ETH amount can change until you pay. Network gas is paid in ETH.
       </p>
@@ -542,11 +542,11 @@ function PayDirectDetails({
           </span>
         </span>
       </div>
-      <div className="flex items-center justify-between gap-3 border-t border-border px-4 py-3 text-sm">
+      <div className="flex items-center justify-between gap-3 border-bs border-border px-4 py-3 text-sm">
         <span className="text-muted">Route fee</span>
         <span className="text-foreground">None</span>
       </div>
-      <p className="border-t border-border px-4 py-3 text-xs text-muted">
+      <p className="border-bs border-border px-4 py-3 text-xs text-muted">
         USDG is transferred directly on Robinhood Chain. Network gas is paid in ETH.
       </p>
     </div>
@@ -656,7 +656,7 @@ function PayAcrossActionBar({
   onPay: () => void;
 }) {
   return (
-    <div className="sticky bottom-0 z-10 -mx-4 space-y-2 border-t border-border bg-panel-elevated px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0">
+    <div className="sticky inset-be-0 z-10 -mx-4 space-y-2 border-bs border-border bg-panel-elevated px-4 py-3 pbe-[max(0.75rem,env(safe-area-inset-bottom))] sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0">
       {blocker && !busy ? (
         <p id={blockerId} className="text-sm text-muted" role="status">
           {blocker}
