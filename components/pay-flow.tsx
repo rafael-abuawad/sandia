@@ -23,14 +23,9 @@ export function PayFlow({ publicId }: PayFlowProps) {
     step,
     quoteError,
     quote,
-    ethQuote,
     tradeType,
     selectedToken,
     chains,
-    directPay,
-    directBalance,
-    robinhoodEth,
-    ethBalance,
     canPay,
     paymentInProgress,
     payerAddress,
@@ -103,17 +98,12 @@ export function PayFlow({ publicId }: PayFlowProps) {
           step={step}
           quoteError={quoteError}
           quote={quote}
-          ethQuote={ethQuote}
           tradeType={tradeType}
           selectedToken={selectedToken}
           chains={chains}
           destinationTokenSymbol={request.destinationTokenSymbol}
           destinationTokenDecimals={request.destinationTokenDecimals}
           outputAmountBaseUnits={request.outputAmountBaseUnits}
-          directPay={directPay}
-          directBalance={directBalance}
-          robinhoodEth={robinhoodEth}
-          ethBalance={ethBalance}
           canPay={canPay}
           payerAddress={payerAddress}
           paymentInProgress={Boolean(paymentInProgress)}

@@ -1,23 +1,13 @@
 import { defineChain } from "viem";
 import { mainnet, optimism, polygon, arbitrum, base, avalanche, bsc, monad } from "viem/chains";
-import { ROBINHOOD_USDG } from "./destination";
 
-/** Robinhood Chain — https://docs.robinhood.com/chain/connecting/ */
-export const robinhoodChain = defineChain({
-  id: 4663,
-  name: "Robinhood Chain",
-  nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
-  rpcUrls: {
-    default: {
-      http: ["https://rpc.mainnet.chain.robinhood.com"],
-    },
-  },
-  blockExplorers: {
-    default: {
-      name: "Robinhood Explorer",
-      url: "https://robinhoodchain.blockscout.com",
-    },
-  },
+/** HyperEVM. Payers can pay from here; Across forwards to HyperCore. */
+export const hyperEvm = defineChain({
+  id: 999,
+  name: "HyperEVM",
+  nativeCurrency: { name: "HYPE", symbol: "HYPE", decimals: 18 },
+  rpcUrls: { default: { http: ["https://rpc.hyperliquid.xyz/evm"] } },
+  blockExplorers: { default: { name: "HyperEVMScan", url: "https://hyperevmscan.io" } },
 });
 
 /** Chains shown in the payer "You pay with" dropdown. */
@@ -30,7 +20,7 @@ export const PAYER_CHAIN_IDS = new Set<number>([
   8453, // Base
   42161, // Arbitrum
   43114, // Avalanche
-  4663, // Robinhood
+  999, // HyperEVM
 ]);
 
 /**
@@ -50,6 +40,8 @@ export const PAYER_TOKEN_SYMBOLS = new Set([
   "WPOL",
   "MON",
   "WMON",
+  "HYPE",
+  "WHYPE",
   "USDC",
   "USDT",
   "USDT0",
@@ -66,6 +58,7 @@ export function displayTokenSymbol(symbol: string): string {
     WMATIC: "MATIC",
     WPOL: "POL",
     WMON: "MON",
+    WHYPE: "HYPE",
     USDT0: "USDT",
   };
   return map[symbol.toUpperCase()] ?? symbol;
@@ -85,6 +78,8 @@ const GAS_TOKEN_HOME_CHAIN: Record<string, number> = {
   WPOL: 137,
   MON: 143,
   WMON: 143,
+  HYPE: 999,
+  WHYPE: 999,
 };
 
 function isEthNativeChain(chainId: number | undefined): boolean {
@@ -92,21 +87,20 @@ function isEthNativeChain(chainId: number | undefined): boolean {
 }
 
 /**
- * Tokens a payer can select. Robinhood is limited to WETH (shown as ETH) and USDG.
- * On ETH-native chains, native ETH replaces WETH: Across wraps it in the deposit, so the
- * payer needs no WETH balance or approval. Other chains keep the shared allowlist, and
- * USDG stays off those chains.
+ * Tokens a payer can select. On ETH-native chains, native ETH replaces WETH: Across wraps
+ * it in the deposit, so the payer needs no WETH balance or approval. HYPE pays natively on
+ * HyperEVM. Other chains keep the shared allowlist.
  */
 export function isPayerTokenAllowed(symbol: string, address: string, chainId?: number): boolean {
   const normalized = address.toLowerCase();
   const upper = symbol.toUpperCase();
-  if (chainId === robinhoodChain.id) {
-    if (upper === "USDG") return normalized === ROBINHOOD_USDG.address.toLowerCase();
-    return upper === "WETH" && normalized !== ZERO_ADDRESS;
-  }
   if (isEthNativeChain(chainId)) {
     if (upper === "ETH") return normalized === ZERO_ADDRESS;
     if (upper === "WETH") return false;
+  }
+  if (chainId === hyperEvm.id) {
+    if (upper === "HYPE") return normalized === ZERO_ADDRESS;
+    if (upper === "WHYPE") return false;
   }
   const home = GAS_TOKEN_HOME_CHAIN[upper];
   if (home !== undefined && home !== chainId) return false;
@@ -124,7 +118,7 @@ export const appChains = [
   avalanche,
   bsc,
   monad,
-  robinhoodChain,
+  hyperEvm,
 ] as const;
 
 export function chainName(chainId: number): string {
@@ -134,7 +128,7 @@ export function chainName(chainId: number): string {
 
 const TX_HASH = /^0x[0-9a-fA-F]{64}$/;
 
-/** Block explorer URL for a transaction. Robinhood Chain uses Blockscout. */
+/** Block explorer URL for a transaction. */
 export function explorerTxUrl(chainId: number, hash: string): string | null {
   if (!TX_HASH.test(hash)) return null;
   const base = appChains.find((chain) => chain.id === chainId)?.blockExplorers?.default.url;

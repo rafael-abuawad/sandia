@@ -105,7 +105,7 @@ export function parseDepositLogs(logs: Log[]): ParsedDeposit[] {
 
 /**
  * Some Across routes deposit to a destination handler contract whose message pays the
- * recipient. Those deposits are accepted here, and the fill's USDG transfer proves the payee.
+ * recipient. Those deposits are accepted here, and Across's fill record proves the payee.
  */
 export function matchDepositToRequest(
   deposits: ParsedDeposit[],

@@ -855,3 +855,352 @@ details[open]::details-content {
     letter-spacing: 0.16em;
   }
 }
+
+/* --------------------------------------------------------------------------
+   Trade — mobile-first app surfaces
+   One column, thumb-reachable actions, numbers first.
+   -------------------------------------------------------------------------- */
+
+.pr-app-page {
+  width: 100%;
+  max-width: 34rem;
+  margin-inline: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.pr-balance {
+  padding-block: 0.25rem 0;
+}
+
+.pr-section-label {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.pr-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pr-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 4rem;
+  padding-block: 0.625rem;
+  padding-inline: 0.5rem;
+  margin-inline: -0.5rem;
+  border-radius: var(--radius);
+  color: inherit;
+  text-decoration: none;
+  transition: background-color var(--duration) var(--ease-out);
+}
+
+.pr-row:hover {
+  background: color-mix(in oklch, var(--foreground) 4%, transparent);
+}
+
+.pr-row:active {
+  background: color-mix(in oklch, var(--foreground) 7%, transparent);
+}
+
+.pr-search {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  min-height: 3rem;
+  padding-inline: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--panel-elevated);
+}
+
+.pr-search:focus-within {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-focus);
+}
+
+.pr-search input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.pr-segmented {
+  display: grid;
+  grid-auto-columns: 1fr;
+  grid-auto-flow: column;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--foreground) 6%, transparent);
+}
+
+.pr-segmented > button {
+  min-height: 2.5rem;
+  border-radius: 999px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--muted);
+  transition:
+    color var(--duration) var(--ease-out),
+    background-color var(--duration) var(--ease-out);
+}
+
+.pr-segmented > button[data-active] {
+  background: var(--panel-elevated);
+  color: var(--foreground);
+  box-shadow:
+    var(--depth-sm),
+    0 1px 3px rgb(14 21 18 / 0.08);
+}
+
+.pr-segmented--quiet {
+  background: transparent;
+  padding: 0;
+}
+
+.pr-segmented--quiet > button {
+  min-height: 2.25rem;
+}
+
+.pr-segmented--quiet > button[data-active] {
+  background: color-mix(in oklch, var(--foreground) 7%, transparent);
+  box-shadow: none;
+}
+
+.pr-segmented--sides > button[data-active="long"] {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.pr-segmented--sides > button[data-active="short"] {
+  background: var(--danger);
+  color: var(--danger-ink);
+}
+
+.pr-side-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.0625rem 0.375rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.pr-side-tag--long {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.pr-side-tag--short {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.pr-chip {
+  min-height: 2.5rem;
+  min-width: 3.25rem;
+  padding-inline: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--panel-elevated);
+  font-size: 0.875rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  transition:
+    border-color var(--duration) var(--ease-out),
+    background-color var(--duration) var(--ease-out);
+}
+
+.pr-chip:hover {
+  border-color: var(--border-strong);
+}
+
+.pr-chip:active {
+  scale: 0.97;
+}
+
+.pr-chip[data-active] {
+  border-color: var(--foreground);
+  background: var(--foreground);
+  color: var(--background);
+}
+
+.pr-amount-field {
+  display: flex;
+  align-items: baseline;
+  gap: 0.25rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--panel-elevated);
+  font-size: 2.25rem;
+  font-weight: 600;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.pr-amount-field:focus-within {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-focus);
+}
+
+.pr-amount-field input {
+  width: 100%;
+  min-width: 0;
+  flex: 1;
+  background: transparent;
+  outline: none;
+}
+
+.pr-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+.pr-summary > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.pr-summary dt {
+  color: var(--muted);
+}
+
+.pr-summary dd {
+  margin: 0;
+  text-align: end;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.pr-stat {
+  padding: 0.75rem 0.875rem;
+  border-radius: var(--radius);
+  background: color-mix(in oklch, var(--foreground) 4%, transparent);
+}
+
+.pr-stat dt {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.pr-stat dd {
+  margin: 0.125rem 0 0;
+  font-weight: 600;
+}
+
+/* Long/Short sit above the mobile tab bar, in thumb reach. */
+.pr-trade-bar {
+  position: fixed;
+  inset-inline: 0;
+  inset-block-end: calc(4.5rem + env(safe-area-inset-bottom));
+  z-index: 30;
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.75rem var(--gutter);
+  background: color-mix(in oklch, var(--background) 90%, transparent);
+  backdrop-filter: blur(12px);
+}
+
+@media (min-width: 768px) {
+  .pr-trade-bar {
+    position: static;
+    padding: 0;
+    background: none;
+    backdrop-filter: none;
+  }
+}
+
+.pr-btn-short {
+  background: var(--danger);
+  color: var(--danger-ink);
+}
+
+.pr-btn-short:hover {
+  background: color-mix(in oklch, var(--danger) 90%, black);
+}
+
+.pr-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--panel-elevated);
+  color: inherit;
+  text-decoration: none;
+  transition: border-color var(--duration) var(--ease-out);
+}
+
+.pr-option:hover,
+.pr-option:active {
+  border-color: var(--border-strong);
+}
+
+/* --------------------------------------------------------------------------
+   Portfolio allocation — categorical slots validated against --panel-solid in
+   both themes (scripts/validate_palette.js). Green and red stay reserved for
+   up/down, so slots skip them. Light contrast is below 3:1 for three hues, so
+   the legend always lists names and values.
+   -------------------------------------------------------------------------- */
+
+:root {
+  --alloc-1: #2a78d6;
+  --alloc-2: #eb6834;
+  --alloc-3: #1baf7a;
+  --alloc-4: #eda100;
+  --alloc-5: #e87ba4;
+  --alloc-6: #6250d6;
+  --alloc-neutral: #8a968e;
+}
+
+[data-theme="dark"] {
+  --alloc-1: #3987e5;
+  --alloc-2: #d95926;
+  --alloc-3: #199e70;
+  --alloc-4: #c98500;
+  --alloc-5: #d55181;
+  --alloc-6: #9085e9;
+  --alloc-neutral: #6f8275;
+}
+
+.pr-alloc-bar {
+  display: flex;
+  gap: 2px;
+  height: 0.75rem;
+}
+
+.pr-alloc-bar > span {
+  min-width: 4px;
+  border-radius: 2px;
+}
+
+.pr-alloc-bar > span:first-child {
+  border-start-start-radius: 4px;
+  border-end-start-radius: 4px;
+}
+
+.pr-alloc-bar > span:last-child {
+  border-start-end-radius: 4px;
+  border-end-end-radius: 4px;
+}
+
+@media (forced-colors: active) {
+  .pr-alloc-bar > span {
+    border: 1px solid CanvasText;
+  }
+}

@@ -20,7 +20,7 @@ function errorChain(error: unknown): ErrorLike[] {
   return chain;
 }
 
-/** Classifies wallet errors without exposing raw provider payloads to the user. */
+/** Classifies wallet and Hyperliquid errors without exposing raw provider payloads. */
 export function sendErrorMessage(error: unknown, fallback = "Send could not be submitted.") {
   const chain = errorChain(error);
   const messages = chain
@@ -30,35 +30,27 @@ export function sendErrorMessage(error: unknown, fallback = "Send could not be s
 
   if (
     chain.some((item) => item.code === 4001 || item.code === "4001") ||
-    /user (rejected|denied)|rejected the request|denied transaction signature/.test(combined)
+    /user (rejected|denied)|rejected the request|denied (transaction|message)? ?signature|user cancel/.test(
+      combined,
+    )
   ) {
-    return "You canceled the send. Your USDG was not sent.";
+    return "You canceled in your wallet. Nothing was sent.";
   }
 
-  if (
-    /gas sponsorship|sponsor(?:ship)? (?:is )?(?:not enabled|unavailable)|paymaster/.test(combined)
-  ) {
-    return "Fee sponsorship is unavailable right now. Your USDG was not sent. Try again later or contact support.";
-  }
-
-  if (/insufficient funds for gas|gas balance/.test(combined)) {
-    return "The network fee could not be sponsored. Check fee sponsorship and try again later.";
-  }
-
-  if (/insufficient funds|exceeds balance/.test(combined)) {
-    return "Your USDG balance changed. Check your balance and review the send again.";
+  if (/insufficient (funds|balance)|exceeds balance/.test(combined)) {
+    return "Your USDC balance is too low. Check your balance and try again.";
   }
 
   if (/not authenticated|unauthorized/.test(combined)) {
     return "Sign in again to continue.";
   }
 
-  if (/timed? ?out|timeout|failed to fetch|fetch failed|rpc|network|transport/.test(combined)) {
-    return "Robinhood Chain is temporarily unavailable. Check your connection and retry.";
+  if (/timed? ?out|timeout|failed to fetch|fetch failed|network|transport/.test(combined)) {
+    return "Hyperliquid is temporarily unreachable. Check your connection and retry.";
   }
 
   const productError = messages.find((message) =>
-    /^(?:Sign in to send USDG\.|Robinhood Chain is not reachable\.|Switch to Robinhood Chain before confirming this send\.|Switch your wallet to Robinhood Chain, then confirm this send\.|Sandia Send is not configured\.|This wallet doesn't have enough USDG on Robinhood Chain\.|USDG approval reverted\.|The transfer reverted on Robinhood Chain\.|The batch transfer reverted on Robinhood Chain\.|USDG approval confirmed, but the batch is not ready yet\.|The wallet did not return a valid transaction hash\.|Add a recipient\.?)/.test(
+    /^(?:Sign in to send USDC\.|Add a recipient\.?|Enable trading first\.|Add USDC to your account first\.)/.test(
       message,
     ),
   );

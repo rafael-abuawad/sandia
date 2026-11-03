@@ -1,6 +1,7 @@
 /** Pure Across fill checks. A request is paid only when every field is present and matches. */
 
-export const ROBINHOOD_CHAIN_ID = 4663;
+/** Across chain id for HyperCore. Every request settles there. */
+export const HYPERCORE_CHAIN_ID = 1337;
 
 export const STUCK_AFTER_MS = 30 * 60 * 1000;
 export const MAX_ATTEMPTS_PER_REQUEST = 8;
@@ -63,8 +64,8 @@ export function evaluateFill(evidence: FillEvidence, expected: ExpectedSettlemen
       reason: `Fill destination chain ${evidence.destinationChainId} is not ${expected.destinationChainId}`,
     };
   }
-  if (evidence.destinationChainId !== ROBINHOOD_CHAIN_ID) {
-    return { outcome: "mismatch", reason: "Fill destination chain is not Robinhood Chain" };
+  if (evidence.destinationChainId !== HYPERCORE_CHAIN_ID) {
+    return { outcome: "mismatch", reason: "Fill destination chain is not HyperCore" };
   }
   if (evidence.outputToken.toLowerCase() !== expected.destinationTokenAddress.toLowerCase()) {
     return { outcome: "mismatch", reason: "Fill output token does not match the request" };

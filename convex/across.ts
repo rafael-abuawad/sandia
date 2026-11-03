@@ -5,32 +5,29 @@ import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { createPublicClient, http, type Hex } from "viem";
 import { arbitrum, avalanche, base, bsc, mainnet, monad, optimism, polygon } from "viem/chains";
-import {
-  parseAcrossDeposit,
-  transferFillEvidence,
-  type AcrossDepositRecord,
-} from "./lib/acrossDeposit";
+import { parseAcrossDeposit, type AcrossDepositRecord } from "./lib/acrossDeposit";
 import { matchDepositToRequest, parseDepositLogs } from "./lib/depositLog";
 import { RECONCILE_BATCH } from "./lib/fillProof";
-import { parseTransferLogs } from "./lib/transferLog";
+import { acrossAppFeeParams } from "./lib/appFee";
 
 const ACROSS_API = "https://app.across.to/api";
 const FETCH_TIMEOUT_MS = 8_000;
 
-const robinhoodChain = {
-  id: 4663,
-  name: "Robinhood Chain",
-  nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
-  rpcUrls: { default: { http: ["https://rpc.mainnet.chain.robinhood.com"] } },
+const hyperEvm = {
+  id: 999,
+  name: "HyperEVM",
+  nativeCurrency: { name: "HYPE", symbol: "HYPE", decimals: 18 },
+  rpcUrls: { default: { http: ["https://rpc.hyperliquid.xyz/evm"] } },
 } as const;
 
 const chainsById = new Map<
   number,
   { id: number; name: string; rpcUrls: { default: { http: readonly string[] } } }
 >(
-  [mainnet, optimism, bsc, polygon, monad, base, arbitrum, avalanche, robinhoodChain].map(
-    (chain) => [chain.id, chain],
-  ),
+  [mainnet, optimism, bsc, polygon, monad, base, arbitrum, avalanche, hyperEvm].map((chain) => [
+    chain.id,
+    chain,
+  ]),
 );
 
 function acrossHeaders(): HeadersInit {
@@ -82,47 +79,12 @@ async function readOriginDeposit(originChainId: number, depositTxnRef: string) {
   return parseDepositLogs(receipt.logs);
 }
 
-type SettlementExpectation = { token: string; recipient: string; amount: string };
-
-async function readRobinhoodTransfers(txHash: string) {
-  const client = createPublicClient({
-    chain: robinhoodChain,
-    transport: http(robinhoodChain.rpcUrls.default.http[0]),
-  });
-  const receipt = await client.getTransactionReceipt({ hash: txHash as Hex });
-  return receipt.status === "success" ? parseTransferLogs(receipt.logs) : [];
-}
-
-async function readDirectProof(
-  txHash: string,
-  expected: SettlementExpectation,
-): Promise<AcrossDepositRecord> {
-  return transferFillEvidence(txHash, expected, await readRobinhoodTransfers(txHash));
-}
-
-/** Across reports the fill; the Robinhood receipt proves the payee received the USDG. */
-async function readAcrossProof(
-  depositTxnRef: string,
-  expected: SettlementExpectation,
-): Promise<AcrossDepositRecord> {
-  const record = await fetchDepositProof(depositTxnRef);
-  const fillTxnRef = record.fillTxnRef ?? record.fillTx;
-  if (
-    record.status?.toLowerCase() !== "filled" ||
-    !fillTxnRef ||
-    record.destinationChainId !== robinhoodChain.id
-  ) {
-    return record;
-  }
-  const evidence = transferFillEvidence(
-    fillTxnRef,
-    expected,
-    await readRobinhoodTransfers(fillTxnRef),
-  );
-  if (evidence.recipient !== expected.recipient) {
-    console.error("payment_fill_missing_payee_transfer", { depositTxnRef, fillTxnRef });
-  }
-  return evidence;
+/**
+ * HyperCore fills have no EVM receipt to read, so Across's `/deposit` record is the proof.
+ * `evaluateFill` then requires chain 1337, the request's token, recipient, and amount.
+ */
+async function readAcrossProof(depositTxnRef: string): Promise<AcrossDepositRecord> {
+  return await fetchDepositProof(depositTxnRef);
 }
 
 export const submitDeposit = action({
@@ -218,7 +180,7 @@ export const quoteSwap = action({
       process.env.ACROSS_INTEGRATOR_ID ?? process.env.NEXT_PUBLIC_ACROSS_INTEGRATOR_ID;
     if (integratorId) params.integratorId = integratorId;
 
-    const quote = (await acrossGet("/swap/approval", params)) as {
+    type Quote = {
       swapTx?: { simulationSuccess?: boolean };
       checks?: {
         balance?: { actual?: string; expected?: string };
@@ -227,6 +189,23 @@ export const quoteSwap = action({
       message?: string;
       error?: string;
     };
+    // Charge Sandia's app fee when Across supports it on the route. Across does not offer app
+    // fees into HyperCore today, so a rejected fee quote falls back to a plain quote.
+    const feeParams = acrossAppFeeParams();
+    let quote: Quote;
+    if (feeParams) {
+      try {
+        quote = (await acrossGet("/swap/approval", { ...params, ...feeParams })) as Quote;
+      } catch (error) {
+        console.warn("across_app_fee_unavailable", {
+          originChainId: args.originChainId,
+          message: error instanceof Error ? error.message.slice(0, 120) : "unknown",
+        });
+        quote = (await acrossGet("/swap/approval", params)) as Quote;
+      }
+    } else {
+      quote = (await acrossGet("/swap/approval", params)) as Quote;
+    }
     if (!quote.swapTx) {
       throw new Error(quote.message || quote.error || "No executable quote for this route");
     }
@@ -286,18 +265,7 @@ export const syncDepositStatus = action({
     });
     try {
       if (!target) throw new Error("Payment attempt not found");
-      const expected = {
-        token: target.destinationTokenAddress,
-        recipient: target.recipientAddress,
-        amount: target.outputAmountBaseUnits,
-      };
-      const record =
-        target.settlementKind === "direct"
-          ? await readDirectProof(depositTxnRef, expected)
-          : await readAcrossProof(depositTxnRef, expected);
-      if (target.settlementKind === "direct") {
-        console.log("payment_status_direct", { depositTxnRef, status: record.status });
-      }
+      const record = await readAcrossProof(depositTxnRef);
       const result = await ctx.runMutation(
         internal.paymentAttempts.applyAcrossStatus,
         proofArgs(depositTxnRef, record, false),
@@ -339,15 +307,7 @@ export const reconcilePending = internalAction({
     let errors = 0;
     for (const attempt of attempts) {
       try {
-        const expected = {
-          token: attempt.destinationTokenAddress,
-          recipient: attempt.recipientAddress,
-          amount: attempt.outputAmountBaseUnits,
-        };
-        const record =
-          attempt.settlementKind === "direct"
-            ? await readDirectProof(attempt.depositTxnRef, expected)
-            : await readAcrossProof(attempt.depositTxnRef, expected);
+        const record = await readAcrossProof(attempt.depositTxnRef);
         await ctx.runMutation(
           internal.paymentAttempts.applyAcrossStatus,
           proofArgs(attempt.depositTxnRef, record, false),
@@ -365,7 +325,6 @@ export const reconcilePending = internalAction({
         );
       }
     }
-    await ctx.runAction(internal.outboundActions.reconcile, {});
     return { checked: attempts.length, errors };
   },
 });

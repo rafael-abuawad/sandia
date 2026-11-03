@@ -12,10 +12,8 @@ function decisionResponse(
     send: 0.96,
     batch_send: 0.01,
     request: 0.01,
-    earn_deposit: 0.005,
-    earn_withdraw: 0.005,
-    stock_buy: 0.005,
-    stock_sell: 0.005,
+    trade_long: 0.01,
+    trade_short: 0.01,
     unsupported: 0,
   };
   return {
@@ -33,13 +31,13 @@ describe("Jev request client", () => {
       expect(init?.headers).toMatchObject({ Authorization: "Bearer test-key" });
       expect(JSON.parse(String(init?.body))).toMatchObject({
         model: "~typesafe/jev-latest",
-        state: { user_intent: "Send 100 USDG to Marco" },
+        state: { user_intent: "Send 100 USDC to Marco" },
       });
       expect(init?.signal).toBeInstanceOf(AbortSignal);
       return new Response(JSON.stringify(decisionResponse()));
     });
     await expect(
-      resolveIntentWithJev("Send 100 USDG to Marco", "test-key", fetcher),
+      resolveIntentWithJev("Send 100 USDC to Marco", "test-key", fetcher),
     ).resolves.toMatchObject({
       status: "resolved",
       action: "send",
@@ -58,10 +56,8 @@ describe("Jev request client", () => {
                 send: 0.61,
                 batch_send: 0.02,
                 request: 0.29,
-                earn_deposit: 0.02,
-                earn_withdraw: 0.01,
-                stock_buy: 0.02,
-                stock_sell: 0.01,
+                trade_long: 0.04,
+                trade_short: 0.02,
                 unsupported: 0.02,
               },
             }),

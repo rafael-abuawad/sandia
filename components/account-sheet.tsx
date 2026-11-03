@@ -75,7 +75,10 @@ export function AccountSheet({ open, onOpenChange, id }: AccountSheetProps) {
           <History className="size-4 shrink-0" strokeWidth={1.5} aria-hidden />
           Activity
         </Link>
-        <AccountPanel onAfterLogout={() => onOpenChange(false)} />
+        <AccountPanel
+          onAfterLogout={() => onOpenChange(false)}
+          onNavigate={() => onOpenChange(false)}
+        />
       </div>
     </dialog>
   );

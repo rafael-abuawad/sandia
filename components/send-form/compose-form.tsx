@@ -59,7 +59,7 @@ function SendComposeFooter({
     return (
       <div className="flex flex-col items-center gap-3">
         <LoginButton />
-        <p className="text-center text-sm text-muted">Sign in to send USDG.</p>
+        <p className="text-center text-sm text-muted">Sign in to send USDC.</p>
       </div>
     );
   }
@@ -175,7 +175,7 @@ export function SendComposeForm({
         <AmountCompose
           kicker="You're sending"
           prefix="$"
-          suffix="USDG"
+          suffix="USDC"
           value={singleAmount}
           onChange={(amount) => dispatch({ type: "setSingleAmount", amount })}
           footer={footer}

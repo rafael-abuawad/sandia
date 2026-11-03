@@ -101,6 +101,8 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_user_and_address", ["userId", "address"]),
 
+  // Legacy tables from the Robinhood Chain version. Nothing writes to them anymore; they stay
+  // declared so existing deployments keep validating. Drop them after clearing their data.
   outboundTransfers: defineTable({
     userId: v.id("users"),
     userOpHash: v.string(),

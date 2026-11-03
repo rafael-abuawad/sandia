@@ -12,11 +12,8 @@ import {
   type TokenOption,
 } from "@/components/token-chain-select";
 import { QuoteSkeleton } from "@/components/quote-skeleton";
-import { TokenChainIcon } from "@/components/token-chain-icon";
 import { PayQuoteDetails } from "@/components/pay-flow/quote-details";
-import type { DirectPayBalance } from "@/components/pay-flow/use-pay-flow";
 import type { PayStep } from "@/components/pay-flow/state";
-import type { EthSwapQuote } from "@/lib/zerox-quote";
 import {
   quoteFundingGap,
   type AcrossChain,
@@ -24,8 +21,6 @@ import {
   type AcrossToken,
 } from "@/lib/across/client";
 import { formatDisplayDateTime } from "@/lib/format-datetime";
-import { ROBINHOOD_USDG } from "@/lib/destination";
-import { formatTokenAmount, formatTokenAmountGrouped } from "@/lib/money";
 import { TxLink } from "@/components/tx-link";
 import { shortenAddress } from "@/lib/utils";
 import type { Hex } from "viem";
@@ -39,17 +34,12 @@ type PayAcrossPanelProps = {
   step: PayStep;
   quoteError: string | null;
   quote: AcrossSwapQuote | null;
-  ethQuote: EthSwapQuote | null;
   tradeType: "exactOutput" | "minOutput" | null;
   selectedToken?: AcrossToken;
   chains: AcrossChain[];
   destinationTokenSymbol: string;
   destinationTokenDecimals: number;
   outputAmountBaseUnits: string;
-  directPay: boolean;
-  directBalance: DirectPayBalance | null;
-  robinhoodEth: boolean;
-  ethBalance: DirectPayBalance | null;
   canPay: boolean;
   payerAddress?: string;
   paymentInProgress?: boolean;
@@ -74,11 +64,6 @@ function payBlockerMessage({
   quote,
   quoteError,
   tokenSymbol,
-  directPay,
-  directBalance,
-  robinhoodEth,
-  ethQuote,
-  ethBalance,
 }: {
   originChainId: number | null;
   inputToken: string;
@@ -86,36 +71,8 @@ function payBlockerMessage({
   quote: AcrossSwapQuote | null;
   quoteError: string | null;
   tokenSymbol?: string;
-  directPay: boolean;
-  directBalance: DirectPayBalance | null;
-  robinhoodEth: boolean;
-  ethQuote: EthSwapQuote | null;
-  ethBalance: DirectPayBalance | null;
 }): string | null {
   if (step === "approving" || step === "paying" || step === "tracking") return null;
-  if (directPay) {
-    if (directBalance === "loading") return "Checking your USDG balance…";
-    if (directBalance === "unavailable") {
-      return "USDG balance could not be checked. Refresh and try again.";
-    }
-    if (directBalance === "short") {
-      return "This wallet doesn't have enough USDG on Robinhood Chain.";
-    }
-    return null;
-  }
-  if (robinhoodEth) {
-    if (step === "quoting") return "Fetching a quote…";
-    if (quoteError) return null;
-    if (!ethQuote) return "Waiting for a valid route before you can pay.";
-    if (ethBalance === "loading") return "Checking your ETH balance…";
-    if (ethBalance === "unavailable") {
-      return "ETH balance could not be checked. Refresh and try again.";
-    }
-    if (ethBalance === "short") {
-      return "This wallet doesn't have enough ETH on Robinhood Chain.";
-    }
-    return null;
-  }
   if (!originChainId) return "Select a chain to continue.";
   if (!inputToken) return "Select a token to continue.";
   if (step === "quoting") return "Fetching a quote…";
@@ -147,17 +104,12 @@ export function PayAcrossPanel({
   step,
   quoteError,
   quote,
-  ethQuote,
   tradeType,
   selectedToken,
   chains,
   destinationTokenSymbol,
   destinationTokenDecimals,
   outputAmountBaseUnits,
-  directPay,
-  directBalance,
-  robinhoodEth,
-  ethBalance,
   canPay,
   payerAddress,
   paymentInProgress,
@@ -186,11 +138,6 @@ export function PayAcrossPanel({
         quote,
         quoteError,
         tokenSymbol: selectedToken?.symbol,
-        directPay,
-        directBalance,
-        robinhoodEth,
-        ethQuote,
-        ethBalance,
       })
     : null;
   const busy = step === "approving" || step === "paying" || step === "tracking";
@@ -212,15 +159,12 @@ export function PayAcrossPanel({
           step={step}
           quoteError={quoteError}
           quote={quote}
-          ethQuote={ethQuote}
           tradeType={tradeType}
           selectedToken={selectedToken}
           chains={chains}
           destinationTokenSymbol={destinationTokenSymbol}
           destinationTokenDecimals={destinationTokenDecimals}
           outputAmountBaseUnits={outputAmountBaseUnits}
-          directPay={directPay}
-          robinhoodEth={robinhoodEth}
           canPay={canPay}
           payerAddress={payerAddress}
           paymentInProgress={paymentInProgress}
@@ -261,15 +205,12 @@ function PayAcrossConnected({
   step,
   quoteError,
   quote,
-  ethQuote,
   tradeType,
   selectedToken,
   chains,
   destinationTokenSymbol,
   destinationTokenDecimals,
   outputAmountBaseUnits,
-  directPay,
-  robinhoodEth,
   canPay,
   payerAddress,
   paymentInProgress,
@@ -292,7 +233,7 @@ function PayAcrossConnected({
   paymentSent,
   checkingPayment,
   onRetryVerification,
-}: Omit<PayAcrossPanelProps, "isConnected" | "directBalance" | "ethBalance"> & {
+}: Omit<PayAcrossPanelProps, "isConnected"> & {
   errorId: string;
   blockerId: string;
   chainId: string;
@@ -322,8 +263,6 @@ function PayAcrossConnected({
         step={step}
         quoteError={quoteError}
         quote={quote}
-        ethQuote={ethQuote}
-        robinhoodEth={robinhoodEth}
         tradeType={tradeType}
         selectedToken={selectedToken}
         originChainId={originChainId}
@@ -331,7 +270,6 @@ function PayAcrossConnected({
         destinationTokenSymbol={destinationTokenSymbol}
         destinationTokenDecimals={destinationTokenDecimals}
         outputAmountBaseUnits={outputAmountBaseUnits}
-        directPay={directPay}
         errorId={errorId}
         onRefreshQuote={onRefreshQuote}
       />
@@ -355,7 +293,7 @@ function PayAcrossConnected({
               type="button"
               variant="secondary"
               size="sm"
-              onClick={directPay || ethQuote || quote ? onPay : onRefreshQuote}
+              onClick={quote ? onPay : onRefreshQuote}
             >
               Try again
             </Button>
@@ -470,95 +408,10 @@ function PayAcrossRouteFields({
   );
 }
 
-function PayEthDetails({
-  ethQuote,
-  destinationTokenSymbol,
-  destinationTokenDecimals,
-  outputAmountBaseUnits,
-}: {
-  ethQuote: EthSwapQuote;
-  destinationTokenSymbol: string;
-  destinationTokenDecimals: number;
-  outputAmountBaseUnits: string;
-}) {
-  return (
-    <div className="pr-inset space-y-0">
-      <div className="flex items-center justify-between gap-3 px-4 py-3">
-        <span className="text-sm text-muted">You send up to</span>
-        <span className="flex min-w-0 items-center gap-2 text-sm text-foreground">
-          <TokenChainIcon
-            tokenSymbol="ETH"
-            tokenLogoUrl="/assets/tokens/eth.svg"
-            chainName="Robinhood"
-            chainLogoUrl={ROBINHOOD_USDG.chainLogoUrl}
-            chainId={ROBINHOOD_USDG.chainId}
-            size="sm"
-          />
-          <span className="pr-money font-semibold">
-            {formatTokenAmountGrouped(ethQuote.maxSellAmount, 18, 6)} ETH
-          </span>
-        </span>
-      </div>
-      <div className="flex items-center justify-between gap-3 border-bs border-border px-4 py-3 text-sm">
-        <span className="text-muted">Recipient receives</span>
-        <span className="pr-money font-semibold text-foreground">
-          {formatTokenAmount(outputAmountBaseUnits, destinationTokenDecimals)}{" "}
-          {destinationTokenSymbol}
-        </span>
-      </div>
-      <p className="border-bs border-border px-4 py-3 text-xs text-muted">
-        ETH swaps to USDG on Robinhood Chain. The USDG goes to the person who created this request.
-        The ETH amount can change until you pay. Network gas is paid in ETH.
-      </p>
-    </div>
-  );
-}
-
-function PayDirectDetails({
-  destinationTokenSymbol,
-  destinationTokenDecimals,
-  outputAmountBaseUnits,
-}: {
-  destinationTokenSymbol: string;
-  destinationTokenDecimals: number;
-  outputAmountBaseUnits: string;
-}) {
-  return (
-    <div className="pr-inset space-y-0">
-      <div className="flex items-center justify-between gap-3 px-4 py-3">
-        <span className="text-sm text-muted">You send</span>
-        <span className="flex min-w-0 items-center gap-2 text-sm text-foreground">
-          <TokenChainIcon
-            tokenSymbol={destinationTokenSymbol}
-            tokenLogoUrl={ROBINHOOD_USDG.logoUrl}
-            chainName="Robinhood"
-            chainLogoUrl={ROBINHOOD_USDG.chainLogoUrl}
-            chainId={ROBINHOOD_USDG.chainId}
-            size="sm"
-          />
-          <span className="pr-money font-semibold">
-            {formatTokenAmount(outputAmountBaseUnits, destinationTokenDecimals)}{" "}
-            {destinationTokenSymbol}
-          </span>
-        </span>
-      </div>
-      <div className="flex items-center justify-between gap-3 border-bs border-border px-4 py-3 text-sm">
-        <span className="text-muted">Route fee</span>
-        <span className="text-foreground">None</span>
-      </div>
-      <p className="border-bs border-border px-4 py-3 text-xs text-muted">
-        USDG is transferred directly on Robinhood Chain. Network gas is paid in ETH.
-      </p>
-    </div>
-  );
-}
-
 function PayAcrossQuoteBlock({
   step,
   quoteError,
   quote,
-  ethQuote,
-  robinhoodEth,
   tradeType,
   selectedToken,
   originChainId,
@@ -566,15 +419,12 @@ function PayAcrossQuoteBlock({
   destinationTokenSymbol,
   destinationTokenDecimals,
   outputAmountBaseUnits,
-  directPay,
   errorId,
   onRefreshQuote,
 }: {
   step: PayStep;
   quoteError: string | null;
   quote: AcrossSwapQuote | null;
-  ethQuote: EthSwapQuote | null;
-  robinhoodEth: boolean;
   tradeType: "exactOutput" | "minOutput" | null;
   selectedToken?: AcrossToken;
   originChainId: number | null;
@@ -582,31 +432,9 @@ function PayAcrossQuoteBlock({
   destinationTokenSymbol: string;
   destinationTokenDecimals: number;
   outputAmountBaseUnits: string;
-  directPay: boolean;
   errorId: string;
   onRefreshQuote: () => void;
 }) {
-  if (directPay) {
-    return (
-      <PayDirectDetails
-        destinationTokenSymbol={destinationTokenSymbol}
-        destinationTokenDecimals={destinationTokenDecimals}
-        outputAmountBaseUnits={outputAmountBaseUnits}
-      />
-    );
-  }
-
-  if (robinhoodEth && ethQuote && step !== "quoting") {
-    return (
-      <PayEthDetails
-        ethQuote={ethQuote}
-        destinationTokenSymbol={destinationTokenSymbol}
-        destinationTokenDecimals={destinationTokenDecimals}
-        outputAmountBaseUnits={outputAmountBaseUnits}
-      />
-    );
-  }
-
   if (step === "quoting") {
     return <QuoteSkeleton />;
   }

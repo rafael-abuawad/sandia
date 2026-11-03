@@ -10,10 +10,8 @@ function probabilities(
     send: selected === "send" ? confidence : runnerUp,
     batch_send: selected === "batch_send" ? confidence : runnerUp,
     request: selected === "request" ? confidence : runnerUp,
-    earn_deposit: selected === "earn_deposit" ? confidence : runnerUp,
-    earn_withdraw: selected === "earn_withdraw" ? confidence : runnerUp,
-    stock_buy: selected === "stock_buy" ? confidence : runnerUp,
-    stock_sell: selected === "stock_sell" ? confidence : runnerUp,
+    trade_long: selected === "trade_long" ? confidence : runnerUp,
+    trade_short: selected === "trade_short" ? confidence : runnerUp,
     unsupported: selected === "unsupported" ? confidence : runnerUp,
   };
 }

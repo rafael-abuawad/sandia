@@ -5,16 +5,18 @@ import { useId, useRef, useState } from "react";
 import { LoginButton } from "@/components/login-button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useAppAuth } from "@/lib/auth-bridge";
-import { UsdgBalanceCard } from "@/components/usdg-balance-card";
+import { BalanceCard } from "@/components/balance-card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 type AccountPanelProps = {
   className?: string;
   onAfterLogout?: () => void;
+  /** Called when a link inside the panel is followed, so a sheet can close. */
+  onNavigate?: () => void;
 };
 
-export function AccountPanel({ className, onAfterLogout }: AccountPanelProps) {
+export function AccountPanel({ className, onAfterLogout, onNavigate }: AccountPanelProps) {
   const { ready, authenticated, logout } = useAppAuth();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
@@ -47,7 +49,7 @@ export function AccountPanel({ className, onAfterLogout }: AccountPanelProps) {
   return (
     <>
       <div className={cn("space-y-3", className)}>
-        <UsdgBalanceCard />
+        <BalanceCard onNavigate={onNavigate} />
         <div className="space-y-2 border-bs border-border pbs-3">
           <div className="flex justify-center md:justify-start">
             <LoginButton />

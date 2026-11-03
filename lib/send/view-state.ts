@@ -1,47 +1,43 @@
 export type BalanceStatus = "loading" | "error" | "ready" | "insufficient";
 
+/** `available` is USDC in dollars; `amountMicros` is the send total in USD micros. */
 export function getBalanceStatus({
   loading,
   error,
-  balance,
+  available,
   amountMicros,
 }: {
   loading: boolean;
   error: boolean;
-  balance: bigint | undefined;
+  available: number | undefined;
   amountMicros: number | null;
 }): BalanceStatus {
-  if (loading) return "loading";
-  if (error || balance === undefined) return "error";
-  if (amountMicros !== null && balance < BigInt(amountMicros)) return "insufficient";
+  if (loading && available === undefined) return "loading";
+  if (error || available === undefined) return "error";
+  if (amountMicros !== null && Math.round(available * 1_000_000) < amountMicros)
+    return "insufficient";
   return "ready";
 }
 
 export function getSendBlocker({
   isSignedIn,
-  chainReady,
+  walletReady,
   balanceStatus,
   maxRecipients,
   withinCap,
-  sendConfigured,
 }: {
   isSignedIn: boolean;
-  chainReady: boolean;
+  walletReady: boolean;
   balanceStatus: BalanceStatus;
   maxRecipients: number;
   withinCap: boolean;
-  sendConfigured: boolean;
 }): string | null {
-  if (!isSignedIn) return "Sign in to send USDG.";
-  if (!chainReady) return "Switch your wallet to Robinhood Chain, then confirm this send.";
-  if (balanceStatus === "error") {
-    return "Could not read your USDG balance. Check your connection and try again.";
-  }
-  if (balanceStatus === "loading") return "Checking your USDG balance…";
-  if (balanceStatus === "insufficient") {
-    return "This wallet doesn't have enough USDG on Robinhood Chain. Lower the amount or add funds.";
-  }
+  if (!isSignedIn) return "Sign in to send USDC.";
+  if (!walletReady) return "Your wallet is still loading…";
+  if (balanceStatus === "error")
+    return "Could not read your balance. Check your connection and try again.";
+  if (balanceStatus === "loading") return "Checking your balance…";
+  if (balanceStatus === "insufficient") return "Not enough USDC. Lower the amount or add funds.";
   if (!withinCap) return `A send can include at most ${maxRecipients} recipients.`;
-  if (!sendConfigured) return "Sandia Send is not configured.";
   return null;
 }

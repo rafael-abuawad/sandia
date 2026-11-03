@@ -4,10 +4,8 @@ export const JEV_ACTIONS = [
   "send",
   "batch_send",
   "request",
-  "earn_deposit",
-  "earn_withdraw",
-  "stock_buy",
-  "stock_sell",
+  "trade_long",
+  "trade_short",
   "unsupported",
 ] as const;
 
@@ -37,7 +35,7 @@ export function interpretJevDecision(
       return {
         status: "unsupported",
         reason:
-          "I couldn’t match that to one supported operation. Try asking to send, request, deposit, withdraw, buy, or sell.",
+          "I couldn’t match that to one supported operation. Try asking to send, request, go long, or go short.",
       };
     }
     return { status: "resolved", action: selected as IntentAction, confidence, probabilities };

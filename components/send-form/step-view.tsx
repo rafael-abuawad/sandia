@@ -20,7 +20,6 @@ export function SendFormStepView({
   dispatch,
   onConfirm,
   onBack,
-  onRetryActivity,
   onReset,
 }: {
   state: SendFormState;
@@ -37,22 +36,12 @@ export function SendFormStepView({
   dispatch: React.Dispatch<import("@/components/send-form/state").SendFormAction>;
   onConfirm: () => void;
   onBack: () => void;
-  onRetryActivity: () => void;
   onReset: () => void;
 }) {
   const { step, review } = state;
 
   if (step === "success" && review) {
-    return (
-      <SendSuccessPanel
-        review={review}
-        transactionHash={state.progress.hash}
-        activityError={state.activityError}
-        activitySyncing={state.progress.phase === "recording"}
-        onRetryActivity={onRetryActivity}
-        onReset={onReset}
-      />
-    );
+    return <SendSuccessPanel review={review} onReset={onReset} />;
   }
 
   if (step === "review" && review) {

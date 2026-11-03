@@ -15,11 +15,10 @@ const nextConfig: NextConfig = {
         destination: "/requests/new",
         permanent: true,
       },
-      {
-        source: "/lending",
-        destination: "/earn",
-        permanent: true,
-      },
+      { source: "/lending", destination: "/trade", permanent: true },
+      { source: "/earn", destination: "/trade", permanent: true },
+      { source: "/stocks", destination: "/trade?tab=stocks", permanent: true },
+      { source: "/stocks/:symbol", destination: "/trade/xyz%3A:symbol", permanent: true },
     ];
   },
   images: {

@@ -4,10 +4,8 @@ export const INTENT_ACTIONS = [
   "send",
   "batch_send",
   "request",
-  "earn_deposit",
-  "earn_withdraw",
-  "stock_buy",
-  "stock_sell",
+  "trade_long",
+  "trade_short",
 ] as const;
 
 export type IntentAction = (typeof INTENT_ACTIONS)[number];
@@ -23,12 +21,12 @@ export type IntentRouting =
   | { status: "unsupported"; reason: string };
 
 export type AgentContact = { name: string; address: string };
-export type AgentStock = {
+/** A tradable Hyperliquid market as the agent sees it. */
+export type AgentMarket = {
+  coin: string;
   symbol: string;
   name: string;
-  shortName: string;
-  contractAddress: string;
-  tokenDecimals: number;
+  keywords: string[];
 };
 export type BatchRecipientDraft = { address: string; amount: string };
 
@@ -36,7 +34,7 @@ export function resolveExplicitAddress(prompt: string): string {
   return prompt.match(/\b0x[a-fA-F0-9]{40}\b/)?.[0] ?? "";
 }
 
-const AMOUNT_TOKEN = String.raw`(?:\$\s*(\d+(?:\.\d{1,6})?)|\b(\d+(?:\.\d{1,6})?)\s*(?:USDG|USD|dollars?|shares?)\b)`;
+const AMOUNT_TOKEN = String.raw`(?:\$\s*(\d+(?:\.\d{1,6})?)|\b(\d+(?:\.\d{1,6})?)\s*(?:USDC|USD|dollars?|bucks)\b)`;
 const AMOUNT_PATTERN = new RegExp(AMOUNT_TOKEN, "gi");
 
 export function extractExplicitAmount(prompt: string): string | null {
@@ -105,24 +103,47 @@ export function resolveBatchRecipients(
   return recipients.map(({ address }, index) => ({ address, amount: amounts[index] }));
 }
 
-export function resolveStock(prompt: string, assets: AgentStock[]): AgentStock | null {
-  const normalizedPrompt = prompt.replace(/\bNVDIA\b/giu, "NVIDIA");
-  const candidates = assets.filter((asset) =>
-    [asset.symbol, asset.name, asset.shortName].some((label) => {
-      const normalizedLabel = label.trim();
-      if (!normalizedLabel) return false;
-      return new RegExp(
-        `(?:^|[^a-z0-9])${escapeRegExp(normalizedLabel)}(?=$|[^a-z0-9])`,
-        "iu",
-      ).test(normalizedPrompt);
+const MARKET_ALIASES: Record<string, string> = {
+  NVDIA: "NVIDIA",
+  BITCOIN: "BTC",
+  ETHER: "ETH",
+  ETHEREUM: "ETH",
+  SOLANA: "SOL",
+};
+
+/**
+ * One market named in the prompt, or null when none or several match. Tickers and names match
+ * as whole words, so "F" never matches "for". Topic keywords are ignored because many markets
+ * share them. Crypto wins a tie with a same-named HIP-3 market.
+ */
+export function resolveMarket(prompt: string, markets: AgentMarket[]): AgentMarket | null {
+  let normalized = prompt;
+  for (const [alias, target] of Object.entries(MARKET_ALIASES)) {
+    normalized = normalized.replace(new RegExp(`\\b${alias}\\b`, "giu"), target);
+  }
+  const matches = markets.filter((market) =>
+    [market.symbol, market.name].some((label) => {
+      const value = label.trim();
+      if (!value || /^(?:usd|usdc|dollars?)$/i.test(value)) return false;
+      return new RegExp(`(?:^|[^a-z0-9])${escapeRegExp(value)}(?=$|[^a-z0-9])`, "iu").test(
+        normalized,
+      );
     }),
   );
-  return candidates.length === 1 ? candidates[0] : null;
+  const unique = new Map(matches.map((market) => [market.symbol.toUpperCase(), market]));
+  if (unique.size !== 1) return null;
+  const symbol = [...unique.keys()][0];
+  return (
+    matches.find(
+      (market) => market.symbol.toUpperCase() === symbol && !market.coin.includes(":"),
+    ) ?? matches[0]
+  );
 }
 
-export function extractStockUnit(prompt: string): "usd" | "shares" | null {
-  const usd = /\$|\b(?:USD|USDG|dollars?)\b/i.test(prompt);
-  const shares = /\bshares?\b/i.test(prompt);
-  if (usd === shares) return null;
-  return usd ? "usd" : "shares";
+/** Leverage like "5x" or "10x leverage". */
+export function extractLeverage(prompt: string): number | null {
+  const match = /\b(\d{1,2})\s*x\b/i.exec(prompt);
+  if (!match) return null;
+  const value = Number(match[1]);
+  return value >= 1 && value <= 50 ? value : null;
 }
