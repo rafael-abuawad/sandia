@@ -159,7 +159,7 @@ export default function ActivityPage() {
   }
 
   const loading = status === "LoadingFirstPage" || (Boolean(address) && hl.isPending);
-  const showEmpty = !loading && rows.length === 0 && !moreBuffered && !moreToFetch;
+  const showEmpty = !loading && !hl.isError && rows.length === 0 && !moreBuffered && !moreToFetch;
 
   return (
     <div className="pr-app-page">

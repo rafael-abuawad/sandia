@@ -91,7 +91,7 @@ export function TradeHome() {
               type="button"
               aria-label="Clear search"
               onClick={() => setQuery("")}
-              className="text-muted"
+              className="-me-3 grid size-11 shrink-0 place-items-center rounded-full text-muted"
             >
               <X className="size-4" aria-hidden />
             </button>
@@ -126,7 +126,7 @@ export function TradeHome() {
         ) : null}
         {visible.length > 0 ? (
           <ul className="pr-list">
-            {visible.slice(0, 120).map((market) => (
+            {visible.map((market) => (
               <MarketRow key={market.coin} market={market} />
             ))}
           </ul>
@@ -236,7 +236,7 @@ export function MarketListSkeleton() {
           </span>
           <span className="space-y-1.5">
             <Skeleton className="h-4 w-20" />
-            <Skeleton className="mis-auto h-4 w-14" />
+            <Skeleton className="ms-auto h-4 w-14" />
           </span>
         </li>
       ))}

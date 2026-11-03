@@ -233,7 +233,7 @@ function TicketBody({
 
         <fieldset className="space-y-2">
           <legend className="pr-kicker">Leverage</legend>
-          <div className="flex flex-wrap gap-2">
+          <div className="grid grid-cols-4 gap-2">
             {leverageSteps(market.maxLeverage).map((step) => (
               <button
                 key={step}
@@ -275,6 +275,11 @@ function TicketBody({
                 : null)
           }
         />
+        {setup.isError ? (
+          <p className="text-sm text-danger" role="alert">
+            Trading status could not be checked. Check your connection and reopen this ticket.
+          </p>
+        ) : null}
         {needsStocksMargin ? (
           <p className="text-xs text-muted" role="note">
             Stock markets need a unified account. Close open positions and enable trading again if

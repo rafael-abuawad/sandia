@@ -204,7 +204,9 @@ function RequestDetailLoaded({
         {request.description ? (
           <div className="flex justify-between gap-4">
             <dt className="text-muted">Note</dt>
-            <dd className="text-end text-foreground">{request.description}</dd>
+            <dd className="min-w-0 text-end text-foreground [overflow-wrap:anywhere]">
+              {request.description}
+            </dd>
           </div>
         ) : null}
         <div className="flex justify-between gap-4">
@@ -215,7 +217,9 @@ function RequestDetailLoaded({
         </div>
         <div className="flex justify-between gap-4">
           <dt className="text-muted">Paid to</dt>
-          <dd className="pr-mono text-end text-foreground">{request.recipientAddress}</dd>
+          <dd className="pr-mono min-w-0 text-end break-all text-foreground">
+            {request.recipientAddress}
+          </dd>
         </div>
       </dl>
 

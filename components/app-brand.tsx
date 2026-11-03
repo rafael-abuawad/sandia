@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 
 export function AppBrand({ className, name = "Sandia" }: { className?: string; name?: string }) {
   return (
-    <Link href="/" className={cn("pr-brand inline-flex items-center gap-2", className)}>
+    <Link href="/" className={cn("pr-brand inline-flex min-h-11 items-center gap-2", className)}>
       <Image
         src="/logo.svg"
         alt=""

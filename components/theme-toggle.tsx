@@ -32,7 +32,7 @@ export function ThemeToggle() {
           type="button"
           variant="ghost"
           size="icon"
-          className="size-10 shrink-0 text-muted hover:text-foreground"
+          className="size-11 shrink-0 text-muted hover:text-foreground"
           aria-label="Choose theme"
           title="Choose theme"
         >

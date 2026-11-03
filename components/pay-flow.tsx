@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { AppBrand } from "@/components/app-brand";
 import { PayAcrossPanel } from "@/components/pay-flow/across-pay-panel";
 import { PayAttemptsList, PayTerminalStatus } from "@/components/pay-flow/attempts-list";
@@ -56,9 +57,16 @@ export function PayFlow({ publicId }: PayFlowProps) {
   }
   if (request === null) {
     return (
-      <div className="space-y-2">
-        <h1 className="pr-display text-2xl">Payment request</h1>
-        <p className="text-sm text-danger">Payment request not found.</p>
+      <div className="space-y-4">
+        <AppBrand />
+        <h1 className="pr-display text-2xl">Payment request not found</h1>
+        <p className="text-sm text-muted">Check the link with the person who sent it.</p>
+        <Link
+          href="/"
+          className="inline-flex min-h-11 items-center text-sm underline underline-offset-2"
+        >
+          Go to Sandia
+        </Link>
       </div>
     );
   }

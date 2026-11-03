@@ -17,8 +17,8 @@ export function MarketAvatar({ symbol, className }: { symbol: string; className?
         className,
       )}
       style={{
-        backgroundColor: `oklch(0.92 0.05 ${h})`,
-        color: `oklch(0.32 0.08 ${h})`,
+        backgroundColor: `oklch(var(--avatar-l) 0.05 ${h})`,
+        color: `oklch(var(--avatar-ink-l) 0.08 ${h})`,
       }}
     >
       {symbol.slice(0, 4)}

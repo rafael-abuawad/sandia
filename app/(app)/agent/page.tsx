@@ -12,6 +12,7 @@ import {
 import { useMarkets } from "@/components/trade/use-hyperliquid";
 import { MarketAvatar } from "@/components/trade/market-avatar";
 import { CreateRequestForm } from "@/components/create-request-form";
+import { EmbeddedPresentation } from "@/components/embedded-presentation";
 import { SendForm } from "@/components/send-form";
 import { LoginButton } from "@/components/login-button";
 import { Button } from "@/components/ui/button";
@@ -347,32 +348,34 @@ function OperationDialog({
             Check the details and complete the operation in the form below.
           </ResponsiveDialogDescription>
         </ResponsiveDialogHeader>
-        <ResponsiveDialogBody className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 pbe-4">
-          {operation.ambiguousRecipient ? (
-            <p className="rounded-md border border-border p-3 text-sm text-muted" role="status">
-              More than one saved contact has this name. Choose the right recipient in the address
-              book.
-            </p>
-          ) : null}
-          {isSend ? (
-            <SendForm
-              initialValues={
-                operation.action === "batch_send"
-                  ? { recipients: operation.recipients }
-                  : { address: operation.address, amount: operation.amount }
-              }
-              onPendingChange={onPendingChange}
-            />
-          ) : null}
-          {isRequest ? (
-            <CreateRequestForm
-              initialAmount={operation.amount}
-              embeddedPresentation
-              onPendingChange={onPendingChange}
-            />
-          ) : null}
-          {isTrade ? <AgentMarketPicker operation={operation} markets={markets} /> : null}
-        </ResponsiveDialogBody>
+        <EmbeddedPresentation value={true}>
+          <ResponsiveDialogBody className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 pbe-4">
+            {operation.ambiguousRecipient ? (
+              <p className="rounded-md border border-border p-3 text-sm text-muted" role="status">
+                More than one saved contact has this name. Choose the right recipient in the address
+                book.
+              </p>
+            ) : null}
+            {isSend ? (
+              <SendForm
+                initialValues={
+                  operation.action === "batch_send"
+                    ? { recipients: operation.recipients }
+                    : { address: operation.address, amount: operation.amount }
+                }
+                onPendingChange={onPendingChange}
+              />
+            ) : null}
+            {isRequest ? (
+              <CreateRequestForm
+                initialAmount={operation.amount}
+                embeddedPresentation
+                onPendingChange={onPendingChange}
+              />
+            ) : null}
+            {isTrade ? <AgentMarketPicker operation={operation} markets={markets} /> : null}
+          </ResponsiveDialogBody>
+        </EmbeddedPresentation>
         <ResponsiveDialogFooter className="shrink-0 border-bs border-border bg-panel-elevated pbs-4">
           <Button
             type="button"

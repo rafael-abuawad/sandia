@@ -484,7 +484,7 @@ function PayAcrossActionBar({
   onPay: () => void;
 }) {
   return (
-    <div className="sticky inset-be-0 z-10 -mx-4 space-y-2 border-bs border-border bg-panel-elevated px-4 py-3 pbe-[max(0.75rem,env(safe-area-inset-bottom))] sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0">
+    <div className="fixed inset-x-0 inset-be-0 z-20 space-y-2 border-bs border-border bg-panel-elevated px-[var(--gutter)] py-3 pbe-[max(0.75rem,env(safe-area-inset-bottom))] sm:static sm:border-0 sm:bg-transparent sm:p-0">
       {blocker && !busy ? (
         <p id={blockerId} className="text-sm text-muted" role="status">
           {blocker}

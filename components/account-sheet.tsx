@@ -28,6 +28,29 @@ export function AccountSheet({ open, onOpenChange, id }: AccountSheetProps) {
     }
   }, [open]);
 
+  // Tapping the backdrop closes the sheet (Escape already does, natively). Content lives in
+  // child elements, so only a backdrop tap targets the dialog itself.
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    const onBackdrop = (event: MouseEvent) => {
+      if (event.target === dialog) onOpenChange(false);
+    };
+    dialog.addEventListener("click", onBackdrop);
+    return () => dialog.removeEventListener("click", onBackdrop);
+  }, [onOpenChange]);
+
+  // A modal <dialog> does not stop the page behind it from scrolling.
+  useEffect(() => {
+    if (!open) return;
+    const root = document.documentElement;
+    const previous = root.style.overflow;
+    root.style.overflow = "hidden";
+    return () => {
+      root.style.overflow = previous;
+    };
+  }, [open]);
+
   return (
     <dialog
       ref={dialogRef}

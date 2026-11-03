@@ -197,7 +197,10 @@ function SignedInPortfolio({ address }: { address: string }) {
           <h2 id="portfolio-activity" className="pr-section-label">
             Recent activity
           </h2>
-          <Link href="/activity" className="text-sm font-semibold underline underline-offset-2">
+          <Link
+            href="/activity"
+            className="inline-flex min-h-11 items-center text-sm font-semibold underline underline-offset-2"
+          >
             See all
           </Link>
         </div>

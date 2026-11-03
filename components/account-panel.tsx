@@ -52,7 +52,7 @@ export function AccountPanel({ className, onAfterLogout, onNavigate }: AccountPa
         <BalanceCard onNavigate={onNavigate} />
         <div className="space-y-2 border-bs border-border pbs-3">
           <div className="flex justify-center md:justify-start">
-            <LoginButton />
+            <LoginButton onBeforeLogin={onNavigate} />
           </div>
           <div className="flex items-center gap-2">
             {ready && authenticated ? (

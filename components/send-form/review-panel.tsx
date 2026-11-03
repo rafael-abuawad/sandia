@@ -1,5 +1,6 @@
 "use client";
 
+import { useEmbeddedPresentation } from "@/components/embedded-presentation";
 import { useId } from "react";
 import { Button } from "@/components/ui/button";
 import { FieldError } from "@/components/ui/field-error";
@@ -42,6 +43,7 @@ export function SendReviewPanel({
   onBack: () => void;
   onConfirm: () => void;
 }) {
+  const embedded = useEmbeddedPresentation();
   const errorId = useId();
   const blockerId = useId();
   const progressMessage = getProgressMessage(progress, confirming);
@@ -97,8 +99,15 @@ export function SendReviewPanel({
         </div>
       ) : null}
 
-      <div className="sticky inset-be-[calc(4.5rem+env(safe-area-inset-bottom))] z-10 flex gap-3 bg-[color-mix(in_oklch,var(--background)_92%,transparent)] py-3 backdrop-blur-sm md:static md:bg-transparent md:p-0 md:backdrop-blur-none">
+      <div
+        className={
+          embedded
+            ? "flex gap-3 py-3"
+            : "sticky inset-be-[calc(4.5rem+env(safe-area-inset-bottom))] z-10 flex gap-3 bg-[color-mix(in_oklch,var(--background)_92%,transparent)] py-3 backdrop-blur-sm md:static md:bg-transparent md:p-0 md:backdrop-blur-none"
+        }
+      >
         <Button
+          size="lg"
           type="button"
           variant="outline"
           className="flex-1"
@@ -108,6 +117,7 @@ export function SendReviewPanel({
           Back
         </Button>
         <Button
+          size="lg"
           type="button"
           className="flex-1"
           disabled={confirming || !canConfirm}

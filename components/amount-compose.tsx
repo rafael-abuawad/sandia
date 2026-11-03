@@ -1,5 +1,6 @@
 "use client";
 
+import { useEmbeddedPresentation } from "@/components/embedded-presentation";
 import { useId, type ReactNode } from "react";
 import { ChevronRight } from "lucide-react";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
@@ -64,8 +65,9 @@ export function AmountCompose({
   errorId,
   inputId,
   invalid,
-  embeddedPresentation = false,
+  embeddedPresentation: embeddedProp,
 }: AmountComposeProps) {
+  const embeddedPresentation = useEmbeddedPresentation() || Boolean(embeddedProp);
   const generatedId = useId();
   const id = inputId ?? generatedId;
   const selected = selectedPreset(value, presets);

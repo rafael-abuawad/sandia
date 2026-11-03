@@ -114,7 +114,7 @@ export default function HomePage() {
                 <Link
                   key={link.href}
                   href={link.href}
-                  className="text-foreground underline underline-offset-2"
+                  className="inline-flex min-h-11 items-center text-foreground underline underline-offset-2"
                 >
                   {link.label}
                 </Link>

@@ -61,10 +61,7 @@ export function BalanceCard({
       </span>
       <span className="min-w-0 flex-1">
         <span className="pr-kicker block">{HYPERCORE_USDC.symbol}</span>
-        <span
-          className="pr-money mbs-1 block truncate text-xl leading-none font-semibold tracking-tight text-foreground"
-          aria-live="polite"
-        >
+        <span className="pr-money mbs-1 block truncate text-xl leading-none font-semibold tracking-tight text-foreground">
           {data ? formatUsd(data.equity) : isError ? "—" : "…"}
         </span>
         <span

@@ -45,7 +45,7 @@ export function Breadcrumbs({ items }: { items: BreadcrumbItem[] }) {
               ) : (
                 <Link
                   href={item.href}
-                  className="underline-offset-2 hover:text-foreground hover:underline"
+                  className="inline-flex min-h-11 items-center underline-offset-2 hover:text-foreground hover:underline"
                 >
                   {item.label}
                 </Link>

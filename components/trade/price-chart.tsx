@@ -46,10 +46,15 @@ export function PriceChart({
   if (!shape || !points) {
     return (
       <div
-        className={cn("pr-chart-grid h-44 w-full", loading && "animate-pulse")}
+        className={cn(
+          "pr-chart-grid grid h-44 w-full place-items-center",
+          loading && "animate-pulse",
+        )}
         role="status"
         aria-label={loading ? "Loading chart" : "No chart data"}
-      />
+      >
+        {loading ? null : <p className="text-sm text-muted">No price history yet.</p>}
+      </div>
     );
   }
 
@@ -77,7 +82,7 @@ export function PriceChart({
       <svg
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
         preserveAspectRatio="none"
-        className="h-44 w-full touch-none"
+        className="h-44 w-full touch-pan-y"
         role="img"
         aria-label={`Price from ${formatMarketPrice(first.c)} to ${formatMarketPrice(last.c)}`}
         onPointerDown={(e) => {

@@ -7,6 +7,7 @@ import { isAddress } from "viem";
 import { api } from "@/convex/_generated/api";
 import { useSignedInWallet } from "@/lib/use-signed-in-wallet";
 import { ContactForm } from "@/components/address-book/contact-form";
+import { LoginButton } from "@/components/login-button";
 import { Button } from "@/components/ui/button";
 import {
   ResponsiveDialog,
@@ -180,7 +181,12 @@ function ContactPickerList({
   onSelect: (address: string) => void;
 }) {
   if (!isSignedIn) {
-    return <p className="text-sm text-muted">Sign in to use your address book.</p>;
+    return (
+      <div className="space-y-3">
+        <p className="text-sm text-muted">Sign in to use your address book.</p>
+        <LoginButton />
+      </div>
+    );
   }
   if (contacts === undefined) {
     return <p className="text-sm text-muted">Loading contacts…</p>;

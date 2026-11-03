@@ -32,7 +32,7 @@ const RANGES: Array<{ value: CandleInterval; label: string }> = [
 ];
 
 export function MarketScreen({ coin }: { coin: string }) {
-  const { market, isLoading } = useMarket(coin);
+  const { market, isLoading, isError } = useMarket(coin);
   const params = useSearchParams();
   const sideParam = params.get("side");
   const [ticket, setTicket] = useState<Side | null>(
@@ -44,8 +44,14 @@ export function MarketScreen({ coin }: { coin: string }) {
   if (!market) {
     return (
       <div className="pr-app-page text-center">
-        <p className="pr-display text-xl">Market not found</p>
-        <p className="text-sm text-muted">{coin} is not listed right now.</p>
+        <h1 className="pr-display text-xl">
+          {isError ? "Market unavailable" : "Market not found"}
+        </h1>
+        <p className="text-sm text-muted">
+          {isError
+            ? "Prices could not be loaded. Check your connection and try again."
+            : `${coin} is not listed right now.`}
+        </p>
         <Button asChild variant="secondary">
           <Link href="/trade">All markets</Link>
         </Button>
@@ -94,7 +100,7 @@ export function MarketScreen({ coin }: { coin: string }) {
 function MarketHeader({ market }: { market: Market }) {
   return (
     <header className="flex items-center gap-3">
-      <Button asChild variant="ghost" size="icon" className="-mis-2">
+      <Button asChild variant="ghost" size="icon" className="-ms-2">
         <Link
           href={market.group === "crypto" ? "/trade" : `/trade?tab=${market.group}`}
           aria-label="Back to markets"
@@ -107,8 +113,12 @@ function MarketHeader({ market }: { market: Market }) {
         <h1 className="truncate text-lg leading-tight font-semibold">{market.symbol}</h1>
         <p className="truncate text-xs text-muted">
           {market.name !== market.symbol ? `${market.name} · ` : ""}
-          {market.group === "crypto" ? "Perpetual" : "Stock perpetual"} · up to {market.maxLeverage}
-          x
+          {market.group === "crypto"
+            ? "Perpetual"
+            : market.group === "stocks"
+              ? "Stock perpetual"
+              : "Macro perpetual"}{" "}
+          · up to {market.maxLeverage}x
         </p>
       </div>
     </header>
@@ -128,7 +138,7 @@ function ChartBlock({ market }: { market: Market }) {
       <div>
         <p
           className="pr-money text-[2.25rem] leading-none font-semibold tracking-tight"
-          aria-live="polite"
+          aria-live={scrub ? "polite" : "off"}
         >
           ${formatMarketPrice(shown)}
         </p>
@@ -182,11 +192,18 @@ function PositionCard({ market, position }: { market: Market; position: Position
   const { address } = useSignedInWallet();
   const { close } = useTrader(address);
   const [closing, setClosing] = useState(false);
+  const [armed, setArmed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const errorId = useId();
   const up = position.unrealizedPnl >= 0;
 
   async function onClose() {
+    if (!armed) {
+      setArmed(true);
+      window.setTimeout(() => setArmed(false), 4000);
+      return;
+    }
+    setArmed(false);
     setClosing(true);
     setError(null);
     try {
@@ -243,12 +260,12 @@ function PositionCard({ market, position }: { market: Market; position: Position
       <FieldError id={errorId} message={error} />
       <Button
         type="button"
-        variant="secondary"
+        variant={armed ? "destructive" : "secondary"}
         className="w-full"
         disabled={closing}
         onClick={() => void onClose()}
       >
-        {closing ? "Closing…" : "Close position"}
+        {closing ? "Closing…" : armed ? "Tap again to close at market" : "Close position"}
       </Button>
     </section>
   );
