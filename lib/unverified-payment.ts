@@ -39,9 +39,6 @@ function readDetails(value: unknown): SentPayment | null {
   if (!isTxHash(hash)) return null;
   if (typeof payerAddress !== "string" || !ADDRESS.test(payerAddress)) return null;
   if (typeof chainId !== "number" || !Number.isInteger(chainId)) return null;
-  if (kind === "direct" || kind === "eth") {
-    return { kind, hash, chainId, payerAddress };
-  }
   if (kind !== "across" || !isRecord(value.details)) return null;
   const details = value.details;
   if (typeof details.originChainId !== "number" || !Number.isInteger(details.originChainId)) {

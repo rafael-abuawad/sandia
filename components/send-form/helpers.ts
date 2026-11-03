@@ -1,6 +1,7 @@
 import { isAddress } from "viem";
 import { parseUsdToMicros } from "@/lib/money";
-import { MAX_SEND_RECIPIENTS } from "@/lib/send/calls";
+/** Each recipient is one signed Hyperliquid transfer, so batches stay small. */
+export const MAX_SEND_RECIPIENTS = 20;
 import {
   newRecipientRow,
   type RecipientRow,

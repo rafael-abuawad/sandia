@@ -35,7 +35,7 @@ describe("sendFormReducer", () => {
     const state = sendFormReducer(createInitialSendFormState(), {
       type: "transactionSubmitted",
       stage: "transfer",
-      label: "Confirm USDG transfer",
+      label: "Confirm USDC transfer",
       hash,
     });
     const pending = sendFormReducer(state, { type: "transactionPending" });

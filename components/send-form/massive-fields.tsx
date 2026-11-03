@@ -9,8 +9,12 @@ import { Label } from "@/components/ui/label";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { AddressBookButton } from "@/components/address-book/contact-picker";
 import { TokenChainChip } from "@/components/token-chain-select";
-import { ROBINHOOD_USDG } from "@/lib/destination";
-import { parseRecipientsCsv, type SendFieldErrors } from "@/components/send-form/helpers";
+import { HYPERCORE_USDC } from "@/lib/hyperliquid/config";
+import {
+  MAX_SEND_RECIPIENTS,
+  parseRecipientsCsv,
+  type SendFieldErrors,
+} from "@/components/send-form/helpers";
 import type { RecipientRow, SendFormAction } from "@/components/send-form/state";
 
 export function MassiveSendFields({
@@ -33,7 +37,15 @@ export function MassiveSendFields({
     dispatch({ type: "setError", error: null });
     try {
       const text = await file.text();
-      dispatch({ type: "setRows", rows: parseRecipientsCsv(text) });
+      const parsed = parseRecipientsCsv(text);
+      if (parsed.length > MAX_SEND_RECIPIENTS) {
+        dispatch({
+          type: "setError",
+          error: `This file has ${parsed.length} recipients. A send can include at most ${MAX_SEND_RECIPIENTS}.`,
+        });
+        return;
+      }
+      dispatch({ type: "setRows", rows: parsed });
     } catch (err) {
       dispatch({
         type: "setError",
@@ -47,19 +59,24 @@ export function MassiveSendFields({
 
   return (
     <>
-      <p className="pr-help">Send different USDG amounts to multiple recipients in one batch.</p>
+      <p className="pr-help">Send different USDC amounts to multiple recipients in one batch.</p>
       <TokenChainChip
-        tokenSymbol={ROBINHOOD_USDG.symbol}
-        tokenLogoUrl={ROBINHOOD_USDG.logoUrl}
-        chainName={ROBINHOOD_USDG.chainName}
-        chainLogoUrl={ROBINHOOD_USDG.chainLogoUrl}
-        chainId={ROBINHOOD_USDG.chainId}
+        tokenSymbol={HYPERCORE_USDC.symbol}
+        tokenLogoUrl={HYPERCORE_USDC.logoUrl}
+        chainName={HYPERCORE_USDC.chainName}
+        chainLogoUrl={HYPERCORE_USDC.chainLogoUrl}
+        chainId={HYPERCORE_USDC.chainId}
       />
       <div className="space-y-3">
         <div className="flex items-end justify-between gap-3">
-          <p className="text-sm font-medium">Recipients</p>
+          <p className="text-sm font-medium">
+            Recipients{" "}
+            <span className="font-normal text-muted">
+              {rows.length}/{MAX_SEND_RECIPIENTS}
+            </span>
+          </p>
           {liveTotalLabel ? (
-            <p className="pr-mono text-xs text-muted">Total {liveTotalLabel} USDG</p>
+            <p className="pr-mono text-xs text-muted">Total {liveTotalLabel} USDC</p>
           ) : null}
         </div>
         <ul className="space-y-3">
@@ -115,7 +132,7 @@ export function MassiveSendFields({
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor={`send-amt-${row.id}`}>Amount (USDG)</Label>
+                  <Label htmlFor={`send-amt-${row.id}`}>Amount (USDC)</Label>
                   <Input
                     id={`send-amt-${row.id}`}
                     inputMode="decimal"
@@ -159,7 +176,12 @@ export function MassiveSendFields({
           }}
         />
         <div className="grid grid-cols-2 gap-2">
-          <Button type="button" variant="secondary" onClick={() => dispatch({ type: "addRow" })}>
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={rows.length >= MAX_SEND_RECIPIENTS}
+            onClick={() => dispatch({ type: "addRow" })}
+          >
             <Plus className="size-4" strokeWidth={1.5} aria-hidden />
             Add recipient
           </Button>
@@ -174,8 +196,8 @@ export function MassiveSendFields({
             href={`data:text/csv;charset=utf-8,${encodeURIComponent(
               "address,amount\n0x0000000000000000000000000000000000000001,10.00\n0x0000000000000000000000000000000000000002,25.50\n",
             )}`}
-            download="usdg-send-template.csv"
-            className="font-medium text-foreground underline underline-offset-2 hover:text-foreground"
+            download="usdc-send-template.csv"
+            className="inline-flex min-h-11 items-center font-medium text-foreground underline underline-offset-2 hover:text-foreground"
           >
             Download template
           </a>

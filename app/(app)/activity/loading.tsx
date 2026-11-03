@@ -20,7 +20,7 @@ export function ActivityListSkeleton() {
 
 export default function ActivityLoading() {
   return (
-    <div className="pr-page pr-page--wide space-y-4">
+    <div className="pr-app-page">
       <Skeleton className="h-8 w-32" />
       <ActivityListSkeleton />
     </div>

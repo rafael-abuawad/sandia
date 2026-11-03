@@ -25,10 +25,10 @@ describe("publicSitemapPaths", () => {
     expect(paths).toContain("/about");
     expect(paths).toContain("/requests/new");
     expect(paths).toContain("/send");
-    expect(paths).toContain("/earn");
-    expect(paths).toContain("/stocks");
-    expect(paths).toContain("/stocks/ETH");
-    expect(paths).toContain("/stocks/HOOD");
+    expect(paths).toContain("/trade");
+    expect(paths).toContain("/trade/BTC");
+    expect(paths).toContain("/trade/xyz%3ATSLA");
+    expect(paths).not.toContain("/earn");
     expect(paths).not.toContain("/dashboard");
     expect(paths).not.toContain("/activity");
     expect(paths).not.toContain("/address-book");

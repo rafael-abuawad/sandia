@@ -35,10 +35,10 @@ function TestDialog() {
     <ResponsiveDialog open onOpenChange={() => undefined}>
       <ResponsiveDialogContent>
         <ResponsiveDialogHeader>
-          <ResponsiveDialogTitle>Deposit into Earn</ResponsiveDialogTitle>
+          <ResponsiveDialogTitle>Long BTC</ResponsiveDialogTitle>
           <ResponsiveDialogDescription>Review the deposit.</ResponsiveDialogDescription>
         </ResponsiveDialogHeader>
-        <ResponsiveDialogBody>Vault details</ResponsiveDialogBody>
+        <ResponsiveDialogBody>Order details</ResponsiveDialogBody>
       </ResponsiveDialogContent>
     </ResponsiveDialog>
   );
@@ -48,14 +48,14 @@ describe("responsive dialog", () => {
   it("shares the root viewport choice with every part during a breakpoint change", () => {
     mocks.useIsMobile.mockReturnValueOnce(false).mockReturnValue(true);
     render(<TestDialog />);
-    expect(screen.getByRole("dialog", { name: "Deposit into Earn" })).toBeTruthy();
+    expect(screen.getByRole("dialog", { name: "Long BTC" })).toBeTruthy();
     expect(mocks.useIsMobile).toHaveBeenCalledTimes(1);
   });
 
   it("renders the mobile drawer with matching parts", () => {
     mocks.useIsMobile.mockReturnValue(true);
     render(<TestDialog />);
-    expect(screen.getByRole("dialog", { name: "Deposit into Earn" })).toBeTruthy();
+    expect(screen.getByRole("dialog", { name: "Long BTC" })).toBeTruthy();
     expect(mocks.useIsMobile).toHaveBeenCalledTimes(1);
   });
 });

@@ -77,14 +77,14 @@ export function PaymentQr({
   return (
     <div
       className={cn(
-        "w-full min-w-0 rounded-xl bg-panel-elevated p-2 text-foreground ring-1 ring-border sm:p-3",
+        "w-full min-w-0 rounded-xl bg-white p-2 text-[#0e1512] ring-1 ring-border sm:p-3",
         className,
       )}
     >
       <div className="relative">
         <svg
           ref={ref}
-          viewBox={`0 0 ${dim} ${dim}`}
+          viewBox={`-4 -4 ${dim + 8} ${dim + 8}`}
           className="block h-auto w-full max-w-full"
           role="img"
           aria-label="Payment link QR code"

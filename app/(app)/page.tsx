@@ -7,28 +7,31 @@ import { jsonLdScript, pageMetadata } from "@/lib/seo";
 export const metadata: Metadata = pageMetadata({
   title: "Sandia",
   description:
-    "Create a USD payment link or send USDG. Payers settle from their own chain, and USDG arrives on Robinhood Chain.",
+    "Trade crypto and stock perpetuals on Hyperliquid from your phone. Get paid from any chain straight into your Hyperliquid USDC balance.",
   path: "/",
   absolute: true,
 });
 
 const homeFaqs = [
   {
+    question: "Where does my money live?",
+    answer:
+      "In your own Hyperliquid account, as USDC. Sandia signs in with your email and creates the wallet that owns it.",
+  },
+  {
     question: "Do payers need a Sandia account?",
     answer:
-      "No. A payer opens the payment link and settles from their own wallet. They do not create a Sandia account.",
+      "No. A payer opens your payment link and pays from their own wallet on Base, Arbitrum, Ethereum, HyperEVM and other chains. Across delivers USDC to your Hyperliquid account.",
   },
   {
-    question: "Where does the payment arrive?",
-    answer: "USDG arrives on Robinhood Chain. The payer can start from another chain.",
+    question: "What can I trade?",
+    answer:
+      "Crypto perpetuals like BTC, ETH and SOL, and stock perpetuals like Tesla, Nvidia and Apple, long or short with leverage. All orders run on Hyperliquid.",
   },
   {
-    question: "When can I trade a stock token?",
-    answer: "A stock trade is offered only after a live quote says that market is open.",
-  },
-  {
-    question: "What is Earn?",
-    answer: "Earn is where you deposit, withdraw, and redeem USDG.",
+    question: "What does Sandia charge?",
+    answer:
+      "Hyperliquid's trading fee plus a small Sandia builder fee on each trade. Sending USDC to another Hyperliquid account is free.",
   },
 ] as const;
 
@@ -64,20 +67,18 @@ export default function HomePage() {
           </div>
           <div className="pr-hero-copy max-w-2xl space-y-6">
             <h1 className="pr-display pr-animate-in pr-animate-in-delay-1 text-3xl sm:text-5xl">
-              Request dollars. Receive USDG on Robinhood Chain.
+              Trade crypto and stocks. Get paid from any chain.
             </h1>
             <p className="pr-lede pr-animate-in pr-animate-in-delay-2">
-              Create a payment link or send USDG. Switch modes from the navigation to get started.
+              One USDC balance on Hyperliquid. Go long or short in two taps, send dollars for free,
+              and share a link anyone can pay from their own chain.
             </p>
             <div className="pr-animate-in pr-animate-in-delay-3 flex flex-wrap gap-3 pbs-2">
               <Button asChild size="lg">
-                <Link href="/requests/new">Create a request</Link>
+                <Link href="/trade">Start trading</Link>
               </Button>
               <Button asChild size="lg" variant="secondary">
-                <Link href="/send">Send USDG</Link>
-              </Button>
-              <Button asChild size="lg" variant="outline">
-                <Link href="/dashboard">Your requests</Link>
+                <Link href="/requests/new">Get paid</Link>
               </Button>
             </div>
           </div>
@@ -87,22 +88,22 @@ export default function HomePage() {
       <section className="pr-grid-3">
         {[
           {
+            title: "Trade",
+            body: "Crypto and stock perpetuals on Hyperliquid. Pick a market, choose long or short, set leverage, done.",
+            links: [
+              { href: "/trade", label: "Crypto" },
+              { href: "/trade?tab=stocks", label: "Stocks" },
+            ],
+          },
+          {
             title: "Request",
-            body: "Create a USD payment link. Payers settle from their own chain, and USDG arrives on Robinhood Chain. No Sandia account required.",
+            body: "Share a USD payment link. Payers settle from their own chain and USDC lands in your Hyperliquid account.",
             links: [{ href: "/requests/new", label: "Create a request" }],
           },
           {
             title: "Send",
-            body: "Push USDG to one recipient or a batch, with a review step before anything is sent.",
-            links: [{ href: "/send", label: "Send USDG" }],
-          },
-          {
-            title: "Stocks and earn",
-            body: "Stock trades appear only after a live quote says they are open. Deposit, withdraw, and redeem USDG from Earn.",
-            links: [
-              { href: "/stocks", label: "Stocks" },
-              { href: "/earn", label: "Earn" },
-            ],
+            body: "Send USDC to any Hyperliquid address, one person or many. Transfers are instant and free.",
+            links: [{ href: "/send", label: "Send USDC" }],
           },
         ].map((item) => (
           <div key={item.title} className="pr-feature">
@@ -113,7 +114,7 @@ export default function HomePage() {
                 <Link
                   key={link.href}
                   href={link.href}
-                  className="text-foreground underline underline-offset-2"
+                  className="inline-flex min-h-11 items-center text-foreground underline underline-offset-2"
                 >
                   {link.label}
                 </Link>

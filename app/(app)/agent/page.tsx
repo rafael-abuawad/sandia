@@ -1,7 +1,7 @@
 "use client";
 
 import { useAction, useQuery } from "convex/react";
-import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowUpRight, BrainCircuit } from "lucide-react";
 import {
@@ -9,8 +9,10 @@ import {
   type AgentMascotHandle,
   type AgentMascotMood,
 } from "@/components/agent-mascot";
-import { StockTradeTicket } from "@/components/stocks/stock-detail";
+import { useMarkets } from "@/components/trade/use-hyperliquid";
+import { MarketAvatar } from "@/components/trade/market-avatar";
 import { CreateRequestForm } from "@/components/create-request-form";
+import { EmbeddedPresentation } from "@/components/embedded-presentation";
 import { SendForm } from "@/components/send-form";
 import { LoginButton } from "@/components/login-button";
 import { Button } from "@/components/ui/button";
@@ -30,36 +32,31 @@ import { api } from "@/convex/_generated/api";
 import {
   MAX_AGENT_PROMPT_LENGTH,
   extractExplicitAmount,
-  extractStockUnit,
+  extractLeverage,
   resolveBatchRecipients,
   resolveExplicitAddress,
+  resolveMarket,
   resolveNamedContact,
-  resolveStock,
-  type AgentStock,
+  type AgentMarket,
   type IntentAction,
   type IntentRouting,
 } from "@/lib/agent-intent";
 import { useSignedInWallet } from "@/lib/use-signed-in-wallet";
-
-const EarnPanel = dynamic(() =>
-  import("@/components/earn-panel").then((module) => module.EarnPanel),
-);
+import { marketHref } from "@/lib/hyperliquid/markets";
 
 const EXAMPLES = [
-  "Send 100 USDG to Marco",
-  "Deposit 20 USDG to earn",
-  "Swap 20 USDG to NVIDIA",
-  "Request 50 USDG from Olivia",
+  "Long BTC with $50 at 5x",
+  "Short Tesla with $20",
+  "Send 100 USDC to Marco",
+  "Request 50 USDC from Olivia",
 ] as const;
 
 const ACTION_LABELS: Record<string, string> = {
-  send: "Send USDG",
+  send: "Send USDC",
   batch_send: "Send to multiple people",
   request: "Create a payment request",
-  earn_deposit: "Deposit into Earn",
-  earn_withdraw: "Withdraw from Earn",
-  stock_buy: "Buy a stock token",
-  stock_sell: "Sell a stock token",
+  trade_long: "Go long",
+  trade_short: "Go short",
 };
 
 type AgentOperation = {
@@ -69,9 +66,20 @@ type AgentOperation = {
   address: string;
   ambiguousRecipient: boolean;
   recipients: Array<{ address: string; amount: string }>;
-  stock: AgentStock | null;
-  stockUnit: "usd" | "shares" | null;
+  leverage: number | null;
 };
+
+function tradeHref(
+  coin: string,
+  action: IntentAction,
+  amount: string,
+  leverage: number | null,
+): string {
+  const params = new URLSearchParams({ side: action === "trade_short" ? "short" : "long" });
+  if (amount) params.set("amount", amount);
+  if (leverage) params.set("leverage", String(leverage));
+  return `${marketHref(coin)}?${params.toString()}`;
+}
 
 export default function AgentPage() {
   const { isSignedIn } = useSignedInWallet();
@@ -81,16 +89,14 @@ export default function AgentPage() {
   const [routing, setRouting] = useState<IntentRouting | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [operationLoading, setOperationLoading] = useState(false);
   const [operation, setOperation] = useState<AgentOperation | null>(null);
   const [operationPending, setOperationPending] = useState(false);
-  const [stocks, setStocks] = useState<AgentStock[]>([]);
-  const [stockError, setStockError] = useState<string | null>(null);
+  const router = useRouter();
+  const { data: markets } = useMarkets();
   const [intentFocused, setIntentFocused] = useState(false);
   const mascot = useRef<AgentMascotHandle>(null);
   const requestId = useRef(0);
   const nextOperationId = useRef(0);
-  const stocksPromise = useRef<Promise<AgentStock[]> | null>(null);
 
   useEffect(
     () => () => {
@@ -98,26 +104,6 @@ export default function AgentPage() {
     },
     [],
   );
-
-  const loadStocks = useCallback(async () => {
-    if (stocks.length) return stocks;
-    if (!stocksPromise.current) {
-      stocksPromise.current = fetch("/api/rhj/assets")
-        .then(async (response) => {
-          if (!response.ok) throw new Error("Stock assets are unavailable right now.");
-          const data = (await response.json()) as { assets?: AgentStock[] };
-          if (!Array.isArray(data.assets)) throw new Error("Stock assets could not be loaded.");
-          setStocks(data.assets);
-          setStockError(null);
-          return data.assets;
-        })
-        .catch((cause: unknown) => {
-          stocksPromise.current = null;
-          throw cause;
-        });
-    }
-    return stocksPromise.current;
-  }, [stocks]);
 
   const openOperation = useCallback(
     async (action: IntentAction, userPrompt: string) => {
@@ -128,18 +114,12 @@ export default function AgentPage() {
       const explicitAddress = resolveExplicitAddress(userPrompt);
       const recipients =
         action === "batch_send" ? resolveBatchRecipients(userPrompt, contactList) : [];
-      let stock: AgentStock | null = null;
-      if (action === "stock_buy" || action === "stock_sell") {
-        setStockError(null);
-        setOperationLoading(true);
-        try {
-          stock = resolveStock(userPrompt, await loadStocks());
-        } catch (cause) {
-          setStockError(
-            cause instanceof Error ? cause.message : "Stock assets are unavailable right now.",
-          );
-        } finally {
-          setOperationLoading(false);
+      const leverage = extractLeverage(userPrompt);
+      if (action === "trade_long" || action === "trade_short") {
+        const market = resolveMarket(userPrompt, markets ?? []);
+        if (market) {
+          router.push(tradeHref(market.coin, action, amount, leverage));
+          return;
         }
       }
       if (requestAtStart !== requestId.current) return;
@@ -150,13 +130,11 @@ export default function AgentPage() {
         address: explicitAddress || namedRecipient.address,
         ambiguousRecipient: namedRecipient.ambiguous,
         recipients,
-        stock,
-        stockUnit:
-          action === "stock_buy" || action === "stock_sell" ? extractStockUnit(userPrompt) : null,
+        leverage,
       });
       setRouting(null);
     },
-    [contacts, loadStocks],
+    [contacts, markets, router],
   );
 
   async function submitIntent(event: React.FormEvent) {
@@ -202,8 +180,7 @@ export default function AgentPage() {
           .sort((a, b) => b[1] - a[1])
           .slice(0, 4)
       : [];
-  const mascotMood: AgentMascotMood =
-    loading || operationLoading ? "thinking" : intentFocused ? "attentive" : "idle";
+  const mascotMood: AgentMascotMood = loading ? "thinking" : intentFocused ? "attentive" : "idle";
 
   return (
     <div className="pr-page mx-auto w-full max-w-2xl gap-8">
@@ -214,7 +191,7 @@ export default function AgentPage() {
           </span>
           <div>
             <h1 className="pr-display text-2xl">AI Agent</h1>
-            <p className="text-sm text-muted">Describe what you want to do with USDG.</p>
+            <p className="text-sm text-muted">Say what you want to do. Trade, send, or get paid.</p>
           </div>
         </div>
       </header>
@@ -231,7 +208,7 @@ export default function AgentPage() {
             }}
             onFocus={() => setIntentFocused(true)}
             onBlur={() => setIntentFocused(false)}
-            placeholder="For example, “Send 100 USDG to Marco”"
+            placeholder="For example, “Long BTC with $50 at 5x”"
             maxLength={MAX_AGENT_PROMPT_LENGTH}
             aria-describedby={error ? "agent-error" : "agent-hint"}
             aria-invalid={Boolean(error) || undefined}
@@ -239,7 +216,9 @@ export default function AgentPage() {
             disabled={loading}
           />
           <p id="agent-hint" className="flex justify-between gap-3 text-xs text-muted">
-            <span>AI Agent prepares a form for you to review. It never submits a transaction.</span>
+            <span>
+              AI Agent prepares a form for you to review. It never places a trade or sends money.
+            </span>
             <span className="shrink-0">
               {prompt.length}/{MAX_AGENT_PROMPT_LENGTH}
             </span>
@@ -251,8 +230,8 @@ export default function AgentPage() {
             <p className="text-center text-sm text-muted">Sign in to prepare an operation.</p>
           </div>
         ) : (
-          <Button type="submit" size="lg" className="w-full" disabled={loading || operationLoading}>
-            {loading || operationLoading ? "Preparing…" : "Continue"}
+          <Button type="submit" size="lg" className="w-full" disabled={loading}>
+            {loading ? "Preparing…" : "Continue"}
             <ArrowUpRight className="size-4" strokeWidth={1.5} aria-hidden />
           </Button>
         )}
@@ -290,11 +269,6 @@ export default function AgentPage() {
           Checking your intent…
         </p>
       ) : null}
-      {operationLoading ? (
-        <p className="text-sm text-muted" role="status">
-          Loading stock tokens…
-        </p>
-      ) : null}
       {routing?.status === "unsupported" ? (
         <p
           className="rounded-lg border border-border bg-panel p-4 text-sm text-muted"
@@ -329,20 +303,11 @@ export default function AgentPage() {
           </div>
         </section>
       ) : null}
-      {stockError && !operation ? (
-        <p className="text-sm text-danger" role="status">
-          {stockError}
-        </p>
-      ) : null}
       {operation ? (
         <OperationDialog
           key={operation.id}
           operation={operation}
-          stockAssets={stocks}
-          stockError={stockError}
-          onStockChange={(stock) =>
-            setOperation((current) => (current ? { ...current, stock } : null))
-          }
+          markets={markets ?? []}
           onPendingChange={setOperationPending}
           operationPending={operationPending}
           open={true}
@@ -357,18 +322,14 @@ export default function AgentPage() {
 
 function OperationDialog({
   operation,
-  stockAssets,
-  stockError,
-  onStockChange,
+  markets,
   onPendingChange,
   operationPending,
   open,
   onOpenChange,
 }: {
   operation: AgentOperation;
-  stockAssets: AgentStock[];
-  stockError: string | null;
-  onStockChange: (stock: AgentStock) => void;
+  markets: AgentMarket[];
   onPendingChange: (pending: boolean) => void;
   operationPending: boolean;
   open: boolean;
@@ -377,8 +338,7 @@ function OperationDialog({
   const title = ACTION_LABELS[operation.action];
   const isSend = operation.action === "send" || operation.action === "batch_send";
   const isRequest = operation.action === "request";
-  const isEarn = operation.action === "earn_deposit" || operation.action === "earn_withdraw";
-  const isStock = operation.action === "stock_buy" || operation.action === "stock_sell";
+  const isTrade = operation.action === "trade_long" || operation.action === "trade_short";
   return (
     <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
       <ResponsiveDialogContent className="flex max-h-[90dvh] flex-col overflow-clip sm:max-w-xl">
@@ -388,48 +348,34 @@ function OperationDialog({
             Check the details and complete the operation in the form below.
           </ResponsiveDialogDescription>
         </ResponsiveDialogHeader>
-        <ResponsiveDialogBody className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 pbe-4">
-          {operation.ambiguousRecipient ? (
-            <p className="rounded-md border border-border p-3 text-sm text-muted" role="status">
-              More than one saved contact has this name. Choose the right recipient in the address
-              book.
-            </p>
-          ) : null}
-          {isSend ? (
-            <SendForm
-              initialValues={
-                operation.action === "batch_send"
-                  ? { recipients: operation.recipients }
-                  : { address: operation.address, amount: operation.amount }
-              }
-              onPendingChange={onPendingChange}
-            />
-          ) : null}
-          {isRequest ? (
-            <CreateRequestForm
-              initialAmount={operation.amount}
-              embeddedPresentation
-              onPendingChange={onPendingChange}
-            />
-          ) : null}
-          {isEarn ? (
-            <EarnPanel
-              initialMode={operation.action === "earn_withdraw" ? "withdraw" : "deposit"}
-              initialAmount={operation.amount}
-              embeddedPresentation
-              onPendingChange={onPendingChange}
-            />
-          ) : null}
-          {isStock ? (
-            <AgentStockPanel
-              operation={operation}
-              assets={stockAssets}
-              error={stockError}
-              onStockChange={onStockChange}
-              onPendingChange={onPendingChange}
-            />
-          ) : null}
-        </ResponsiveDialogBody>
+        <EmbeddedPresentation value={true}>
+          <ResponsiveDialogBody className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 pbe-4">
+            {operation.ambiguousRecipient ? (
+              <p className="rounded-md border border-border p-3 text-sm text-muted" role="status">
+                More than one saved contact has this name. Choose the right recipient in the address
+                book.
+              </p>
+            ) : null}
+            {isSend ? (
+              <SendForm
+                initialValues={
+                  operation.action === "batch_send"
+                    ? { recipients: operation.recipients }
+                    : { address: operation.address, amount: operation.amount }
+                }
+                onPendingChange={onPendingChange}
+              />
+            ) : null}
+            {isRequest ? (
+              <CreateRequestForm
+                initialAmount={operation.amount}
+                embeddedPresentation
+                onPendingChange={onPendingChange}
+              />
+            ) : null}
+            {isTrade ? <AgentMarketPicker operation={operation} markets={markets} /> : null}
+          </ResponsiveDialogBody>
+        </EmbeddedPresentation>
         <ResponsiveDialogFooter className="shrink-0 border-bs border-border bg-panel-elevated pbs-4">
           <Button
             type="button"
@@ -446,138 +392,55 @@ function OperationDialog({
   );
 }
 
-function AgentStockPanel({
+function AgentMarketPicker({
   operation,
-  assets,
-  error,
-  onStockChange,
-  onPendingChange,
+  markets,
 }: {
   operation: AgentOperation;
-  assets: AgentStock[];
-  error: string | null;
-  onStockChange: (stock: AgentStock) => void;
-  onPendingChange: (pending: boolean) => void;
+  markets: AgentMarket[];
 }) {
+  const router = useRouter();
   const [query, setQuery] = useState("");
-  const [side, setSide] = useState<"buy" | "sell">(
-    operation.action === "stock_sell" ? "sell" : "buy",
-  );
-  const [unit, setUnit] = useState<"usd" | "shares" | null>(operation.stockUnit);
-  const [amount, setAmount] = useState(operation.amount);
-  const [halted, setHalted] = useState(false);
-  const stockSymbol = operation.stock?.symbol ?? null;
-
-  useEffect(() => {
-    if (!stockSymbol) {
-      setHalted(false);
-      return;
-    }
-    let cancelled = false;
-    const loadHalt = () => {
-      void fetch(`/api/rhj/prices?symbol=${encodeURIComponent(stockSymbol)}`)
-        .then(async (response) => {
-          if (!response.ok) return false;
-          const body = (await response.json()) as { quote?: { isTradingHalt?: boolean } };
-          return Boolean(body.quote?.isTradingHalt);
-        })
-        .then((next) => {
-          if (!cancelled) setHalted(next);
-        })
-        .catch((haltError: unknown) => {
-          console.error("[stocks] halt check failed", haltError);
-        });
-    };
-    loadHalt();
-    const id = window.setInterval(loadHalt, 30_000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(id);
-    };
-  }, [stockSymbol]);
-  const visibleAssets = assets
-    .filter((asset) =>
-      [asset.symbol, asset.shortName].join(" ").toLowerCase().includes(query.toLowerCase()),
+  const q = query.trim().toLowerCase();
+  const visible = markets
+    .filter(
+      (market) =>
+        !q || [market.symbol, market.name].some((label) => label.toLowerCase().includes(q)),
     )
     .slice(0, 8);
   return (
-    <div className="space-y-4">
-      {!operation.stock ? (
-        <div className="space-y-2">
-          <Label htmlFor="agent-stock-search">Choose a Robinhood stock token</Label>
-          <Input
-            id="agent-stock-search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search symbol or name"
-          />
-          {error ? (
-            <p className="text-sm text-danger" role="alert">
-              {error}
-            </p>
-          ) : null}
-          <ul className="max-h-48 space-y-1 overflow-y-auto" aria-label="Matching stock tokens">
-            {visibleAssets.map((asset) => (
-              <li key={asset.contractAddress}>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-auto w-full justify-start py-2 text-start"
-                  onClick={() => onStockChange(asset)}
-                >
-                  <span className="pr-mono w-16 shrink-0">{asset.symbol}</span>
-                  <span className="truncate text-muted">{asset.shortName}</span>
-                </Button>
-              </li>
-            ))}
-            {visibleAssets.length === 0 ? (
-              <li className="p-2 text-sm text-muted">No matching stock tokens.</li>
-            ) : null}
-          </ul>
-        </div>
-      ) : (
-        <div className="rounded-md border border-border px-3 py-2 text-sm">
-          <span className="pr-mono font-semibold">{operation.stock.symbol}</span>
-          <span className="ms-2 text-muted">{operation.stock.shortName}</span>
-        </div>
-      )}
-      {unit === null ? (
-        <div className="space-y-2">
-          <p className="text-sm font-medium">What does the amount refer to?</p>
-          <div className="grid grid-cols-2 gap-2">
-            <Button
+    <div className="space-y-2">
+      <Label htmlFor="agent-market-search">Which market?</Label>
+      <Input
+        id="agent-market-search"
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+        placeholder="Search BTC, Tesla, gold…"
+      />
+      <ul className="pr-list max-h-72 overflow-y-auto" aria-label="Matching markets">
+        {visible.map((market) => (
+          <li key={market.coin}>
+            <button
               type="button"
-              variant="outline"
-              aria-pressed={false}
-              onClick={() => setUnit("usd")}
+              className="pr-row w-full text-start"
+              onClick={() =>
+                router.push(
+                  tradeHref(market.coin, operation.action, operation.amount, operation.leverage),
+                )
+              }
             >
-              USD
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              aria-pressed={false}
-              onClick={() => setUnit("shares")}
-            >
-              Shares
-            </Button>
-          </div>
-        </div>
-      ) : null}
-      {unit !== null && operation.stock ? (
-        <StockTradeTicket
-          asset={operation.stock}
-          halted={halted}
-          side={side}
-          onSideChange={setSide}
-          unit={unit}
-          onUnitChange={setUnit}
-          ticketAmount={amount}
-          onTicketAmountChange={setAmount}
-          embeddedPresentation
-          onPendingChange={onPendingChange}
-        />
-      ) : null}
+              <MarketAvatar symbol={market.symbol} />
+              <span className="min-w-0 flex-1">
+                <span className="block font-semibold">{market.symbol}</span>
+                <span className="block truncate text-xs text-muted">{market.name}</span>
+              </span>
+            </button>
+          </li>
+        ))}
+        {visible.length === 0 ? (
+          <li className="p-2 text-sm text-muted">No matching markets.</li>
+        ) : null}
+      </ul>
     </div>
   );
 }

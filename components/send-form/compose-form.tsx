@@ -1,5 +1,6 @@
 "use client";
 
+import { useEmbeddedPresentation } from "@/components/embedded-presentation";
 import { useEffect, useId, useRef, useState } from "react";
 import { LoginButton } from "@/components/login-button";
 import { Button } from "@/components/ui/button";
@@ -59,7 +60,7 @@ function SendComposeFooter({
     return (
       <div className="flex flex-col items-center gap-3">
         <LoginButton />
-        <p className="text-center text-sm text-muted">Sign in to send USDG.</p>
+        <p className="text-center text-sm text-muted">Sign in to send USDC.</p>
       </div>
     );
   }
@@ -95,6 +96,7 @@ export function SendComposeForm({
   dispatch,
   onSubmit,
 }: SendComposeFormProps) {
+  const embedded = useEmbeddedPresentation();
   const lastFocusedValidationAttempt = useRef(0);
   const errorId = useId();
   const singleAddressErrorId = useId();
@@ -175,7 +177,7 @@ export function SendComposeForm({
         <AmountCompose
           kicker="You're sending"
           prefix="$"
-          suffix="USDG"
+          suffix="USDC"
           value={singleAmount}
           onChange={(amount) => dispatch({ type: "setSingleAmount", amount })}
           footer={footer}
@@ -218,7 +220,13 @@ export function SendComposeForm({
             openBook={openBook}
           />
           <FieldError id={errorId} message={error} />
-          <div className="sticky inset-be-[calc(4.5rem+env(safe-area-inset-bottom))] z-10 -mx-1 bg-[color-mix(in_oklch,var(--background)_92%,transparent)] px-1 py-3 backdrop-blur-sm md:static md:inset-be-auto md:bg-transparent md:p-0 md:backdrop-blur-none">
+          <div
+            className={
+              embedded
+                ? "py-3"
+                : "sticky inset-be-[calc(4.5rem+env(safe-area-inset-bottom))] z-10 -mx-1 bg-[color-mix(in_oklch,var(--background)_92%,transparent)] px-1 py-3 backdrop-blur-sm md:static md:inset-be-auto md:bg-transparent md:p-0 md:backdrop-blur-none"
+            }
+          >
             {footer}
           </div>
         </>

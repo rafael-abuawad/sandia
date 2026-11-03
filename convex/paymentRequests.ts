@@ -4,8 +4,7 @@ import { v } from "convex/values";
 import { getCurrentUser, getCurrentUserOrNull, payoutAddress } from "./lib/auth";
 import { paymentRequestStatus } from "./schema";
 
-const ROBINHOOD_CHAIN_ID = 4663;
-const ALLOWED_DEST_SYMBOLS = new Set(["USDC", "USDT", "USDG"]);
+import { HYPERCORE_USDC } from "../lib/hyperliquid/config";
 
 function normalizeAddress(address: string): string {
   const lower = address.toLowerCase();
@@ -52,9 +51,6 @@ export function usdMicrosToTokenBaseUnits(amountUsdMicros: number, tokenDecimals
 export const create = mutation({
   args: {
     amountUsdMicros: v.number(),
-    destinationTokenSymbol: v.string(),
-    destinationTokenAddress: v.string(),
-    destinationTokenDecimals: v.number(),
     description: v.optional(v.string()),
     expiresAt: v.optional(v.number()),
   },
@@ -67,13 +63,6 @@ export const create = mutation({
     const creatorAddress = normalizeAddress(user.address);
     const recipientAddress = normalizeAddress(payoutAddress(user));
 
-    const symbol = args.destinationTokenSymbol.toUpperCase();
-    if (!ALLOWED_DEST_SYMBOLS.has(symbol)) {
-      throw new Error("Destination token must be USDC, USDT, or USDG");
-    }
-    if (args.destinationTokenDecimals < 0 || args.destinationTokenDecimals > 18) {
-      throw new Error("Invalid destination token decimals");
-    }
     if (!Number.isInteger(args.amountUsdMicros) || args.amountUsdMicros <= 0) {
       throw new Error("Amount must be a positive integer in USD micros");
     }
@@ -81,10 +70,11 @@ export const create = mutation({
       throw new Error("Expiration must be in the future");
     }
 
-    const destinationTokenAddress = normalizeAddress(args.destinationTokenAddress);
+    // Every request settles to the payee's HyperCore perps USDC balance.
+    const destinationTokenAddress = normalizeAddress(HYPERCORE_USDC.address);
     const outputAmountBaseUnits = usdMicrosToTokenBaseUnits(
       args.amountUsdMicros,
-      args.destinationTokenDecimals,
+      HYPERCORE_USDC.decimals,
     );
 
     const now = Date.now();
@@ -96,10 +86,10 @@ export const create = mutation({
       creatorAddress,
       amountUsdMicros: args.amountUsdMicros,
       recipientAddress,
-      destinationChainId: ROBINHOOD_CHAIN_ID,
-      destinationTokenSymbol: symbol,
+      destinationChainId: HYPERCORE_USDC.chainId,
+      destinationTokenSymbol: HYPERCORE_USDC.symbol,
       destinationTokenAddress,
-      destinationTokenDecimals: args.destinationTokenDecimals,
+      destinationTokenDecimals: HYPERCORE_USDC.decimals,
       outputAmountBaseUnits,
       description: args.description?.trim() || undefined,
       expiresAt: args.expiresAt,
@@ -310,5 +300,3 @@ export const markCompleted = internalMutation({
     return { status: "completed" as const };
   },
 });
-
-export { ROBINHOOD_CHAIN_ID, ALLOWED_DEST_SYMBOLS };

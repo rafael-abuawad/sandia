@@ -2,7 +2,7 @@
 
 import { StatusBadge } from "@/components/status-badge";
 import { TokenChainIcon } from "@/components/token-chain-icon";
-import { ROBINHOOD_USDG } from "@/lib/destination";
+import { HYPERCORE_USDC } from "@/lib/hyperliquid/config";
 import { formatTokenAmount, formatUsdFromMicros } from "@/lib/money";
 import { shortenAddress } from "@/lib/utils";
 
@@ -39,10 +39,10 @@ export function PayRequestSummary({
       <div className="flex items-center gap-2.5">
         <TokenChainIcon
           tokenSymbol={destinationTokenSymbol}
-          tokenLogoUrl={ROBINHOOD_USDG.logoUrl}
-          chainName="Robinhood"
-          chainLogoUrl={ROBINHOOD_USDG.chainLogoUrl}
-          chainId={ROBINHOOD_USDG.chainId}
+          tokenLogoUrl={HYPERCORE_USDC.logoUrl}
+          chainName="Hyperliquid"
+          chainLogoUrl={HYPERCORE_USDC.chainLogoUrl}
+          chainId={HYPERCORE_USDC.chainId}
           size="md"
         />
         <div className="min-w-0">
@@ -60,9 +60,9 @@ export function PayRequestSummary({
         </p>
       ) : null}
       <p className="text-xs text-muted">
-        The USD amount converts 1:1 into {destinationTokenSymbol}. Paying in USDG on Robinhood sends
-        that amount in full, with no route fee. Other tokens can include a route fee, and the
-        recipient still receives at least the requested amount.
+        The USD amount converts 1:1 into {destinationTokenSymbol} on Hyperliquid. Pay from any
+        supported chain. The route fee is added to what you pay, so the recipient gets the full
+        amount.
       </p>
     </section>
   );

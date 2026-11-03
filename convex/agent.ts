@@ -7,10 +7,8 @@ const actionValidator = v.union(
   v.literal("send"),
   v.literal("batch_send"),
   v.literal("request"),
-  v.literal("earn_deposit"),
-  v.literal("earn_withdraw"),
-  v.literal("stock_buy"),
-  v.literal("stock_sell"),
+  v.literal("trade_long"),
+  v.literal("trade_short"),
   v.literal("unsupported"),
 );
 const probabilityValidator = v.record(v.string(), v.number());

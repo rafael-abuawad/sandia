@@ -69,7 +69,7 @@ export function AgentMascot({
     >
       <div className="pr-mascot-float">
         <div ref={bodyRef} className="pr-mascot-body">
-          <svg viewBox="0 0 195.79166 263.525" className="h-28 w-auto sm:h-32">
+          <svg viewBox="0 0 195.79166 263.525" className="h-20 w-auto sm:h-32">
             <defs>
               <linearGradient
                 id={`${id}-skin`}

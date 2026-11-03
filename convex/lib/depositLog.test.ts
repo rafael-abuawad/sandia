@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { matchDepositToRequest, parseDepositLogs, v3FundsDeposited } from "./depositLog";
 
 const recipient = "0x1111111111111111111111111111111111111111";
-const outputToken = "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168";
+const outputToken = "0x2100000000000000000000000000000000000000";
 const depositor = "0x2222222222222222222222222222222222222222";
 
 function depositLog(overrides?: {
@@ -16,7 +16,7 @@ function depositLog(overrides?: {
     abi: [v3FundsDeposited],
     eventName: "V3FundsDeposited",
     args: {
-      destinationChainId: overrides?.chainId ?? 4663n,
+      destinationChainId: overrides?.chainId ?? 1337n,
       depositId: 1,
       depositor,
     },
@@ -55,7 +55,7 @@ function depositLog(overrides?: {
 }
 
 const expected = {
-  destinationChainId: 4663,
+  destinationChainId: 1337,
   destinationTokenAddress: outputToken,
   recipientAddress: recipient,
   outputAmountBaseUnits: "1000000",

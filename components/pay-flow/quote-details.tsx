@@ -4,7 +4,7 @@ import { ChevronDown } from "lucide-react";
 import { TokenChainIcon } from "@/components/token-chain-icon";
 import type { AcrossSwapQuote, AcrossChain, AcrossToken } from "@/lib/across/client";
 import { chainName, displayTokenSymbol } from "@/lib/chains";
-import { ROBINHOOD_USDG } from "@/lib/destination";
+import { HYPERCORE_USDC } from "@/lib/hyperliquid/config";
 import { formatTokenAmount } from "@/lib/money";
 
 type PayQuoteDetailsProps = {
@@ -76,10 +76,10 @@ export function PayQuoteDetails({
             <span className="flex items-center gap-2 text-foreground">
               <TokenChainIcon
                 tokenSymbol={destinationTokenSymbol}
-                tokenLogoUrl={ROBINHOOD_USDG.logoUrl}
-                chainName="Robinhood"
-                chainLogoUrl={ROBINHOOD_USDG.chainLogoUrl}
-                chainId={ROBINHOOD_USDG.chainId}
+                tokenLogoUrl={HYPERCORE_USDC.logoUrl}
+                chainName="Hyperliquid"
+                chainLogoUrl={HYPERCORE_USDC.chainLogoUrl}
+                chainId={HYPERCORE_USDC.chainId}
                 size="sm"
               />
               <span className="pr-money">
@@ -120,8 +120,8 @@ export function PayQuoteDetails({
             <span className="text-end text-foreground">{tradeTypeLabel(tradeType)}</span>
           </div>
           <p className="pbs-1 text-xs text-muted">
-            This route converts your tokens into USDG on Robinhood Chain. Quotes are not cached and
-            may change every block.
+            Across converts your tokens into USDC in the recipient&apos;s Hyperliquid account.
+            Quotes are not cached and may change every block.
           </p>
         </div>
       </details>

@@ -9,11 +9,11 @@ const CHAIN_ICONS: Record<number, string> = {
   8453: "/assets/chains/base.svg",
   42161: "/assets/chains/arbitrum.svg",
   43114: "/assets/chains/avalanche.svg",
-  4663: "/assets/chains/robinhood.svg",
+  999: "/assets/chains/hyperevm.svg",
+  1337: "/assets/chains/hyperliquid.svg",
 };
 
 const TOKEN_ICONS: Record<string, string> = {
-  USDG: "/assets/tokens/usdg.svg",
   USDC: "/assets/tokens/usdc.svg",
   USDT: "/assets/tokens/usdt.svg",
   DAI: "/assets/tokens/dai.svg",
@@ -39,8 +39,9 @@ const CHAIN_NAME_ICONS: Record<string, string> = {
   bsc: "/assets/chains/bsc.svg",
   "bnb smart chain": "/assets/chains/bsc.svg",
   monad: "/assets/chains/monad.svg",
-  robinhood: "/assets/chains/robinhood.svg",
-  "robinhood chain": "/assets/chains/robinhood.svg",
+  hyperevm: "/assets/chains/hyperevm.svg",
+  hypercore: "/assets/chains/hyperliquid.svg",
+  hyperliquid: "/assets/chains/hyperliquid.svg",
 };
 
 export function resolveChainIcon(

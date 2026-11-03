@@ -67,7 +67,7 @@ export function PayTerminalStatus({
   if (kind === "completed") {
     return (
       <section className="pr-inset pr-inset--success p-5 text-sm text-success">
-        Payment complete. USDG settled on Robinhood Chain.
+        Payment complete. USDC settled on Hyperliquid.
         {depositTxnRef ? (
           <p className="mbs-2 text-xs text-muted">
             Deposit:{" "}

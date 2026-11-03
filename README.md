@@ -1,13 +1,14 @@
 # Sandia
 
-USD-denominated payment requests settled as stablecoins on **Robinhood Chain** via [Across Protocol](https://docs.across.to/).
+A mobile-first app on **Hyperliquid Core**: trade crypto and stock perpetuals, send USDC, and get paid from any chain through [Across Protocol](https://docs.across.to/).
 
 ## Stack
 
 - Next.js App Router + React 19
 - Convex (database + backend functions)
-- Privy for Sandia accounts (email OTP and an embedded wallet) and for payer wallet connection, wagmi/viem for chain reads and sends
-- Across Swap API for quotes, approvals, bridging, and deposit tracking
+- Privy for Sandia accounts (email OTP and an embedded wallet) and for payer wallet connection, wagmi/viem for payer chain sends
+- [`@nktkas/hyperliquid`](https://github.com/nktkas/hyperliquid) for Hyperliquid exchange actions; reads go to the public `/info` API
+- Across Swap API for quotes, approvals, bridging to HyperCore, and deposit tracking
 
 ## Setup
 
@@ -52,15 +53,13 @@ The Privy app secret stays on Convex only. Copy it from **Configuration → App 
 npx convex env set PRIVY_APP_SECRET <app-secret>
 ```
 
-Batch sends also need the deployed Sandia Send address in `.env.local`:
+Hyperliquid settings (defaults shown). The referral code is applied to new accounts. A builder fee is charged only when a builder address is set:
 
 ```bash
-NEXT_PUBLIC_SANDIA_SEND_ADDRESS=<sandia-send-address>
+NEXT_PUBLIC_HL_REFERRAL_CODE=BOLIVIA
+NEXT_PUBLIC_HL_BUILDER_ADDRESS=            # empty = no builder fee
+NEXT_PUBLIC_HL_BUILDER_FEE_TENTHS_BPS=50   # 0.05% per trade when a builder is set, max 100 (0.1%)
 ```
-
-The Sandia Send contract, deployment scripts, and contract tests live in [sandia-core](https://github.com/rafael-abuawad/sandia-core).
-
-A single recipient still transfers USDG directly. Two or more recipients approve that contract, then call `sandia_send`.
 
 5. In another terminal:
 
@@ -72,19 +71,29 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ## Product flow
 
-1. Creator signs in with email+OTP. Privy creates an embedded wallet, and that wallet is claimed automatically so they can create requests and send.
-2. Create a request: USD amount, optional description and expiry. The recipient is that wallet. The destination token is USDG on Robinhood Chain.
-3. Share the public `/pay/{id}` URL.
-4. Payer connects an external wallet through Privy, selects an Across-supported source chain/token, reviews quote (input, fees, min received, ETA), approves if needed, and pays. Paying does not create a Sandia account.
-5. The request is marked **completed** only after a deposit receipt matches the request and Across `/deposit` reports `filled` with destination chain 4663, the request token, the snapshotted recipient, an output amount at least as large as the request, and a fill transaction. `/deposit/status` is not used as proof. A minute cron keeps checking if the payer closes the tab.
+1. Sign in with email and OTP. Privy creates an embedded wallet. Its address is the user's Hyperliquid account.
+2. **Get paid.** Create a USD request and share `/pay/{id}`. The payer connects their own wallet, picks a chain and token (Base, Arbitrum, Ethereum, HyperEVM, and more), and Across delivers USDC to the creator's HyperCore perps balance (Across chain `1337`, token `0x2100…0000`). Paying does not create a Sandia account.
+3. **Trade.** `/trade` lists validator perps (Crypto) and the `xyz` HIP-3 dex (Stocks, plus Macro for commodities, indices and FX). A market page shows a touch chart, the open position, and Long/Short buttons that open a bottom-sheet ticket: amount, leverage, size, liquidation estimate, and fees.
+4. **Send.** USDC goes to any Hyperliquid address, one person or a batch. Each recipient is one signed, instant, gasless transfer.
+
+### Trading setup
+
+The first trade asks the account wallet for two signatures:
+
+- `approveAgent` registers a trading key that is generated and stored only in this browser (`localStorage`). Hyperliquid API wallets can place and cancel orders but cannot withdraw or transfer funds. Later orders need no wallet prompt.
+- `approveBuilderFee` approves Sandia's builder fee. It runs only when `NEXT_PUBLIC_HL_BUILDER_ADDRESS` is set, and orders then include `builder: { b, f }`.
+
+The trading key then calls `setReferrer({ code: "BOLIVIA" })` if the account has no referrer yet, and `agentSetAbstraction("u")` to switch the account to unified mode, so stocks and crypto share one USDC balance. Balances follow Hyperliquid's rules: unified accounts read USDC from the spot clearinghouse, and standard accounts add each dex's account value. Sends use `spotSend` for unified accounts and `usdSend` otherwise.
+
+Market orders are IOC limits 1% through the mark. Position size is margin × leverage ÷ mark, truncated to the lot size.
+
+### Payment verification
+
+A request is marked **completed** only when its deposit receipt matches the request (destination chain 1337, HyperCore USDC, recipient, and amount) and Across `/deposit` reports `filled` with the same fields and a fill reference. HyperCore has no EVM receipt to read, so the Across record is the fill proof. A cron runs every minute in case the payer closes the tab.
 
 ## Notes
 
-- Monetary values are stored as integer base units / USD micros — no floating-point arithmetic.
-- Destination tokens are discovered live from `GET /swap/tokens?chainId=4663` filtered to `USDC|USDT|USDG`.
-- The payer's browser also polls every 10 seconds. The server calls Across `GET /deposit` (or `/deposits`) with `ACROSS_API_KEY` on Convex, not a public env var.
-- Register an Across integrator id and set Convex `ACROSS_INTEGRATOR_ID`.
-- `/otc` redirects to `/requests/new`.
-- App accounts use the Privy embedded wallet on Robinhood Chain. The public pay page uses the same Privy wagmi provider and connects an external wallet for payment, so paying does not claim a Sandia account. WalletConnect for payers is the connector enabled in the Privy dashboard.
-- Outbound USDG sends use Privy's embedded-wallet gas sponsorship on Robinhood Chain (chain id 4663), so the sender does not need ETH. The browser calls `useSendTransaction` with `sponsor: true`; that uses the signed-in session, not the app secret. In the Privy Dashboard: enable TEE execution under **Wallets → Advanced** (do not disable automatic wallet migration), turn on **Fee sponsorship → Sponsor gas fees** (App pays; User pays does not cover Robinhood Chain), add Robinhood Chain, allow client-initiated sponsored transactions, set a spend cap, and add credits plus a payment method under **Billing → Fee sponsorship**. Store the app secret only as Convex `PRIVY_APP_SECRET`. Batch sends sponsor both the USDG approval and the Sandia Send call.
-- Stock buy and sell quote Uniswap v2 and v3 on Robinhood Chain and submit the swap to SwapRouter02. Steakhouse USDG deposits, withdrawals, and redemptions are submitted from Earn. See `docs/gates.md`.
+- Monetary values are stored as integer base units / USD micros — no floating-point arithmetic. Trade sizing uses Hyperliquid's decimal strings.
+- The Across integrator id comes from Convex `ACROSS_INTEGRATOR_ID`. Set both `ACROSS_APP_FEE` and `ACROSS_APP_FEE_RECIPIENT` to charge an app fee on payment quotes. As of Nov 2026 Across rejects app fees on routes into HyperCore. The quote then retries without the fee, so payments keep working and the fee starts once Across supports it.
+- Referral rewards follow Hyperliquid's program. Hyperliquid can refuse a referrer once an account already has one or has traded too much; setup ignores that and trading continues. A builder address, if you add one, must hold 100 USDC in perps before Hyperliquid pays builder fees.
+- `/stocks`, `/earn` and `/lending` redirect to `/trade`. Earn and the Robinhood Chain stock tokens were removed. Legacy Convex tables (`outboundTransfers`, `swapFills`, `vaultActivities`) stay in the schema so existing deployments validate. Nothing writes to them.

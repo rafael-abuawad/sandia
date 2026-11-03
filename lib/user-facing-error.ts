@@ -15,7 +15,6 @@ const REPLACEMENTS: Array<[RegExp, string]> = [
     "Trading is unavailable until a quote shows liquidity.",
   ],
   [/^deposits are closed because maxdeposit is 0$/i, "Deposits are closed right now."],
-  [/^vault snapshot failed$/i, "Vault details are unavailable right now."],
 ];
 
 function innerMessage(raw: string): string {

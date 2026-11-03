@@ -18,7 +18,7 @@ export const metadata: Metadata = {
     template: "%s · Sandia",
   },
   description:
-    "Create a USD payment link or send USDG. Payers settle from their own chain, and USDG arrives on Robinhood Chain.",
+    "Trade crypto and stock perpetuals on Hyperliquid, send USDC for free, and get paid from any chain.",
   applicationName: "Sandia",
   openGraph: {
     siteName: "Sandia",

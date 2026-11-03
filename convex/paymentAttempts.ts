@@ -97,7 +97,7 @@ export const getByDepositTxnRef = internalQuery({
   },
 });
 
-/** Attempt plus the request fields needed to verify a direct USDG transfer. */
+/** Attempt plus the request fields needed to verify a payment attempt. */
 export const getSettlementTarget = internalQuery({
   args: { depositTxnRef: v.string() },
   returns: v.union(

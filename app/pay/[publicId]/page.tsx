@@ -8,7 +8,7 @@ export async function generateMetadata({ params }: PayPageProps): Promise<Metada
   const { publicId } = await params;
   return pageMetadata({
     title: "Pay a request",
-    description: "Pay this Sandia request. USDG settles on Robinhood Chain.",
+    description: "Pay this Sandia request from any chain. USDC settles on Hyperliquid.",
     path: `/pay/${publicId}`,
     index: false,
   });

@@ -5,16 +5,18 @@ import { useId, useRef, useState } from "react";
 import { LoginButton } from "@/components/login-button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useAppAuth } from "@/lib/auth-bridge";
-import { UsdgBalanceCard } from "@/components/usdg-balance-card";
+import { BalanceCard } from "@/components/balance-card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 type AccountPanelProps = {
   className?: string;
   onAfterLogout?: () => void;
+  /** Called when a link inside the panel is followed, so a sheet can close. */
+  onNavigate?: () => void;
 };
 
-export function AccountPanel({ className, onAfterLogout }: AccountPanelProps) {
+export function AccountPanel({ className, onAfterLogout, onNavigate }: AccountPanelProps) {
   const { ready, authenticated, logout } = useAppAuth();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
@@ -47,13 +49,13 @@ export function AccountPanel({ className, onAfterLogout }: AccountPanelProps) {
   return (
     <>
       <div className={cn("space-y-3", className)}>
-        <UsdgBalanceCard />
-        <div className="space-y-2 border-bs border-border pbs-3">
-          <div className="flex justify-center md:justify-start">
-            <LoginButton />
-          </div>
-          <div className="flex items-center gap-2">
-            {ready && authenticated ? (
+        <BalanceCard onNavigate={onNavigate} />
+        {ready && authenticated ? (
+          <div className="space-y-2 border-bs border-border pbs-3">
+            <div className="flex justify-center md:justify-start">
+              <LoginButton onBeforeLogin={onNavigate} />
+            </div>
+            <div className="flex items-center gap-2">
               <Button
                 type="button"
                 variant="ghost"
@@ -64,12 +66,18 @@ export function AccountPanel({ className, onAfterLogout }: AccountPanelProps) {
                 <LogOut className="size-4" strokeWidth={1.5} aria-hidden />
                 Logout
               </Button>
-            ) : (
-              <div className="flex-1" />
-            )}
+              <ThemeToggle />
+            </div>
+          </div>
+        ) : (
+          // Signed out there is no Logout, so Sign in shares the row with the theme toggle.
+          <div className="flex items-center gap-2 border-bs border-border pbs-3">
+            <div className="min-w-0 flex-1">
+              <LoginButton onBeforeLogin={onNavigate} />
+            </div>
             <ThemeToggle />
           </div>
-        </div>
+        )}
       </div>
       <dialog
         ref={dialogRef}

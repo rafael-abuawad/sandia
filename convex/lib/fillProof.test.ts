@@ -8,15 +8,15 @@ import {
 } from "./fillProof";
 
 const expected = {
-  destinationChainId: 4663,
-  destinationTokenAddress: "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168",
+  destinationChainId: 1337,
+  destinationTokenAddress: "0x2100000000000000000000000000000000000000",
   recipientAddress: "0x1111111111111111111111111111111111111111",
   outputAmountBaseUnits: "1000000",
 };
 
 const filled = {
   status: "filled",
-  destinationChainId: 4663,
+  destinationChainId: 1337,
   outputToken: expected.destinationTokenAddress,
   recipient: expected.recipientAddress,
   outputAmount: "1000000",

@@ -1,39 +1,22 @@
 "use client";
 
+import { useEmbeddedPresentation } from "@/components/embedded-presentation";
 import { useId } from "react";
 import { Button } from "@/components/ui/button";
 import { FieldError } from "@/components/ui/field-error";
-import { TxLink } from "@/components/tx-link";
-import { robinhoodChain } from "@/lib/chains";
 import { formatUsdFromMicros } from "@/lib/money";
 import { truncateAddress } from "@/components/send-form/helpers";
 import { SendSummaryDetails } from "@/components/send-form/summary-details";
 import type { ReviewPayload, SendTransactionProgress } from "@/components/send-form/state";
 
 function getProgressMessage(progress: SendTransactionProgress, confirming: boolean) {
-  switch (progress.phase) {
-    case "awaiting-wallet":
-      return progress.label;
-    case "confirming":
-      return `${progress.label ?? "Transaction"} submitted. Waiting for confirmation…`;
-    case "pending":
-      return "The transaction is still pending. Check its status before starting another send.";
-    case "recording":
-      return "Transfer confirmed. Updating send activity…";
-    default:
-      return confirming ? "Preparing your send…" : null;
-  }
+  if (progress.phase === "awaiting-wallet") return progress.label;
+  return confirming ? "Sending…" : null;
 }
 
 function getActionLabel(progress: SendTransactionProgress, confirming: boolean) {
-  if (progress.phase === "pending" && progress.hash !== null) {
-    return progress.stage === "approval"
-      ? "Check approval and continue"
-      : "Check transaction status";
-  }
-  if (!confirming) return "Confirm send";
+  if (!confirming) return "Send now";
   if (progress.phase === "awaiting-wallet") return "Waiting for wallet…";
-  if (progress.phase === "recording") return "Updating activity…";
   return "Sending…";
 }
 
@@ -60,6 +43,7 @@ export function SendReviewPanel({
   onBack: () => void;
   onConfirm: () => void;
 }) {
+  const embedded = useEmbeddedPresentation();
   const errorId = useId();
   const blockerId = useId();
   const progressMessage = getProgressMessage(progress, confirming);
@@ -72,8 +56,8 @@ export function SendReviewPanel({
           <h2 className="pr-section-title">Review send</h2>
           <p className="mbs-1 text-sm text-muted">
             {review.mode === "massive"
-              ? "Robinhood Chain · USDG. This batch is one send after you approve USDG for the total. Sandia covers the network fees."
-              : "Robinhood Chain · USDG. This is a direct transfer. Sandia covers the network fee."}
+              ? "USDC on Hyperliquid. Each recipient is one instant transfer. No network fees."
+              : "USDC on Hyperliquid. Instant, with no network fee."}
           </p>
         </div>
 
@@ -87,7 +71,7 @@ export function SendReviewPanel({
             >
               <span className="pr-mono truncate text-muted">{truncateAddress(r.address)}</span>
               <span className="pr-mono shrink-0 font-medium">
-                {formatUsdFromMicros(r.amountUsdMicros)} USDG
+                {formatUsdFromMicros(r.amountUsdMicros)} USDC
               </span>
             </li>
           ))}
@@ -102,14 +86,6 @@ export function SendReviewPanel({
           aria-live="polite"
         >
           <p>{progressMessage}</p>
-          {progress.hash ? (
-            <p className="text-xs">
-              Transaction{" "}
-              <TxLink chainId={robinhoodChain.id} hash={progress.hash} className="text-xs">
-                {progress.hash.slice(0, 10)}…{progress.hash.slice(-6)}
-              </TxLink>
-            </p>
-          ) : null}
         </div>
       ) : null}
       {blocker && !confirming && !error ? (
@@ -123,17 +99,25 @@ export function SendReviewPanel({
         </div>
       ) : null}
 
-      <div className="sticky inset-be-[calc(4.5rem+env(safe-area-inset-bottom))] z-10 flex gap-3 bg-[color-mix(in_oklch,var(--background)_92%,transparent)] py-3 backdrop-blur-sm md:static md:bg-transparent md:p-0 md:backdrop-blur-none">
+      <div
+        className={
+          embedded
+            ? "flex gap-3 py-3"
+            : "sticky inset-be-[calc(4.5rem+env(safe-area-inset-bottom))] z-10 flex gap-3 bg-[color-mix(in_oklch,var(--background)_92%,transparent)] py-3 backdrop-blur-sm md:static md:bg-transparent md:p-0 md:backdrop-blur-none"
+        }
+      >
         <Button
+          size="lg"
           type="button"
           variant="outline"
           className="flex-1"
-          disabled={confirming || progress.hash !== null}
+          disabled={confirming}
           onClick={onBack}
         >
           Back
         </Button>
         <Button
+          size="lg"
           type="button"
           className="flex-1"
           disabled={confirming || !canConfirm}

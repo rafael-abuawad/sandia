@@ -14,7 +14,7 @@ export function SendSummaryDetails({ review }: { review: ReviewPayload }) {
       </div>
       <div className="flex justify-between gap-4">
         <dt className="text-muted">Total</dt>
-        <dd className="pr-mono font-medium">{formatUsdFromMicros(review.totalUsdMicros)} USDG</dd>
+        <dd className="pr-mono font-medium">{formatUsdFromMicros(review.totalUsdMicros)} USDC</dd>
       </div>
     </dl>
   );

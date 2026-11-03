@@ -8,7 +8,11 @@ import { shortenAddress } from "@/lib/utils";
 import { useAppAuth } from "@/lib/auth-bridge";
 import { useSignedInWallet } from "@/lib/use-signed-in-wallet";
 
-export function LoginButton() {
+/**
+ * `onBeforeLogin` runs right before Privy opens. Callers inside a modal surface (the account
+ * sheet is a top-layer <dialog>) use it to close themselves, or Privy renders behind them.
+ */
+export function LoginButton({ onBeforeLogin }: { onBeforeLogin?: () => void } = {}) {
   const { login } = useAppAuth();
   const { ready, authenticated, address } = useSignedInWallet();
   const { failed, retry } = useWalletSetup();
@@ -47,7 +51,14 @@ export function LoginButton() {
   }
 
   return (
-    <Button type="button" className="w-full" onClick={() => login()}>
+    <Button
+      type="button"
+      className="w-full"
+      onClick={() => {
+        onBeforeLogin?.();
+        login();
+      }}
+    >
       Sign in
     </Button>
   );

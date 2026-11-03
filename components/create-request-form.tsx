@@ -22,7 +22,6 @@ import {
   ResponsiveDialogHeader,
   ResponsiveDialogTitle,
 } from "@/components/responsive-dialog";
-import { ROBINHOOD_USDG } from "@/lib/destination";
 import { parseUsdToMicros } from "@/lib/money";
 import { userFacingError } from "@/lib/user-facing-error";
 
@@ -104,9 +103,6 @@ export function CreateRequestForm({
 
       const result = await createRequest({
         amountUsdMicros,
-        destinationTokenSymbol: ROBINHOOD_USDG.symbol,
-        destinationTokenAddress: ROBINHOOD_USDG.address,
-        destinationTokenDecimals: ROBINHOOD_USDG.decimals,
         description: description || undefined,
         expiresAt,
       });
@@ -154,8 +150,7 @@ export function CreateRequestForm({
           <div className="space-y-4 rounded-lg border border-border p-4">
             <p className="pr-display text-base">Request details</p>
             <p className="text-sm text-muted">
-              Optional note and expiration. The request settles to your connected wallet as USDG on
-              Robinhood Chain.
+              Optional note and expiration. The request settles as USDC in your Hyperliquid account.
             </p>
             <div className="space-y-2">
               <Label htmlFor="note">Note</Label>
@@ -189,8 +184,8 @@ export function CreateRequestForm({
             <ResponsiveDialogHeader>
               <ResponsiveDialogTitle>Request details</ResponsiveDialogTitle>
               <ResponsiveDialogDescription>
-                Optional note and expiration. Funds always settle to your connected wallet as USDG
-                on Robinhood Chain.
+                Optional note and expiration. Funds always settle as USDC in your Hyperliquid
+                account.
               </ResponsiveDialogDescription>
             </ResponsiveDialogHeader>
             <ResponsiveDialogBody className="space-y-4">

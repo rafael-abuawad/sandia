@@ -10,7 +10,7 @@ export const toggleVariants = cva(
       },
       size: {
         default: "h-9 min-w-9 px-2",
-        sm: "h-8 min-w-8 px-3 text-xs",
+        sm: "h-11 min-w-11 px-3 text-xs sm:h-8 sm:min-w-8",
         lg: "h-10 min-w-10 px-2.5",
       },
     },
