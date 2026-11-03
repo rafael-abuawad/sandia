@@ -1071,8 +1071,23 @@ details[open]::details-content {
   width: 100%;
   min-width: 0;
   flex: 1;
+  border: 0;
   background: transparent;
+  appearance: none;
   outline: none;
+  box-shadow: none;
+}
+
+.pr-amount-field input:focus,
+.pr-amount-field input:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+@media (forced-colors: active) {
+  .pr-amount-field:focus-within {
+    outline: 2px solid Highlight;
+  }
 }
 
 .pr-summary {
