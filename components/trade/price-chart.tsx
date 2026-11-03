@@ -46,10 +46,7 @@ export function PriceChart({
   if (!shape || !points) {
     return (
       <div
-        className={cn(
-          "h-44 w-full rounded-[var(--radius-lg)] bg-foreground/[0.03]",
-          loading && "animate-pulse",
-        )}
+        className={cn("pr-chart-grid h-44 w-full", loading && "animate-pulse")}
         role="status"
         aria-label={loading ? "Loading chart" : "No chart data"}
       />
@@ -76,7 +73,7 @@ export function PriceChart({
   const last = points[points.length - 1];
 
   return (
-    <figure className="relative m-0 select-none">
+    <figure className="pr-chart-grid relative m-0 select-none">
       <svg
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
         preserveAspectRatio="none"

@@ -62,6 +62,7 @@
   --canvas-blue: rgba(47, 127, 150, 0.08);
   --canvas-shade: rgba(14, 21, 18, 0.04);
   --grid-line: rgba(14, 21, 18, 0.045);
+  --chart-grid: rgba(14, 21, 18, 0.22);
   --overlay: rgba(14, 21, 18, 0.32);
 
   /* Shape */
@@ -121,6 +122,7 @@
   --canvas-blue: rgba(47, 127, 150, 0.06);
   --canvas-shade: rgba(0, 0, 0, 0.16);
   --grid-line: rgba(237, 244, 238, 0.045);
+  --chart-grid: rgba(237, 244, 238, 0.2);
   --overlay: rgba(0, 0, 0, 0.6);
 }
 
@@ -1202,5 +1204,18 @@ details[open]::details-content {
 @media (forced-colors: active) {
   .pr-alloc-bar > span {
     border: 1px solid CanvasText;
+  }
+}
+
+/* Dotted plot grid behind price and portfolio charts. Dots stay round in CSS
+   because the chart SVG stretches with preserveAspectRatio="none". */
+.pr-chart-grid {
+  background-image: radial-gradient(circle, var(--chart-grid) 0.7px, transparent 0.85px);
+  background-size: 16px 16px;
+}
+
+@media (forced-colors: active) {
+  .pr-chart-grid {
+    background-image: none;
   }
 }
