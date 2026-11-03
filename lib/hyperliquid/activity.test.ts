@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { buildHlActivity } from "./activity";
+import {
+  ACTIVITY_PAGE_SIZE,
+  buildHlActivity,
+  mergeActivityItems,
+  nextActivityCursor,
+  sourcesToLoad,
+  visibleActivity,
+} from "./activity";
 
 const ME = "0x00000000000000000000000000000000000000aa";
 const THEM = "0x00000000000000000000000000000000000000bb";
@@ -77,5 +84,130 @@ describe("buildHlActivity", () => {
       ],
     );
     expect(items).toEqual([]);
+  });
+});
+
+describe("activity pagination", () => {
+  it("hides rows older than a source that still has pages", () => {
+    const visible = visibleActivity([
+      {
+        items: [
+          { time: 100, id: "new-request" },
+          { time: 40, id: "old-request" },
+        ],
+        hasMore: true,
+      },
+      {
+        items: [
+          { time: 90, id: "trade" },
+          { time: 10, id: "old-trade" },
+        ],
+        hasMore: true,
+      },
+    ]);
+    expect(visible.map((item) => item.id)).toEqual(["new-request", "trade", "old-request"]);
+  });
+
+  it("shows everything once every source is exhausted", () => {
+    const visible = visibleActivity([
+      { items: [{ time: 5, id: "request" }], hasMore: false },
+      { items: [{ time: 9, id: "trade" }], hasMore: false },
+    ]);
+    expect(visible.map((item) => item.id)).toEqual(["trade", "request"]);
+  });
+
+  it("waits until a source that is still loading its first page", () => {
+    expect(
+      visibleActivity([
+        { items: [{ time: 5, id: "request" }], hasMore: false },
+        { items: [], hasMore: true },
+      ]),
+    ).toEqual([]);
+  });
+
+  it("loads only the source sitting on the frontier", () => {
+    expect(
+      sourcesToLoad([
+        { oldest: 80, hasMore: true },
+        { oldest: 20, hasMore: true },
+      ]),
+    ).toEqual([true, false]);
+    expect(
+      sourcesToLoad([
+        { oldest: null, hasMore: false },
+        { oldest: 20, hasMore: true },
+      ]),
+    ).toEqual([false, true]);
+  });
+
+  it("keeps scanning a short window and stops when a fill page is capped", () => {
+    expect(
+      nextActivityCursor({
+        startTime: 50,
+        floor: 0,
+        itemCount: 3,
+        pageSize: ACTIVITY_PAGE_SIZE,
+        fillsCapped: false,
+        oldestFillTime: null,
+      }),
+    ).toEqual({ nextEndTime: 49, continueScan: true });
+
+    expect(
+      nextActivityCursor({
+        startTime: 50,
+        floor: 0,
+        itemCount: 3,
+        pageSize: ACTIVITY_PAGE_SIZE,
+        fillsCapped: true,
+        oldestFillTime: 80,
+      }),
+    ).toEqual({ nextEndTime: 79, continueScan: false });
+  });
+
+  it("stops at the lookback floor", () => {
+    expect(
+      nextActivityCursor({
+        startTime: 10,
+        floor: 10,
+        itemCount: 1,
+        pageSize: ACTIVITY_PAGE_SIZE,
+        fillsCapped: false,
+        oldestFillTime: null,
+      }),
+    ).toEqual({ nextEndTime: null, continueScan: false });
+  });
+
+  it("drops duplicate rows when pages overlap", () => {
+    const merged = mergeActivityItems([
+      [
+        {
+          id: "fill-1",
+          kind: "trade",
+          title: "Buy BTC",
+          detail: "1",
+          amountUsd: null,
+          time: 2,
+        },
+      ],
+      [
+        {
+          id: "fill-1",
+          kind: "trade",
+          title: "Buy BTC",
+          detail: "1",
+          amountUsd: null,
+          time: 2,
+        },
+        {
+          id: "ledger-1",
+          kind: "deposit",
+          title: "Deposit",
+          detail: "USDC arrived",
+          amountUsd: 5,
+          time: 1,
+        },
+      ],
+    ]);
+    expect(merged.map((item) => item.id)).toEqual(["fill-1", "ledger-1"]);
   });
 });

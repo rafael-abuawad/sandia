@@ -1,3 +1,4 @@
+import { paginationOptsValidator } from "convex/server";
 import { query } from "./_generated/server";
 import { v } from "convex/values";
 import { getCurrentUserOrNull } from "./lib/auth";
@@ -11,25 +12,50 @@ const itemValidator = v.object({
   createdAt: v.number(),
 });
 
-/** Payment requests for the activity feed. Trades and transfers come from Hyperliquid. */
+const emptyPage = {
+  page: [],
+  isDone: true,
+  continueCursor: "",
+  splitCursor: null,
+  pageStatus: null,
+};
+
+/** One page of payment requests for the activity feed, newest first. */
 export const listMine = query({
-  args: {},
-  returns: v.array(itemValidator),
-  handler: async (ctx) => {
+  args: { paginationOpts: paginationOptsValidator },
+  returns: v.object({
+    page: v.array(itemValidator),
+    isDone: v.boolean(),
+    continueCursor: v.string(),
+    splitCursor: v.optional(v.union(v.string(), v.null())),
+    pageStatus: v.optional(v.union(v.string(), v.null())),
+  }),
+  handler: async (ctx, args) => {
     const user = await getCurrentUserOrNull(ctx);
-    if (!user) return [];
-    const requests = await ctx.db
+    if (!user) return emptyPage;
+
+    const result = await ctx.db
       .query("paymentRequests")
       .withIndex("by_creator", (q) => q.eq("creatorId", user._id))
       .order("desc")
-      .take(30);
-    return requests.map((row) => ({
-      id: row._id,
-      publicId: row.publicId,
-      amountUsdMicros: row.amountUsdMicros,
-      description: row.description,
-      status: row.status,
-      createdAt: row.createdAt,
-    }));
+      .paginate(args.paginationOpts);
+
+    console.log("Listed activity page", {
+      userId: user._id,
+      count: result.page.length,
+      isDone: result.isDone,
+    });
+
+    return {
+      ...result,
+      page: result.page.map((row) => ({
+        id: row._id,
+        publicId: row.publicId,
+        amountUsdMicros: row.amountUsdMicros,
+        description: row.description,
+        status: row.status,
+        createdAt: row.createdAt,
+      })),
+    };
   },
 });

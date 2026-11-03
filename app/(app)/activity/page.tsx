@@ -1,14 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
-import { useQuery } from "convex/react";
+import { useMemo, useState } from "react";
+import { usePaginatedQuery } from "convex/react";
 import { ArrowDownLeft, ArrowUpRight, CandlestickChart, Link2 } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import { LoginButton } from "@/components/login-button";
 import { StatusBadge } from "@/components/status-badge";
-import { useHlActivity } from "@/components/trade/use-hyperliquid";
+import { usePagedHlActivity } from "@/components/trade/use-hyperliquid";
 import { Button } from "@/components/ui/button";
+import {
+  ACTIVITY_PAGE_SIZE,
+  mergeActivityItems,
+  sourcesToLoad,
+  visibleActivity,
+} from "@/lib/hyperliquid/activity";
 import { formatUsd } from "@/lib/hyperliquid/math";
 import { formatUsdFromMicros } from "@/lib/money";
 import { useSignedInWallet } from "@/lib/use-signed-in-wallet";
@@ -39,14 +45,36 @@ function dayLabel(time: number): string {
   });
 }
 
+function oldestTime(items: Array<{ time: number }>): number | null {
+  if (items.length === 0) return null;
+  return items.reduce((min, item) => Math.min(min, item.time), Infinity);
+}
+
 export default function ActivityPage() {
   const { ready, isSignedIn, address } = useSignedInWallet();
-  const requests = useQuery(api.activity.listMine, isSignedIn ? {} : "skip");
-  const hl = useHlActivity(isSignedIn ? address : undefined);
+  const {
+    results: requests,
+    status,
+    loadMore,
+  } = usePaginatedQuery(api.activity.listMine, isSignedIn ? {} : "skip", {
+    initialNumItems: ACTIVITY_PAGE_SIZE,
+  });
+  const hl = usePagedHlActivity(isSignedIn ? address : undefined);
+  const [shownFor, setShownFor] = useState(address);
+  const [shown, setShown] = useState(ACTIVITY_PAGE_SIZE);
+  if (address !== shownFor) {
+    setShownFor(address);
+    setShown(ACTIVITY_PAGE_SIZE);
+  }
 
-  const groups = useMemo(() => {
-    const rows: Row[] = [
-      ...(requests ?? []).map((request) => ({
+  const hlItems = useMemo(
+    () => mergeActivityItems(hl.data?.pages.map((page) => page.items) ?? []),
+    [hl.data],
+  );
+
+  const requestRows = useMemo<Row[]>(
+    () =>
+      requests.map((request) => ({
         id: request.id,
         time: request.createdAt,
         icon: Link2,
@@ -56,7 +84,12 @@ export default function ActivityPage() {
         status: request.status,
         href: `/requests/${request.publicId}`,
       })),
-      ...(hl.data ?? []).map((item) => ({
+    [requests],
+  );
+
+  const tradeRows = useMemo<Row[]>(
+    () =>
+      hlItems.map((item) => ({
         id: item.id,
         time: item.time,
         icon:
@@ -69,14 +102,45 @@ export default function ActivityPage() {
         detail: item.detail,
         amount: item.amountUsd,
       })),
-    ].sort((a, b) => b.time - a.time);
+    [hlItems],
+  );
+
+  const requestsHaveMore = status === "CanLoadMore" || status === "LoadingMore";
+  const tradesHaveMore = hl.isPending || hl.hasNextPage || hl.isFetchingNextPage;
+  const visible = useMemo(
+    () =>
+      visibleActivity([
+        { items: requestRows, hasMore: status !== "Exhausted" },
+        { items: tradeRows, hasMore: tradesHaveMore },
+      ]),
+    [requestRows, status, tradeRows, tradesHaveMore],
+  );
+  const rows = visible.slice(0, shown);
+  const loadPlan = sourcesToLoad([
+    { oldest: oldestTime(requestRows), hasMore: requestsHaveMore },
+    { oldest: oldestTime(tradeRows), hasMore: hl.hasNextPage },
+  ]);
+  const moreBuffered = visible.length > shown;
+  const moreToFetch = loadPlan.some(Boolean);
+  const loadingMore = (status === "LoadingMore" || hl.isFetchingNextPage) && !moreBuffered;
+
+  const groups = useMemo(() => {
     const byDay = new Map<string, Row[]>();
-    for (const row of rows.slice(0, 100)) {
+    for (const row of rows) {
       const label = dayLabel(row.time);
       byDay.set(label, [...(byDay.get(label) ?? []), row]);
     }
     return [...byDay.entries()];
-  }, [requests, hl.data]);
+  }, [rows]);
+
+  function onLoadMore() {
+    if (visible.length > shown) {
+      setShown((count) => count + ACTIVITY_PAGE_SIZE);
+      return;
+    }
+    if (loadPlan[0]) loadMore(ACTIVITY_PAGE_SIZE);
+    if (loadPlan[1]) void hl.fetchNextPage();
+  }
 
   if (!ready) return <ActivityLoading />;
 
@@ -94,7 +158,8 @@ export default function ActivityPage() {
     );
   }
 
-  const loading = requests === undefined || hl.isLoading;
+  const loading = status === "LoadingFirstPage" || (Boolean(address) && hl.isPending);
+  const showEmpty = !loading && rows.length === 0 && !moreBuffered && !moreToFetch;
 
   return (
     <div className="pr-app-page">
@@ -102,10 +167,10 @@ export default function ActivityPage() {
       {loading && groups.length === 0 ? <ActivityListSkeleton /> : null}
       {hl.isError ? (
         <p className="text-sm text-muted" role="status">
-          Trades and transfers could not be loaded from Hyperliquid. Retrying…
+          Trades and transfers could not be loaded from Hyperliquid.
         </p>
       ) : null}
-      {!loading && groups.length === 0 ? (
+      {showEmpty ? (
         <div className="pr-panel pr-panel--padded space-y-3">
           <p className="font-medium">No activity yet</p>
           <p className="text-sm text-muted">
@@ -116,11 +181,11 @@ export default function ActivityPage() {
           </Button>
         </div>
       ) : null}
-      {groups.map(([label, rows]) => (
+      {groups.map(([label, dayRows]) => (
         <section key={label} className="space-y-1" aria-label={label}>
           <h2 className="pr-section-label">{label}</h2>
           <ul className="pr-list">
-            {rows.map((row) => {
+            {dayRows.map((row) => {
               const Icon = row.icon;
               const body = (
                 <>
@@ -160,6 +225,17 @@ export default function ActivityPage() {
           </ul>
         </section>
       ))}
+      {moreBuffered || moreToFetch ? (
+        <Button
+          type="button"
+          variant="secondary"
+          className="w-full"
+          disabled={loadingMore}
+          onClick={onLoadMore}
+        >
+          {loadingMore ? "Loading…" : "Load more"}
+        </Button>
+      ) : null}
     </div>
   );
 }

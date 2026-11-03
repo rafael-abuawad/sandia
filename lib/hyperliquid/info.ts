@@ -106,8 +106,34 @@ export const info = {
   candleSnapshot: (coin: string, interval: string, startTime: number) =>
     hlInfo<HlCandle[]>({ type: "candleSnapshot", req: { coin, interval, startTime } }),
   userFills: (user: string) => hlInfo<HlFill[]>({ type: "userFills", user, aggregateByTime: true }),
-  userNonFundingLedgerUpdates: (user: string, startTime: number) =>
-    hlInfo<HlLedgerUpdate[]>({ type: "userNonFundingLedgerUpdates", user, startTime }),
+  /** Newest first. Hyperliquid returns at most 2000 fills for the range. */
+  userFillsByTime: (user: string, startTime: number, endTime: number, signal?: AbortSignal) =>
+    hlInfo<HlFill[]>(
+      {
+        type: "userFillsByTime",
+        user,
+        startTime,
+        endTime,
+        aggregateByTime: true,
+        reversed: true,
+      },
+      signal,
+    ),
+  userNonFundingLedgerUpdates: (
+    user: string,
+    startTime: number,
+    endTime?: number,
+    signal?: AbortSignal,
+  ) =>
+    hlInfo<HlLedgerUpdate[]>(
+      {
+        type: "userNonFundingLedgerUpdates",
+        user,
+        startTime,
+        ...(endTime !== undefined ? { endTime } : {}),
+      },
+      signal,
+    ),
   extraAgents: (user: string) => hlInfo<HlExtraAgent[]>({ type: "extraAgents", user }),
   maxBuilderFee: (user: string, builder: string) =>
     hlInfo<number>({ type: "maxBuilderFee", user, builder }),

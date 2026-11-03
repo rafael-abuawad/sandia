@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback, useMemo, useRef } from "react";
+import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useWalletClient } from "wagmi";
 import { privateKeyToAccount } from "viem/accounts";
 import { ExchangeClient, HttpTransport } from "@nktkas/hyperliquid";
@@ -24,7 +24,11 @@ import {
   type AccountSummary,
 } from "@/lib/hyperliquid/account";
 import { createAgent, loadAgent } from "@/lib/hyperliquid/agent-store";
-import { buildHlActivity } from "@/lib/hyperliquid/activity";
+import {
+  buildHlActivity,
+  fetchHlActivityPage,
+  HL_ACTIVITY_LOOKBACK_MS,
+} from "@/lib/hyperliquid/activity";
 import { parsePortfolio } from "@/lib/hyperliquid/portfolio";
 import { closeLimitPx, quoteTicket, type Side } from "@/lib/hyperliquid/math";
 
@@ -78,7 +82,32 @@ export function useHlAccount(user: string | undefined) {
   });
 }
 
-/** Trades and USDC movements from the last 90 days. */
+/**
+ * Trades and USDC movements, one time window at a time.
+ * The first page walks backward until it has a screenful or it reaches the lookback floor.
+ */
+export function usePagedHlActivity(user: string | undefined) {
+  const floors = useRef(new Map<string, number>());
+  const userKey = user ?? "";
+  if (!floors.current.has(userKey)) {
+    floors.current.set(userKey, Date.now() - HL_ACTIVITY_LOOKBACK_MS);
+  }
+  const floor = floors.current.get(userKey) ?? Date.now() - HL_ACTIVITY_LOOKBACK_MS;
+
+  return useInfiniteQuery({
+    queryKey: [...hlKeys.activity(user ?? ""), "pages", floor] as const,
+    enabled: Boolean(user),
+    initialPageParam: { endTime: null as number | null },
+    queryFn: ({ pageParam, signal }) =>
+      fetchHlActivityPage(user!, pageParam.endTime ?? Date.now(), floor, signal),
+    getNextPageParam: (last) =>
+      last.nextEndTime === null ? undefined : { endTime: last.nextEndTime },
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+  });
+}
+
+/** Recent trades and USDC movements for the portfolio preview. */
 export function useHlActivity(user: string | undefined) {
   return useQuery({
     queryKey: hlKeys.activity(user ?? ""),
