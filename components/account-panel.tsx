@@ -50,12 +50,12 @@ export function AccountPanel({ className, onAfterLogout, onNavigate }: AccountPa
     <>
       <div className={cn("space-y-3", className)}>
         <BalanceCard onNavigate={onNavigate} />
-        <div className="space-y-2 border-bs border-border pbs-3">
-          <div className="flex justify-center md:justify-start">
-            <LoginButton onBeforeLogin={onNavigate} />
-          </div>
-          <div className="flex items-center gap-2">
-            {ready && authenticated ? (
+        {ready && authenticated ? (
+          <div className="space-y-2 border-bs border-border pbs-3">
+            <div className="flex justify-center md:justify-start">
+              <LoginButton onBeforeLogin={onNavigate} />
+            </div>
+            <div className="flex items-center gap-2">
               <Button
                 type="button"
                 variant="ghost"
@@ -66,12 +66,18 @@ export function AccountPanel({ className, onAfterLogout, onNavigate }: AccountPa
                 <LogOut className="size-4" strokeWidth={1.5} aria-hidden />
                 Logout
               </Button>
-            ) : (
-              <div className="flex-1" />
-            )}
+              <ThemeToggle />
+            </div>
+          </div>
+        ) : (
+          // Signed out there is no Logout, so Sign in shares the row with the theme toggle.
+          <div className="flex items-center gap-2 border-bs border-border pbs-3">
+            <div className="min-w-0 flex-1">
+              <LoginButton onBeforeLogin={onNavigate} />
+            </div>
             <ThemeToggle />
           </div>
-        </div>
+        )}
       </div>
       <dialog
         ref={dialogRef}
