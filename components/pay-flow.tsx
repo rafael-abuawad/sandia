@@ -1,7 +1,7 @@
 "use client";
 
 import { AppBrand } from "@/components/app-brand";
-import { PayAcrossPanel } from "@/components/pay-flow/across-pay-panel";
+import { PayPanel } from "@/components/pay-flow/pay-panel";
 import { PayAttemptsList, PayTerminalStatus } from "@/components/pay-flow/attempts-list";
 import { PayRequestLoading } from "@/components/pay-flow/pay-request-loading";
 import { PayRequestSummary } from "@/components/pay-flow/request-summary";
@@ -12,49 +12,8 @@ type PayFlowProps = {
 };
 
 export function PayFlow({ publicId }: PayFlowProps) {
-  const {
-    request,
-    attempts,
-    isConnected,
-    originChainId,
-    inputToken,
-    chainOptions,
-    tokenOptions,
-    step,
-    quoteError,
-    quote,
-    ethQuote,
-    tradeType,
-    selectedToken,
-    chains,
-    directPay,
-    directBalance,
-    robinhoodEth,
-    ethBalance,
-    canPay,
-    paymentInProgress,
-    payerAddress,
-    statusMsg,
-    pendingTx,
-    txSuccess,
-    txError,
-    depositTxnRef,
-    onChainChange,
-    onTokenChange,
-    paymentSent,
-    checkingPayment,
-    refreshQuote,
-    executePayment,
-    retryVerification,
-  } = usePayFlow(publicId);
-
-  const depositAttempt = attempts?.find(
-    (attempt) =>
-      depositTxnRef &&
-      attempt.depositTxnRef &&
-      attempt.depositTxnRef.toLowerCase() === depositTxnRef.toLowerCase(),
-  );
-  const depositChainId = depositAttempt?.originChainId ?? originChainId;
+  const flow = usePayFlow(publicId);
+  const { request, attempts, step, settledHash, legacyRequest, activeDeposit } = flow;
 
   if (request === undefined) {
     return <PayRequestLoading />;
@@ -70,7 +29,14 @@ export function PayFlow({ publicId }: PayFlowProps) {
 
   const isTerminalPaid = request.status === "completed" || step === "done";
   const isUnavailable =
-    request.status === "cancelled" || request.status === "expired" || request.status === "failed";
+    legacyRequest ||
+    request.status === "cancelled" ||
+    request.status === "expired" ||
+    request.status === "failed";
+  const settlementHash =
+    settledHash ??
+    activeDeposit?.txHash ??
+    attempts?.find((attempt) => attempt.status === "settled")?.txHash;
 
   return (
     <div className="space-y-6">
@@ -86,49 +52,19 @@ export function PayFlow({ publicId }: PayFlowProps) {
       />
 
       {isTerminalPaid ? (
-        <PayTerminalStatus
-          kind="completed"
-          depositTxnRef={depositTxnRef}
-          depositChainId={depositChainId}
-        />
+        <PayTerminalStatus kind="completed" txHash={settlementHash} message={flow.statusMsg} />
       ) : isUnavailable ? (
-        <PayTerminalStatus kind="unavailable" statusLabel={request.status} />
+        <PayTerminalStatus
+          kind="unavailable"
+          statusLabel={legacyRequest ? undefined : request.status}
+        />
       ) : (
-        <PayAcrossPanel
-          isConnected={isConnected}
-          originChainId={originChainId}
-          inputToken={inputToken}
-          chainOptions={chainOptions}
-          tokenOptions={tokenOptions}
-          step={step}
-          quoteError={quoteError}
-          quote={quote}
-          ethQuote={ethQuote}
-          tradeType={tradeType}
-          selectedToken={selectedToken}
-          chains={chains}
-          destinationTokenSymbol={request.destinationTokenSymbol}
-          destinationTokenDecimals={request.destinationTokenDecimals}
-          outputAmountBaseUnits={request.outputAmountBaseUnits}
-          directPay={directPay}
-          directBalance={directBalance}
-          robinhoodEth={robinhoodEth}
-          ethBalance={ethBalance}
-          canPay={canPay}
-          payerAddress={payerAddress}
-          paymentInProgress={Boolean(paymentInProgress)}
+        <PayPanel
+          flow={flow}
+          amountBaseUnits={request.outputAmountBaseUnits}
+          decimals={request.destinationTokenDecimals}
+          symbol={request.destinationTokenSymbol}
           expiresAt={request.expiresAt}
-          statusMsg={statusMsg}
-          pendingTx={pendingTx}
-          txSuccess={txSuccess}
-          txError={txError}
-          onChainChange={onChainChange}
-          onTokenChange={onTokenChange}
-          onRefreshQuote={() => void refreshQuote()}
-          onPay={() => void executePayment()}
-          paymentSent={paymentSent}
-          checkingPayment={checkingPayment}
-          onRetryVerification={() => void retryVerification()}
         />
       )}
 

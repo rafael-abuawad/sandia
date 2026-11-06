@@ -1,6 +1,7 @@
-import { isAddress } from "viem";
 import { parseUsdToMicros } from "@/lib/money";
-import { MAX_SEND_RECIPIENTS } from "@/lib/send/calls";
+import { MAX_SEND_RECIPIENTS } from "@/lib/stellar/constants";
+import { memoError } from "@/lib/stellar/memo";
+import { isStellarRecipient } from "@/lib/stellar/strkey";
 import {
   newRecipientRow,
   type RecipientRow,
@@ -9,7 +10,7 @@ import {
   type SendMode,
 } from "@/components/send-form/state";
 
-export type SendFieldErrors = Record<string, { address?: string; amount?: string }>;
+export type SendFieldErrors = Record<string, { address?: string; amount?: string; memo?: string }>;
 
 export type SendValidation = {
   review: ReviewPayload | null;
@@ -68,13 +69,18 @@ export function validateReviewPayload(
   singleAddress: string,
   singleAmount: string,
   rows: RecipientRow[],
+  singleMemo = "",
 ): SendValidation {
   const fieldErrors: SendFieldErrors = {};
   if (mode === "single") {
     let amountUsdMicros: number | null = null;
-    if (!isAddress(singleAddress)) {
-      fieldErrors.single = { address: "Enter a valid recipient address" };
+    const recipient = singleAddress.trim();
+    const memo = singleMemo.trim();
+    if (!isStellarRecipient(recipient)) {
+      fieldErrors.single = { address: "Enter a valid Stellar address" };
     }
+    const memoProblem = memoError(memo);
+    if (memoProblem) fieldErrors.single = { ...fieldErrors.single, memo: memoProblem };
     try {
       amountUsdMicros = parseUsdToMicros(singleAmount);
     } catch (err) {
@@ -83,7 +89,7 @@ export function validateReviewPayload(
         amount: err instanceof Error ? err.message : "Enter a valid amount",
       };
     }
-    if (!isAddress(singleAddress) || amountUsdMicros === null) {
+    if (!isStellarRecipient(recipient) || memoProblem || amountUsdMicros === null) {
       return { review: null, error: null, fieldErrors };
     }
     return {
@@ -93,11 +99,12 @@ export function validateReviewPayload(
         mode,
         recipients: [
           {
-            address: singleAddress as `0x${string}`,
+            address: recipient,
             amountUsdMicros,
           },
         ],
         totalUsdMicros: amountUsdMicros,
+        ...(memo ? { memo } : {}),
       },
     };
   }
@@ -120,11 +127,13 @@ export function validateReviewPayload(
     const row = rows[i];
     const label = `Recipient ${i + 1}`;
     let rowHasError = false;
-    if (!isAddress(row.address)) {
-      fieldErrors[row.id] = { address: `${label}: enter a valid address` };
+    const address = row.address.trim();
+    if (!isStellarRecipient(address)) {
+      fieldErrors[row.id] = { address: `${label}: enter a valid Stellar address` };
       rowHasError = true;
     } else {
-      const normalized = row.address.toLowerCase();
+      // Case is significant in Stellar addresses, so this compares them exactly.
+      const normalized = address;
       const duplicateIndex = seen.get(normalized);
       if (duplicateIndex !== undefined) {
         const original = rows[duplicateIndex];
@@ -155,11 +164,8 @@ export function validateReviewPayload(
       rowHasError = true;
     }
 
-    if (!rowHasError && isAddress(row.address) && amountUsdMicros !== null) {
-      recipients.push({
-        address: row.address as `0x${string}`,
-        amountUsdMicros,
-      });
+    if (!rowHasError && amountUsdMicros !== null) {
+      recipients.push({ address, amountUsdMicros });
     }
   }
 

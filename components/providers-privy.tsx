@@ -1,17 +1,11 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
-import {
-  getEmbeddedConnectedWallet,
-  useCreateWallet,
-  usePrivy,
-  useWallets,
-} from "@privy-io/react-auth";
-import { useSetActiveWallet } from "@privy-io/wagmi";
-import { useAccount, useConnect } from "wagmi";
+import { usePrivy } from "@privy-io/react-auth";
+import { useCreateWallet } from "@privy-io/react-auth/extended-chains";
 import { AuthBridgeProvider } from "@/lib/auth-bridge";
 import { EnsureConvexUser } from "@/components/ensure-convex-user";
-import { privyConnectorReady, walletSetupAction } from "@/lib/wallet-setup";
+import { stellarWalletAddress, walletSetupAction } from "@/lib/wallet-setup";
 
 const WALLET_SETUP_TIMEOUT_MS = 12_000;
 
@@ -29,101 +23,46 @@ export function useWalletSetup() {
   return useContext(WalletSetupContext);
 }
 
-function EmbeddedWalletPin({
+function EmbeddedWalletSetup({
   attempt,
   onFailed,
 }: {
   attempt: number;
   onFailed: (failed: boolean) => void;
 }) {
-  const { authenticated } = usePrivy();
-  const { wallets, ready: walletsReady } = useWallets();
+  const { ready, authenticated, user } = usePrivy();
   const { createWallet } = useCreateWallet();
-  const { setActiveWallet } = useSetActiveWallet();
-  const { address } = useAccount();
-  const { connectors } = useConnect();
   const createAttempted = useRef(false);
-  const activating = useRef(false);
-  const attemptedKey = useRef<string | null>(null);
   const lastAttempt = useRef(attempt);
   if (lastAttempt.current !== attempt) {
     lastAttempt.current = attempt;
     createAttempted.current = false;
-    attemptedKey.current = null;
-    activating.current = false;
   }
 
-  const embedded = getEmbeddedConnectedWallet(wallets);
-  const embeddedAddress = embedded?.address;
-  const connectorKey = connectors.map((connector) => connector.id).join("|");
-  const connectorReady = embeddedAddress
-    ? privyConnectorReady(connectorKey.split("|"), embeddedAddress)
-    : false;
-  const settled = Boolean(
-    embeddedAddress && address && address.toLowerCase() === embeddedAddress.toLowerCase(),
-  );
+  const stellarAddress = stellarWalletAddress(user?.linkedAccounts);
 
   useEffect(() => {
-    if (!authenticated || settled) {
-      onFailed(false);
-      return;
-    }
+    if (!authenticated || stellarAddress) return;
     const timer = window.setTimeout(() => onFailed(true), WALLET_SETUP_TIMEOUT_MS);
     return () => window.clearTimeout(timer);
-  }, [authenticated, settled, attempt, onFailed]);
+  }, [authenticated, stellarAddress, attempt, onFailed]);
 
   useEffect(() => {
     const action = walletSetupAction({
       authenticated,
-      walletsReady,
-      embeddedAddress,
-      activeAddress: address,
-      connectorReady,
+      ready,
+      stellarAddress,
       createAttempted: createAttempted.current,
     });
-
-    if (action === "create") {
-      createAttempted.current = true;
-      void createWallet().catch((error: unknown) => {
-        console.error("embedded_wallet_create_failed", {
-          message: error instanceof Error ? error.message : "Could not create embedded wallet",
-        });
+    if (action !== "create") return;
+    createAttempted.current = true;
+    void createWallet({ chainType: "stellar" }).catch((error: unknown) => {
+      onFailed(true);
+      console.error("embedded_wallet_create_failed", {
+        message: error instanceof Error ? error.message : "Could not create embedded wallet",
       });
-      return;
-    }
-
-    if (action !== "activate" || !embedded) return;
-
-    const key = `${embedded.address.toLowerCase()}::${connectorKey}`;
-    if (activating.current || attemptedKey.current === key) return;
-
-    activating.current = true;
-    attemptedKey.current = key;
-    console.log("embedded_wallet_activate_requested", { address: embedded.address });
-    void setActiveWallet(embedded)
-      .catch((error: unknown) => {
-        attemptedKey.current = null;
-        console.error("embedded_wallet_activate_failed", {
-          address: embedded.address,
-          message: error instanceof Error ? error.message : "Could not activate embedded wallet",
-        });
-      })
-      .finally(() => {
-        activating.current = false;
-      });
-  }, [
-    authenticated,
-    walletsReady,
-    wallets,
-    embedded,
-    embeddedAddress,
-    address,
-    connectorReady,
-    connectorKey,
-    setActiveWallet,
-    createWallet,
-    attempt,
-  ]);
+    });
+  }, [authenticated, ready, stellarAddress, createWallet, attempt, onFailed]);
 
   return null;
 }
@@ -149,8 +88,8 @@ function PrivyBridge({ children }: { children: React.ReactNode }) {
       }}
     >
       <WalletSetupContext.Provider value={{ failed, retry }}>
-        <EmbeddedWalletPin attempt={attempt} onFailed={setFailed} />
-        <EnsureConvexUser />
+        <EmbeddedWalletSetup attempt={attempt} onFailed={setFailed} />
+        <EnsureConvexUser attempt={attempt} onFailed={setFailed} />
         {children}
       </WalletSetupContext.Provider>
     </AuthBridgeProvider>

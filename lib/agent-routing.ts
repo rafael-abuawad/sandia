@@ -1,15 +1,6 @@
 import type { IntentAction, IntentProbabilities, IntentRouting } from "./agent-intent";
 
-export const JEV_ACTIONS = [
-  "send",
-  "batch_send",
-  "request",
-  "earn_deposit",
-  "earn_withdraw",
-  "stock_buy",
-  "stock_sell",
-  "unsupported",
-] as const;
+export const JEV_ACTIONS = ["send", "batch_send", "request", "unsupported"] as const;
 
 export type JevAction = (typeof JEV_ACTIONS)[number];
 
@@ -37,7 +28,7 @@ export function interpretJevDecision(
       return {
         status: "unsupported",
         reason:
-          "I couldn’t match that to one supported operation. Try asking to send, request, deposit, withdraw, buy, or sell.",
+          "I couldn’t match that to one supported operation. Try asking to send or request USDC.",
       };
     }
     return { status: "resolved", action: selected as IntentAction, confidence, probabilities };

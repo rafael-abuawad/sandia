@@ -1,12 +1,14 @@
+import { Keypair } from "@stellar/stellar-sdk";
 import { describe, expect, it, vi } from "vitest";
-import { ROBINHOOD_USDG } from "@/lib/destination";
-import type { SendExecutionClient } from "@/lib/send/execute";
+import { parseAccountState } from "@/lib/stellar/horizon";
+import { STELLAR_USDC } from "@/lib/stellar/constants";
 import { createInitialSendFormState, sendFormReducer, type ReviewPayload } from "./state";
 import { createSendController } from "./controller";
 
-const account = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" as const;
-const recipient = "0x1111111111111111111111111111111111111111" as const;
-const hash = `0x${"a".repeat(64)}` as const;
+const user = Keypair.random();
+const account = user.publicKey();
+const recipient = Keypair.random().publicKey();
+const hash = "a".repeat(64);
 
 describe("send controller", () => {
   it("keeps confirmed transfers successful when activity recording fails", async () => {
@@ -23,20 +25,30 @@ describe("send controller", () => {
     const controller = createSendController({
       review,
       address: account,
-      chainId: ROBINHOOD_USDG.chainId,
-      client: {
-        readContract: async () => 2_000_000n,
-        call: async () => undefined,
-        waitForTransactionReceipt: async () => ({ status: "success" }),
-      } satisfies SendExecutionClient,
+      deps: {
+        loadAccount: async () =>
+          parseAccountState({
+            sequence: "1",
+            balances: [
+              {
+                asset_type: "credit_alphanum4",
+                asset_code: "USDC",
+                asset_issuer: STELLAR_USDC.issuer,
+                balance: "5.0000000",
+              },
+            ],
+          }),
+        lookupTransaction: async () => null,
+        sign: async (hex) => Buffer.from(user.sign(Buffer.from(hex, "hex"))).toString("hex"),
+        submit: async () => ({ ok: true, hash }),
+      },
       dispatch,
       sendLock: { current: false },
       submittedTransaction: { current: null },
-      sendSponsored: vi.fn(async () => hash),
       recordSend: vi.fn(async () => {
         throw new Error("Convex is temporarily unavailable");
       }),
-      attachBundle: vi.fn(async () => ({ status: "filled" as const })),
+      confirmSend: vi.fn(async () => ({ status: "filled" as const })),
       refetchBalance: () => undefined,
     });
 

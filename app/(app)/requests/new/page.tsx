@@ -6,7 +6,7 @@ import { pageMetadata } from "@/lib/seo";
 export const metadata: Metadata = pageMetadata({
   title: "New payment request",
   description:
-    "Create a Sandia payment link. The payer settles from their chain and you receive USDG on Robinhood Chain.",
+    "Create a Sandia payment link. The payer settles from Stellar or another chain and you receive USDC on Stellar.",
   path: "/requests/new",
 });
 

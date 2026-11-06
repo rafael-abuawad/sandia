@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { BookUser, Plus } from "lucide-react";
-import { isAddress } from "viem";
 import { api } from "@/convex/_generated/api";
 import { useSignedInWallet } from "@/lib/use-signed-in-wallet";
 import { ContactForm } from "@/components/address-book/contact-form";
@@ -17,13 +16,15 @@ import {
   ResponsiveDialogHeader,
   ResponsiveDialogTitle,
 } from "@/components/responsive-dialog";
+import { memoError } from "@/lib/stellar/memo";
+import { isStellarRecipient } from "@/lib/stellar/strkey";
 import { cn, shortenAddress } from "@/lib/utils";
 import { userFacingError } from "@/lib/user-facing-error";
 
 type ContactPickerProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSelect: (address: string) => void;
+  onSelect: (address: string, memo?: string) => void;
   draftAddress?: string;
   startOnSave?: boolean;
 };
@@ -62,6 +63,7 @@ function ContactPickerSession({
   const [showForm, setShowForm] = useState(startOnSave);
   const [name, setName] = useState("");
   const [address, setAddress] = useState(() => draftAddress?.trim() || "");
+  const [memo, setMemo] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -69,6 +71,7 @@ function ContactPickerSession({
     setShowForm(startOnSave);
     setName("");
     setAddress(draftAddress?.trim() || "");
+    setMemo("");
     setError(null);
   }, [open, startOnSave, draftAddress]);
 
@@ -81,6 +84,7 @@ function ContactPickerSession({
     setShowForm(false);
     setName("");
     setAddress("");
+    setMemo("");
     setError(null);
   }
 
@@ -97,14 +101,21 @@ function ContactPickerSession({
       setError("Enter a name");
       return;
     }
-    if (!isAddress(address)) {
-      setError("Enter a valid wallet address");
+    const recipient = address.trim();
+    const contactMemo = memo.trim();
+    if (!isStellarRecipient(recipient)) {
+      setError("Enter a valid Stellar address");
+      return;
+    }
+    const memoProblem = memoError(contactMemo);
+    if (memoProblem) {
+      setError(memoProblem);
       return;
     }
     setSaving(true);
     try {
-      await createContact({ name: name.trim(), address });
-      onSelect(address);
+      await createContact({ name: name.trim(), address: recipient, memo: contactMemo });
+      onSelect(recipient, contactMemo);
       onOpenChange(false);
     } catch (err) {
       setError(userFacingError(err, "Unable to save contact."));
@@ -128,8 +139,10 @@ function ContactPickerSession({
           <ContactForm
             name={name}
             address={address}
+            memo={memo}
             onNameChange={setName}
             onAddressChange={setAddress}
+            onMemoChange={setMemo}
             error={error}
             onSubmit={(e) => void onSave(e)}
             saving={saving}
@@ -143,8 +156,8 @@ function ContactPickerSession({
             isSignedIn={isSignedIn}
             contacts={contacts}
             sorted={sorted}
-            onSelect={(nextAddress) => {
-              onSelect(nextAddress);
+            onSelect={(nextAddress, nextMemo) => {
+              onSelect(nextAddress, nextMemo);
               onOpenChange(false);
             }}
           />
@@ -175,9 +188,9 @@ function ContactPickerList({
   onSelect,
 }: {
   isSignedIn: boolean;
-  contacts: { _id: string; name: string; address: string }[] | undefined;
-  sorted: { _id: string; name: string; address: string }[];
-  onSelect: (address: string) => void;
+  contacts: { _id: string; name: string; address: string; memo?: string }[] | undefined;
+  sorted: { _id: string; name: string; address: string; memo?: string }[];
+  onSelect: (address: string, memo?: string) => void;
 }) {
   if (!isSignedIn) {
     return <p className="text-sm text-muted">Sign in to use your address book.</p>;
@@ -197,7 +210,7 @@ function ContactPickerList({
             type="button"
             className="flex w-full items-center justify-between gap-3 px-3 py-3 text-start hover:bg-foreground/[0.03] active:bg-foreground/5"
             aria-label={`Select ${contact.name}, ${shortenAddress(contact.address, 6)}`}
-            onClick={() => onSelect(contact.address)}
+            onClick={() => onSelect(contact.address, contact.memo)}
           >
             <span className="min-w-0">
               <span className="block truncate text-sm font-semibold text-foreground">
@@ -225,11 +238,11 @@ export function AddressBookButton({
 }) {
   const { isSignedIn } = useSignedInWallet();
   const contacts = useQuery(api.contacts.list, isSignedIn ? {} : "skip");
-  const normalized = address?.trim().toLowerCase() ?? "";
+  const normalized = address?.trim() ?? "";
   const unregistered = Boolean(
     isSignedIn &&
-    address &&
-    isAddress(address) &&
+    normalized &&
+    isStellarRecipient(normalized) &&
     contacts &&
     !contacts.some((contact) => contact.address === normalized),
   );

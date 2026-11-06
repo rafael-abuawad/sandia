@@ -1,7 +1,6 @@
 "use client";
 
 import { useAction, useQuery } from "convex/react";
-import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowUpRight, BrainCircuit } from "lucide-react";
 import {
@@ -9,12 +8,10 @@ import {
   type AgentMascotHandle,
   type AgentMascotMood,
 } from "@/components/agent-mascot";
-import { StockTradeTicket } from "@/components/stocks/stock-detail";
 import { CreateRequestForm } from "@/components/create-request-form";
 import { SendForm } from "@/components/send-form";
 import { LoginButton } from "@/components/login-button";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -30,36 +27,24 @@ import { api } from "@/convex/_generated/api";
 import {
   MAX_AGENT_PROMPT_LENGTH,
   extractExplicitAmount,
-  extractStockUnit,
   resolveBatchRecipients,
   resolveExplicitAddress,
   resolveNamedContact,
-  resolveStock,
-  type AgentStock,
   type IntentAction,
   type IntentRouting,
 } from "@/lib/agent-intent";
 import { useSignedInWallet } from "@/lib/use-signed-in-wallet";
 
-const EarnPanel = dynamic(() =>
-  import("@/components/earn-panel").then((module) => module.EarnPanel),
-);
-
 const EXAMPLES = [
-  "Send 100 USDG to Marco",
-  "Deposit 20 USDG to earn",
-  "Swap 20 USDG to NVIDIA",
-  "Request 50 USDG from Olivia",
+  "Send 100 USDC to Marco",
+  "Send 25 USDC to Priya and 25 USDC to Tom",
+  "Request 50 USDC from Olivia",
 ] as const;
 
 const ACTION_LABELS: Record<string, string> = {
-  send: "Send USDG",
+  send: "Send USDC",
   batch_send: "Send to multiple people",
   request: "Create a payment request",
-  earn_deposit: "Deposit into Earn",
-  earn_withdraw: "Withdraw from Earn",
-  stock_buy: "Buy a stock token",
-  stock_sell: "Sell a stock token",
 };
 
 type AgentOperation = {
@@ -69,8 +54,6 @@ type AgentOperation = {
   address: string;
   ambiguousRecipient: boolean;
   recipients: Array<{ address: string; amount: string }>;
-  stock: AgentStock | null;
-  stockUnit: "usd" | "shares" | null;
 };
 
 export default function AgentPage() {
@@ -81,16 +64,12 @@ export default function AgentPage() {
   const [routing, setRouting] = useState<IntentRouting | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [operationLoading, setOperationLoading] = useState(false);
   const [operation, setOperation] = useState<AgentOperation | null>(null);
   const [operationPending, setOperationPending] = useState(false);
-  const [stocks, setStocks] = useState<AgentStock[]>([]);
-  const [stockError, setStockError] = useState<string | null>(null);
   const [intentFocused, setIntentFocused] = useState(false);
   const mascot = useRef<AgentMascotHandle>(null);
   const requestId = useRef(0);
   const nextOperationId = useRef(0);
-  const stocksPromise = useRef<Promise<AgentStock[]> | null>(null);
 
   useEffect(
     () => () => {
@@ -99,50 +78,14 @@ export default function AgentPage() {
     [],
   );
 
-  const loadStocks = useCallback(async () => {
-    if (stocks.length) return stocks;
-    if (!stocksPromise.current) {
-      stocksPromise.current = fetch("/api/rhj/assets")
-        .then(async (response) => {
-          if (!response.ok) throw new Error("Stock assets are unavailable right now.");
-          const data = (await response.json()) as { assets?: AgentStock[] };
-          if (!Array.isArray(data.assets)) throw new Error("Stock assets could not be loaded.");
-          setStocks(data.assets);
-          setStockError(null);
-          return data.assets;
-        })
-        .catch((cause: unknown) => {
-          stocksPromise.current = null;
-          throw cause;
-        });
-    }
-    return stocksPromise.current;
-  }, [stocks]);
-
   const openOperation = useCallback(
-    async (action: IntentAction, userPrompt: string) => {
-      const requestAtStart = requestId.current;
+    (action: IntentAction, userPrompt: string) => {
       const amount = extractExplicitAmount(userPrompt) ?? "";
       const contactList = (contacts ?? []).map(({ name, address }) => ({ name, address }));
       const namedRecipient = resolveNamedContact(userPrompt, contactList);
       const explicitAddress = resolveExplicitAddress(userPrompt);
       const recipients =
         action === "batch_send" ? resolveBatchRecipients(userPrompt, contactList) : [];
-      let stock: AgentStock | null = null;
-      if (action === "stock_buy" || action === "stock_sell") {
-        setStockError(null);
-        setOperationLoading(true);
-        try {
-          stock = resolveStock(userPrompt, await loadStocks());
-        } catch (cause) {
-          setStockError(
-            cause instanceof Error ? cause.message : "Stock assets are unavailable right now.",
-          );
-        } finally {
-          setOperationLoading(false);
-        }
-      }
-      if (requestAtStart !== requestId.current) return;
       setOperation({
         id: ++nextOperationId.current,
         action,
@@ -150,13 +93,10 @@ export default function AgentPage() {
         address: explicitAddress || namedRecipient.address,
         ambiguousRecipient: namedRecipient.ambiguous,
         recipients,
-        stock,
-        stockUnit:
-          action === "stock_buy" || action === "stock_sell" ? extractStockUnit(userPrompt) : null,
       });
       setRouting(null);
     },
-    [contacts, loadStocks],
+    [contacts],
   );
 
   async function submitIntent(event: React.FormEvent) {
@@ -180,7 +120,7 @@ export default function AgentPage() {
     try {
       const result = await resolveIntent({ prompt: prompt.trim() });
       if (currentRequest !== requestId.current) return;
-      if (result.status === "resolved") await openOperation(result.action, prompt);
+      if (result.status === "resolved") openOperation(result.action, prompt);
       else setRouting(result);
     } catch (cause) {
       if (currentRequest === requestId.current) {
@@ -202,8 +142,7 @@ export default function AgentPage() {
           .sort((a, b) => b[1] - a[1])
           .slice(0, 4)
       : [];
-  const mascotMood: AgentMascotMood =
-    loading || operationLoading ? "thinking" : intentFocused ? "attentive" : "idle";
+  const mascotMood: AgentMascotMood = loading ? "thinking" : intentFocused ? "attentive" : "idle";
 
   return (
     <div className="pr-page mx-auto w-full max-w-2xl gap-8">
@@ -214,7 +153,7 @@ export default function AgentPage() {
           </span>
           <div>
             <h1 className="pr-display text-2xl">AI Agent</h1>
-            <p className="text-sm text-muted">Describe what you want to do with USDG.</p>
+            <p className="text-sm text-muted">Describe what you want to do with USDC.</p>
           </div>
         </div>
       </header>
@@ -231,7 +170,7 @@ export default function AgentPage() {
             }}
             onFocus={() => setIntentFocused(true)}
             onBlur={() => setIntentFocused(false)}
-            placeholder="For example, “Send 100 USDG to Marco”"
+            placeholder="For example, “Send 100 USDC to Marco”"
             maxLength={MAX_AGENT_PROMPT_LENGTH}
             aria-describedby={error ? "agent-error" : "agent-hint"}
             aria-invalid={Boolean(error) || undefined}
@@ -251,8 +190,8 @@ export default function AgentPage() {
             <p className="text-center text-sm text-muted">Sign in to prepare an operation.</p>
           </div>
         ) : (
-          <Button type="submit" size="lg" className="w-full" disabled={loading || operationLoading}>
-            {loading || operationLoading ? "Preparing…" : "Continue"}
+          <Button type="submit" size="lg" className="w-full" disabled={loading}>
+            {loading ? "Preparing…" : "Continue"}
             <ArrowUpRight className="size-4" strokeWidth={1.5} aria-hidden />
           </Button>
         )}
@@ -290,11 +229,6 @@ export default function AgentPage() {
           Checking your intent…
         </p>
       ) : null}
-      {operationLoading ? (
-        <p className="text-sm text-muted" role="status">
-          Loading stock tokens…
-        </p>
-      ) : null}
       {routing?.status === "unsupported" ? (
         <p
           className="rounded-lg border border-border bg-panel p-4 text-sm text-muted"
@@ -320,7 +254,7 @@ export default function AgentPage() {
                 type="button"
                 variant="outline"
                 className="h-auto min-h-12 justify-between whitespace-normal text-start"
-                onClick={() => void openOperation(actionName as IntentAction, prompt)}
+                onClick={() => openOperation(actionName as IntentAction, prompt)}
               >
                 <span>{ACTION_LABELS[actionName]}</span>
                 <span className="pr-mono text-xs text-muted">{Math.round(probability * 100)}%</span>
@@ -329,20 +263,10 @@ export default function AgentPage() {
           </div>
         </section>
       ) : null}
-      {stockError && !operation ? (
-        <p className="text-sm text-danger" role="status">
-          {stockError}
-        </p>
-      ) : null}
       {operation ? (
         <OperationDialog
           key={operation.id}
           operation={operation}
-          stockAssets={stocks}
-          stockError={stockError}
-          onStockChange={(stock) =>
-            setOperation((current) => (current ? { ...current, stock } : null))
-          }
           onPendingChange={setOperationPending}
           operationPending={operationPending}
           open={true}
@@ -357,18 +281,12 @@ export default function AgentPage() {
 
 function OperationDialog({
   operation,
-  stockAssets,
-  stockError,
-  onStockChange,
   onPendingChange,
   operationPending,
   open,
   onOpenChange,
 }: {
   operation: AgentOperation;
-  stockAssets: AgentStock[];
-  stockError: string | null;
-  onStockChange: (stock: AgentStock) => void;
   onPendingChange: (pending: boolean) => void;
   operationPending: boolean;
   open: boolean;
@@ -377,8 +295,6 @@ function OperationDialog({
   const title = ACTION_LABELS[operation.action];
   const isSend = operation.action === "send" || operation.action === "batch_send";
   const isRequest = operation.action === "request";
-  const isEarn = operation.action === "earn_deposit" || operation.action === "earn_withdraw";
-  const isStock = operation.action === "stock_buy" || operation.action === "stock_sell";
   return (
     <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
       <ResponsiveDialogContent className="flex max-h-[90dvh] flex-col overflow-clip sm:max-w-xl">
@@ -412,23 +328,6 @@ function OperationDialog({
               onPendingChange={onPendingChange}
             />
           ) : null}
-          {isEarn ? (
-            <EarnPanel
-              initialMode={operation.action === "earn_withdraw" ? "withdraw" : "deposit"}
-              initialAmount={operation.amount}
-              embeddedPresentation
-              onPendingChange={onPendingChange}
-            />
-          ) : null}
-          {isStock ? (
-            <AgentStockPanel
-              operation={operation}
-              assets={stockAssets}
-              error={stockError}
-              onStockChange={onStockChange}
-              onPendingChange={onPendingChange}
-            />
-          ) : null}
         </ResponsiveDialogBody>
         <ResponsiveDialogFooter className="shrink-0 border-bs border-border bg-panel-elevated pbs-4">
           <Button
@@ -443,141 +342,5 @@ function OperationDialog({
         </ResponsiveDialogFooter>
       </ResponsiveDialogContent>
     </ResponsiveDialog>
-  );
-}
-
-function AgentStockPanel({
-  operation,
-  assets,
-  error,
-  onStockChange,
-  onPendingChange,
-}: {
-  operation: AgentOperation;
-  assets: AgentStock[];
-  error: string | null;
-  onStockChange: (stock: AgentStock) => void;
-  onPendingChange: (pending: boolean) => void;
-}) {
-  const [query, setQuery] = useState("");
-  const [side, setSide] = useState<"buy" | "sell">(
-    operation.action === "stock_sell" ? "sell" : "buy",
-  );
-  const [unit, setUnit] = useState<"usd" | "shares" | null>(operation.stockUnit);
-  const [amount, setAmount] = useState(operation.amount);
-  const [halted, setHalted] = useState(false);
-  const stockSymbol = operation.stock?.symbol ?? null;
-
-  useEffect(() => {
-    if (!stockSymbol) {
-      setHalted(false);
-      return;
-    }
-    let cancelled = false;
-    const loadHalt = () => {
-      void fetch(`/api/rhj/prices?symbol=${encodeURIComponent(stockSymbol)}`)
-        .then(async (response) => {
-          if (!response.ok) return false;
-          const body = (await response.json()) as { quote?: { isTradingHalt?: boolean } };
-          return Boolean(body.quote?.isTradingHalt);
-        })
-        .then((next) => {
-          if (!cancelled) setHalted(next);
-        })
-        .catch((haltError: unknown) => {
-          console.error("[stocks] halt check failed", haltError);
-        });
-    };
-    loadHalt();
-    const id = window.setInterval(loadHalt, 30_000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(id);
-    };
-  }, [stockSymbol]);
-  const visibleAssets = assets
-    .filter((asset) =>
-      [asset.symbol, asset.shortName].join(" ").toLowerCase().includes(query.toLowerCase()),
-    )
-    .slice(0, 8);
-  return (
-    <div className="space-y-4">
-      {!operation.stock ? (
-        <div className="space-y-2">
-          <Label htmlFor="agent-stock-search">Choose a Robinhood stock token</Label>
-          <Input
-            id="agent-stock-search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search symbol or name"
-          />
-          {error ? (
-            <p className="text-sm text-danger" role="alert">
-              {error}
-            </p>
-          ) : null}
-          <ul className="max-h-48 space-y-1 overflow-y-auto" aria-label="Matching stock tokens">
-            {visibleAssets.map((asset) => (
-              <li key={asset.contractAddress}>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-auto w-full justify-start py-2 text-start"
-                  onClick={() => onStockChange(asset)}
-                >
-                  <span className="pr-mono w-16 shrink-0">{asset.symbol}</span>
-                  <span className="truncate text-muted">{asset.shortName}</span>
-                </Button>
-              </li>
-            ))}
-            {visibleAssets.length === 0 ? (
-              <li className="p-2 text-sm text-muted">No matching stock tokens.</li>
-            ) : null}
-          </ul>
-        </div>
-      ) : (
-        <div className="rounded-md border border-border px-3 py-2 text-sm">
-          <span className="pr-mono font-semibold">{operation.stock.symbol}</span>
-          <span className="ms-2 text-muted">{operation.stock.shortName}</span>
-        </div>
-      )}
-      {unit === null ? (
-        <div className="space-y-2">
-          <p className="text-sm font-medium">What does the amount refer to?</p>
-          <div className="grid grid-cols-2 gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              aria-pressed={false}
-              onClick={() => setUnit("usd")}
-            >
-              USD
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              aria-pressed={false}
-              onClick={() => setUnit("shares")}
-            >
-              Shares
-            </Button>
-          </div>
-        </div>
-      ) : null}
-      {unit !== null && operation.stock ? (
-        <StockTradeTicket
-          asset={operation.stock}
-          halted={halted}
-          side={side}
-          onSideChange={setSide}
-          unit={unit}
-          onUnitChange={setUnit}
-          ticketAmount={amount}
-          onTicketAmountChange={setAmount}
-          embeddedPresentation
-          onPendingChange={onPendingChange}
-        />
-      ) : null}
-    </div>
   );
 }

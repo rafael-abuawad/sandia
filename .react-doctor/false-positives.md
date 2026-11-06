@@ -14,21 +14,19 @@ Keep the modules; ignore dead-code rules under `convex/` via `doctor.config.json
 Generated Convex client surface. The `components` export is unused until a Convex
 component is added; editing `_generated` is incorrect.
 
-## react-doctor/async-await-in-loop · `components/pay-flow/use-pay-flow.ts`
+## react-doctor/async-await-in-loop · `convex/sendsActions.ts`, `convex/nearIntents.ts`
 
-Across `approvalTxns` must run **in order**: each approval changes wallet nonce and
-token allowance that the next tx depends on. `Promise.all` would race and break payment.
-Sequential `await` here is required correctness, not a missed optimization.
+`reconcile` walks submitted rows one at a time on purpose. Each row hits Horizon or 1Click,
+then writes a Convex mutation. Parallelizing the loop would stampede those APIs and race
+mark-result writes without a concurrency budget. Sequential `await` is a resource cap, not a
+missed optimization.
 
-## react-doctor/async-await-in-loop · `components/send-form.tsx`
+## react-doctor/async-await-in-loop · `lib/send/execute.ts`
 
-A batch send approves USDG for the Sandia Send contract, waits for that receipt,
-then calls `sandia_send`. The approval must mine first so the allowance and nonce
-are ready. A single recipient is one `transfer` and does not use the contract.
+Recipient preflight runs in chunks of 10, one chunk at a time, so a 100-recipient batch doesn't
+trip Horizon's rate limit.
 
-## react-doctor/async-await-in-loop · `convex/outboundActions.ts`
+## react-doctor/async-await-in-loop · `components/ensure-convex-user.tsx`
 
-`reconcile` walks submitted sends one at a time on purpose. Each row hits Robinhood
-RPC for receipts, then writes a Convex mutation. Parallelizing the loop would stampede
-the RPC and race mark-result writes without a concurrency budget. Sequential `await`
-is a resource cap, not a missed optimization.
+Account activation retries in sequence. A sequence-number clash needs a fresh transaction built
+from the last attempt's outcome, so the tries can't run in parallel.

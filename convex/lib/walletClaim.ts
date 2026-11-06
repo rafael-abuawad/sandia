@@ -1,5 +1,5 @@
-import { secp256k1 } from "@noble/curves/secp256k1";
-import { getAddress, hashMessage, hexToNumber, keccak256, size, type Hex } from "viem";
+import { ed25519 } from "@noble/curves/ed25519";
+import { accountPublicKey, isStellarAccount } from "../../lib/stellar/strkey";
 
 export const WALLET_CLAIM_PREFIX = "Sandia wallet claim";
 
@@ -9,6 +9,14 @@ export function walletClaimMessage(nonce: string): string {
 
 function bytesToHex(bytes: Uint8Array): string {
   return [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function hexToBytes(value: string): Uint8Array {
+  const clean = value.startsWith("0x") ? value.slice(2) : value;
+  if (clean.length % 2 !== 0 || !/^[0-9a-fA-F]*$/.test(clean)) {
+    throw new Error("Invalid signature");
+  }
+  return Uint8Array.from(clean.match(/../g) ?? [], (pair) => parseInt(pair, 16));
 }
 
 export async function signClaimNonce(
@@ -48,28 +56,30 @@ export async function assertClaimNonce(
   }
 }
 
-function toRecoveryBit(yParityOrV: number): number {
-  if (yParityOrV === 0 || yParityOrV === 1) return yParityOrV;
-  if (yParityOrV === 27) return 0;
-  if (yParityOrV === 28) return 1;
-  throw new Error("Invalid signature");
+/** The 32-byte hash the embedded wallet signs. Stellar wallets sign raw hashes, not messages. */
+export async function walletClaimHash(nonce: string): Promise<`0x${string}`> {
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(walletClaimMessage(nonce)),
+  );
+  return `0x${bytesToHex(new Uint8Array(digest))}`;
 }
 
-/**
- * Recover the signer of an EIP-191 personal_sign message.
- * viem's recoverMessageAddress dynamically imports @noble/curves, which the Convex runtime rejects.
- */
-export async function recoverClaimAddress(nonce: string, signature: string): Promise<string> {
-  const signatureHex = signature as Hex;
-  if (size(signatureHex) !== 65) throw new Error("Invalid signature");
-  const hash = hashMessage(walletClaimMessage(nonce));
-  const yParityOrV = hexToNumber(`0x${signatureHex.slice(130)}`);
-  const publicKey = secp256k1.Signature.fromCompact(signatureHex.slice(2, 130))
-    .addRecoveryBit(toRecoveryBit(yParityOrV))
-    .recoverPublicKey(hash.slice(2))
-    .toHex(false);
-  const addressHash = keccak256(`0x${publicKey.slice(2)}`);
-  return getAddress(`0x${addressHash.slice(-40)}`).toLowerCase();
+/** Verifies the Ed25519 signature a Stellar `G…` wallet made over the claim hash. */
+export async function verifyWalletClaim(
+  address: string,
+  nonce: string,
+  signature: string,
+): Promise<boolean> {
+  if (!isStellarAccount(address)) return false;
+  const signatureBytes = hexToBytes(signature);
+  if (signatureBytes.length !== 64) return false;
+  const hash = hexToBytes(await walletClaimHash(nonce));
+  try {
+    return ed25519.verify(signatureBytes, hash, accountPublicKey(address));
+  } catch {
+    return false;
+  }
 }
 
 export function assertLinkTargets(input: {

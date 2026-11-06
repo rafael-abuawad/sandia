@@ -1,67 +1,108 @@
-import { encodeFunctionData, erc20Abi, type Address, type Hex } from "viem";
-import { ROBINHOOD_USDG } from "@/lib/destination";
-import { buildSandiaSendCall, buildUsdgTransferCalls, type TransferCall } from "@/lib/send/calls";
 import type { ReviewPayload } from "@/components/send-form/state";
+import { usdMicrosToStroops } from "@/lib/stellar/amount";
+import type { HorizonTransaction, StellarAccountState } from "@/lib/stellar/horizon";
+import { assertSponsorable } from "@/lib/stellar/policy";
+import { baseAccount, isMuxedAccount } from "@/lib/stellar/strkey";
+import {
+  buildUsdcPaymentTx,
+  signWith,
+  transactionHashHex,
+  TX_TIMEOUT_SECONDS,
+  type StellarSigner,
+} from "@/lib/stellar/tx";
 
-type BalanceRead = {
-  address: Address;
-  abi: typeof erc20Abi;
-  functionName: "balanceOf";
-  args: [Address];
-};
-
-type AllowanceRead = {
-  address: Address;
-  abi: typeof erc20Abi;
-  functionName: "allowance";
-  args: [Address, Address];
-};
-
-export type SendExecutionClient = {
-  readContract: (request: BalanceRead | AllowanceRead) => Promise<bigint>;
-  call: (request: { account: Address; to: Address; data: Hex; value: bigint }) => Promise<unknown>;
-  waitForTransactionReceipt: (request: {
-    hash: Hex;
-    timeout: number;
-  }) => Promise<{ status: "success" | "reverted" }>;
-};
+const PREFLIGHT_CONCURRENCY = 10;
 
 export type SubmittedSendTransaction = {
-  hash: Hex;
-  stage: "approval" | "transfer" | "activity";
+  hash: string;
+  stage: "transfer" | "activity";
   label: string;
+  /** Unix seconds. After this, a transaction the network hasn't seen can never land. */
+  expiresAt?: number;
 };
 
-type SendCall = Pick<TransferCall, "to" | "data" | "value">;
+export type SubmitResult =
+  | { ok: true; hash: string }
+  | { ok: false; message: string; indeterminate: boolean };
+
+export type SendDependencies = {
+  loadAccount: (address: string) => Promise<StellarAccountState>;
+  lookupTransaction: (hash: string) => Promise<HorizonTransaction | null>;
+  sign: StellarSigner;
+  submit: (xdr: string) => Promise<SubmitResult>;
+};
+
+export type SendCall = { recipient: string; amount: bigint };
+
+function shorten(address: string): string {
+  return `${address.slice(0, 4)}…${address.slice(-4)}`;
+}
+
+/** Stellar rejects a payment to an account without a USDC trustline, so check before signing. */
+export async function preflightRecipients(
+  review: ReviewPayload,
+  loadAccount: SendDependencies["loadAccount"],
+): Promise<void> {
+  const problems: string[] = [];
+  const recipients = review.recipients.map((row) => row.address);
+  for (let start = 0; start < recipients.length; start += PREFLIGHT_CONCURRENCY) {
+    const chunk = recipients.slice(start, start + PREFLIGHT_CONCURRENCY);
+    // Chunks stay sequential, so a 100-recipient batch doesn't trip Horizon's rate limit.
+    // react-doctor-disable-next-line react-doctor/async-await-in-loop
+    const states = await Promise.all(chunk.map((address) => loadAccount(baseAccount(address))));
+    states.forEach((state, index) => {
+      const address = chunk[index];
+      if (!state.exists) {
+        problems.push(`${shorten(address)} doesn't have a Stellar account yet.`);
+      } else if (!state.hasUsdcTrustline) {
+        problems.push(`${shorten(address)} hasn't enabled USDC on their account.`);
+      } else if (state.memoRequired && !review.memo && !isMuxedAccount(address)) {
+        problems.push(`${shorten(address)} requires a memo on incoming payments.`);
+      }
+    });
+  }
+  if (problems.length > 0) {
+    const shown = problems.slice(0, 3).join(" ");
+    const extra = problems.length > 3 ? ` ${problems.length - 3} more can't receive this.` : "";
+    throw new Error(`${shown}${extra} Nothing was sent.`);
+  }
+}
+
+export function callsForReview(review: ReviewPayload): SendCall[] {
+  return review.recipients.map((row) => ({
+    recipient: row.address,
+    amount: usdMicrosToStroops(row.amountUsdMicros),
+  }));
+}
+
+/** Thrown while the outcome is unknown. The controller keeps the transaction for a status check. */
+export class SendPendingError extends Error {
+  constructor(message = "The transaction is still pending.") {
+    super(message);
+    this.name = "SendPendingError";
+  }
+}
 
 export async function executeSend({
   review,
   account,
-  chainId,
-  client,
   pending,
-  sendSponsored,
+  deps,
+  now = () => Math.floor(Date.now() / 1000),
+  onAwaiting,
   onSubmitted,
   onCleared,
 }: {
   review: ReviewPayload;
-  account: Address;
-  chainId: number | undefined;
-  client: SendExecutionClient;
+  account: string;
   pending: SubmittedSendTransaction | null;
-  sendSponsored: (call: SendCall, stage: "approval" | "transfer", label: string) => Promise<Hex>;
+  deps: SendDependencies;
+  now?: () => number;
+  onAwaiting: (label: string) => void;
   onSubmitted: (transaction: SubmittedSendTransaction) => void;
   onCleared: () => void;
-}): Promise<{ hash: Hex; calls: Array<{ recipient: Address; amount: bigint }> }> {
-  const calls = review.recipients.map((recipient) => ({
-    recipient: recipient.address as Address,
-    amount: BigInt(recipient.amountUsdMicros),
-  }));
-
-  if (pending?.stage === "transfer") {
-    await waitForSuccess(client, pending, onCleared);
-    return { hash: pending.hash, calls };
-  }
+}): Promise<{ hash: string; calls: SendCall[] }> {
+  const calls = callsForReview(review);
 
   if (pending?.stage === "activity") {
     throw new Error(
@@ -69,137 +110,48 @@ export async function executeSend({
     );
   }
 
-  if (pending?.stage === "approval") {
-    await waitForSuccess(client, pending, onCleared);
-  }
-
-  if (chainId !== ROBINHOOD_USDG.chainId) {
-    throw new Error("Switch to Robinhood Chain before confirming this send.");
-  }
-
-  const currentBalance = await client.readContract({
-    address: ROBINHOOD_USDG.address as Address,
-    abi: erc20Abi,
-    functionName: "balanceOf",
-    args: [account],
-  });
-  if (currentBalance < BigInt(review.totalUsdMicros)) {
-    throw new Error("This wallet doesn't have enough USDG on Robinhood Chain.");
-  }
-
-  const recipientInputs = review.recipients.map((recipient) => ({
-    address: recipient.address,
-    amountUsdMicros: recipient.amountUsdMicros,
-  }));
-
-  if (recipientInputs.length === 1) {
-    const [call] = buildUsdgTransferCalls(recipientInputs);
-    if (!call) throw new Error("Add a recipient");
-    await simulate(client, account, call);
-    const hash = await submitAndWait(
-      call,
-      "transfer",
-      "Confirm USDG transfer in your wallet",
-      sendSponsored,
-      onSubmitted,
-      onCleared,
-      client,
-    );
-    return { hash, calls };
-  }
-
-  const batch = buildSandiaSendCall(recipientInputs);
-  const allowance = await client.readContract({
-    address: ROBINHOOD_USDG.address as Address,
-    abi: erc20Abi,
-    functionName: "allowance",
-    args: [account, batch.to],
-  });
-
-  if (allowance < batch.total) {
-    const approval: SendCall = {
-      to: ROBINHOOD_USDG.address as Address,
-      data: encodeApproval(batch.to, batch.total),
-      value: 0n,
-    };
-    await simulate(client, account, approval);
-    await submitAndWait(
-      approval,
-      "approval",
-      "Approve exact USDG batch amount",
-      sendSponsored,
-      onSubmitted,
-      onCleared,
-      client,
-    );
-    const confirmedAllowance = await client.readContract({
-      address: ROBINHOOD_USDG.address as Address,
-      abi: erc20Abi,
-      functionName: "allowance",
-      args: [account, batch.to],
-    });
-    if (confirmedAllowance < batch.total) {
-      throw new Error("USDG approval confirmed, but the batch is not ready yet. Try again.");
+  if (pending) {
+    const found = await deps.lookupTransaction(pending.hash);
+    if (found) {
+      if (found.successful) return { hash: found.hash, calls };
+      onCleared();
+      throw new Error("The send failed on the Stellar network. Review it and try again.");
     }
-  }
-
-  await simulate(client, account, batch);
-  const hash = await submitAndWait(
-    batch,
-    "transfer",
-    "Confirm USDG batch send in your wallet",
-    sendSponsored,
-    onSubmitted,
-    onCleared,
-    client,
-  );
-  return { hash, calls };
-}
-
-async function simulate(client: SendExecutionClient, account: Address, call: SendCall) {
-  await client.call({ account, ...call });
-}
-
-async function submitAndWait(
-  call: SendCall,
-  stage: "approval" | "transfer",
-  label: string,
-  sendSponsored: (call: SendCall, stage: "approval" | "transfer", label: string) => Promise<Hex>,
-  onSubmitted: (transaction: SubmittedSendTransaction) => void,
-  onCleared: () => void,
-  client: SendExecutionClient,
-): Promise<Hex> {
-  const hash = await sendSponsored(call, stage, label);
-  const transaction = { hash, stage, label } as const;
-  onSubmitted(transaction);
-  await waitForSuccess(client, transaction, onCleared);
-  return hash;
-}
-
-async function waitForSuccess(
-  client: SendExecutionClient,
-  transaction: SubmittedSendTransaction,
-  onCleared: () => void,
-) {
-  const receipt = await client.waitForTransactionReceipt({
-    hash: transaction.hash,
-    timeout: 60_000,
-  });
-  if (receipt.status !== "success") {
+    if (pending.expiresAt !== undefined && now() <= pending.expiresAt) {
+      throw new SendPendingError();
+    }
     onCleared();
-    throw new Error(
-      transaction.stage === "approval"
-        ? "USDG approval reverted. Review the batch and try again."
-        : "The transfer reverted on Robinhood Chain. Review the send and try again.",
-    );
+    throw new Error("This send expired before reaching the network. Your USDC was not sent.");
   }
-  if (transaction.stage === "approval") onCleared();
-}
 
-function encodeApproval(spender: Address, amount: bigint): Hex {
-  return encodeFunctionData({
-    abi: erc20Abi,
-    functionName: "approve",
-    args: [spender, amount],
+  const source = await deps.loadAccount(account);
+  if (!source.exists || !source.sequence || !source.hasUsdcTrustline) {
+    throw new Error("Your wallet is still being set up. Try again in a moment.");
+  }
+  const total = usdMicrosToStroops(review.totalUsdMicros);
+  if (source.usdcBalance < total) throw new Error("This wallet doesn't have enough USDC.");
+
+  await preflightRecipients(review, deps.loadAccount);
+
+  const tx = buildUsdcPaymentTx({
+    source: account,
+    sequence: source.sequence,
+    memo: review.memo,
+    payments: calls.map((call) => ({ destination: call.recipient, stroops: call.amount })),
   });
+  assertSponsorable(tx, account);
+
+  const label = calls.length > 1 ? "Confirm USDC batch send" : "Confirm USDC transfer";
+  onAwaiting(label);
+  const xdr = await signWith(tx, account, deps.sign);
+
+  // Remember the hash first. If the response is lost, the status check can still find it.
+  const hash = transactionHashHex(tx);
+  onSubmitted({ hash, stage: "transfer", label, expiresAt: now() + TX_TIMEOUT_SECONDS });
+
+  const result = await deps.submit(xdr);
+  if (result.ok) return { hash: result.hash, calls };
+  if (result.indeterminate) throw new SendPendingError();
+  onCleared();
+  throw new Error(result.message);
 }

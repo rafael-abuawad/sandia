@@ -10,7 +10,6 @@ type TokenChainIconProps = {
   tokenLogoUrl?: string | null;
   chainName: string;
   chainLogoUrl?: string | null;
-  chainId?: number | null;
   size?: "sm" | "md" | "lg";
   className?: string;
 };
@@ -39,7 +38,6 @@ export function TokenChainIcon({
   tokenLogoUrl,
   chainName,
   chainLogoUrl,
-  chainId,
   size = "md",
   className,
 }: TokenChainIconProps) {
@@ -47,7 +45,7 @@ export function TokenChainIcon({
   const [tokenBroken, setTokenBroken] = useState(false);
   const [chainBroken, setChainBroken] = useState(false);
   const tokenSrc = resolveTokenIcon(tokenSymbol, tokenLogoUrl);
-  const chainSrc = resolveChainIcon(chainId, chainName, chainLogoUrl);
+  const chainSrc = resolveChainIcon(chainName, chainLogoUrl);
 
   return (
     <div

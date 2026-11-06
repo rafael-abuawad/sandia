@@ -1,16 +1,12 @@
 import type { Metadata } from "next";
-import { LOCAL_CHAIN_STOCKS } from "@/lib/stocks/assets";
 
 export const SITE_NAME = "Sandia";
 
-const PUBLIC_PAGES = ["/", "/about", "/requests/new", "/send", "/earn", "/stocks"] as const;
+const PUBLIC_PAGES = ["/", "/about", "/requests/new", "/send"] as const;
 
 /** URLs that describe the product. Account and payment-link URLs stay out. */
 export function publicSitemapPaths(): string[] {
-  return [
-    ...PUBLIC_PAGES,
-    ...LOCAL_CHAIN_STOCKS.map((stock) => `/stocks/${encodeURIComponent(stock.symbol)}`),
-  ];
+  return [...PUBLIC_PAGES];
 }
 
 export function siteOrigin(): URL {

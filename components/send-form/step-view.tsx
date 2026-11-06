@@ -77,6 +77,7 @@ export function SendFormStepView({
       mode={state.mode}
       singleAddress={state.singleAddress}
       singleAmount={state.singleAmount}
+      singleMemo={state.singleMemo}
       rows={state.rows}
       liveTotalLabel={liveTotalLabel}
       error={state.error}

@@ -1,6 +1,6 @@
 export type SendMode = "single" | "massive";
 export type SendStep = "compose" | "review" | "success";
-export type SendTransactionStage = "approval" | "transfer" | "activity";
+export type SendTransactionStage = "transfer" | "activity";
 export type SendTransactionPhase =
   | "idle"
   | "awaiting-wallet"
@@ -12,7 +12,7 @@ export type SendTransactionProgress = {
   phase: SendTransactionPhase;
   stage: SendTransactionStage | null;
   label: string | null;
-  hash: `0x${string}` | null;
+  hash: string | null;
 };
 
 export type RecipientRow = {
@@ -22,7 +22,7 @@ export type RecipientRow = {
 };
 
 export type ReviewRecipient = {
-  address: `0x${string}`;
+  address: string;
   amountUsdMicros: number;
 };
 
@@ -30,6 +30,8 @@ export type ReviewPayload = {
   mode: SendMode;
   recipients: ReviewRecipient[];
   totalUsdMicros: number;
+  /** One memo per transaction, so only a single send carries one. Batches can use M… addresses. */
+  memo?: string;
 };
 
 export function newRecipientRow(): RecipientRow {
@@ -45,11 +47,12 @@ export type SendFormState = {
   step: SendStep;
   singleAddress: string;
   singleAmount: string;
+  singleMemo: string;
   rows: RecipientRow[];
   review: ReviewPayload | null;
   error: string | null;
   confirming: boolean;
-  fieldErrors: Record<string, { address?: string; amount?: string }>;
+  fieldErrors: Record<string, { address?: string; amount?: string; memo?: string }>;
   progress: SendTransactionProgress;
   activityError: string | null;
   validationAttempt: number;
@@ -60,6 +63,7 @@ export const initialSendFormState: SendFormState = {
   step: "compose",
   singleAddress: "",
   singleAmount: "10",
+  singleMemo: "",
   rows: [], // filled in initializer
   review: null,
   error: null,
@@ -92,6 +96,7 @@ export type SendFormAction =
   | { type: "setMode"; mode: SendMode }
   | { type: "setSingleAddress"; address: string }
   | { type: "setSingleAmount"; amount: string }
+  | { type: "setSingleMemo"; memo: string }
   | { type: "setRows"; rows: RecipientRow[] }
   | { type: "addRow" }
   | { type: "removeRow"; id: string }
@@ -107,10 +112,10 @@ export type SendFormAction =
       type: "transactionSubmitted";
       stage: SendTransactionStage;
       label: string;
-      hash: `0x${string}`;
+      hash: string;
     }
   | { type: "transactionPending" }
-  | { type: "transactionRecording"; hash: `0x${string}` }
+  | { type: "transactionRecording"; hash: string }
   | { type: "transactionCleared" }
   | { type: "activitySyncStarted" }
   | { type: "confirmSucceeded"; activityError?: string };
@@ -139,6 +144,16 @@ export function sendFormReducer(state: SendFormState, action: SendFormAction): S
         fieldErrors: {
           ...state.fieldErrors,
           single: { ...state.fieldErrors.single, amount: undefined },
+        },
+      };
+    case "setSingleMemo":
+      return {
+        ...state,
+        singleMemo: action.memo,
+        error: null,
+        fieldErrors: {
+          ...state.fieldErrors,
+          single: { ...state.fieldErrors.single, memo: undefined },
         },
       };
     case "setRows":

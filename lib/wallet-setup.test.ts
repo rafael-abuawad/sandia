@@ -1,79 +1,53 @@
 import { describe, expect, it } from "vitest";
-import { privyConnectorReady, walletSetupAction } from "./wallet-setup";
+import { stellarWalletAddress, walletSetupAction } from "./wallet-setup";
+
+const ADDRESS = "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN";
 
 describe("walletSetupAction", () => {
-  it("waits until wallets are ready", () => {
+  it("waits until Privy is ready", () => {
+    expect(walletSetupAction({ authenticated: true, ready: false, createAttempted: false })).toBe(
+      "wait",
+    );
+    expect(walletSetupAction({ authenticated: false, ready: true, createAttempted: false })).toBe(
+      "wait",
+    );
+  });
+
+  it("creates a wallet once when none exists", () => {
+    expect(walletSetupAction({ authenticated: true, ready: true, createAttempted: false })).toBe(
+      "create",
+    );
+    expect(walletSetupAction({ authenticated: true, ready: true, createAttempted: true })).toBe(
+      "wait",
+    );
+  });
+
+  it("is done when a Stellar wallet exists", () => {
     expect(
       walletSetupAction({
         authenticated: true,
-        walletsReady: false,
+        ready: true,
         createAttempted: false,
-        connectorReady: false,
-      }),
-    ).toBe("wait");
-  });
-
-  it("creates a wallet once when none is connected", () => {
-    expect(
-      walletSetupAction({
-        authenticated: true,
-        walletsReady: true,
-        createAttempted: false,
-        connectorReady: false,
-      }),
-    ).toBe("create");
-    expect(
-      walletSetupAction({
-        authenticated: true,
-        walletsReady: true,
-        createAttempted: true,
-        connectorReady: false,
-      }),
-    ).toBe("wait");
-  });
-
-  it("does not activate before the wagmi connector exists", () => {
-    expect(
-      walletSetupAction({
-        authenticated: true,
-        walletsReady: true,
-        embeddedAddress: "0xabc",
-        connectorReady: false,
-        createAttempted: false,
-      }),
-    ).toBe("wait");
-  });
-
-  it("activates once the connector is registered", () => {
-    expect(
-      walletSetupAction({
-        authenticated: true,
-        walletsReady: true,
-        embeddedAddress: "0xAbC",
-        activeAddress: "0xdef",
-        connectorReady: true,
-        createAttempted: true,
-      }),
-    ).toBe("activate");
-  });
-
-  it("is done when the active account is the embedded wallet", () => {
-    expect(
-      walletSetupAction({
-        authenticated: true,
-        walletsReady: true,
-        embeddedAddress: "0xAbC",
-        activeAddress: "0xabc",
-        connectorReady: true,
-        createAttempted: true,
+        stellarAddress: ADDRESS,
       }),
     ).toBe("done");
   });
 });
 
-describe("privyConnectorReady", () => {
-  it("matches a connector id that contains the wallet address", () => {
-    expect(privyConnectorReady(["io.privy.wallet.0xAbC"], "0xabc")).toBe(true);
-    expect(privyConnectorReady(["metaMask"], "0xabc")).toBe(false);
+describe("stellarWalletAddress", () => {
+  it("finds only the embedded Stellar wallet and keeps its case", () => {
+    expect(
+      stellarWalletAddress([
+        { type: "email", address: "a@b.co" },
+        { type: "wallet", chainType: "ethereum", walletClientType: "privy", address: "0xabc" },
+        { type: "wallet", chainType: "stellar", walletClientType: "freighter", address: "GOTHER" },
+        { type: "wallet", chainType: "stellar", walletClientType: "privy", address: ADDRESS },
+      ]),
+    ).toBe(ADDRESS);
+  });
+
+  it("returns undefined without one", () => {
+    expect(stellarWalletAddress(undefined)).toBeUndefined();
+    expect(stellarWalletAddress([])).toBeUndefined();
   });
 });

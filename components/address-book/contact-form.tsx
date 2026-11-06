@@ -9,8 +9,10 @@ import { Label } from "@/components/ui/label";
 type ContactFormProps = {
   name: string;
   address: string;
+  memo: string;
   onNameChange: (value: string) => void;
   onAddressChange: (value: string) => void;
+  onMemoChange: (value: string) => void;
   error: string | null;
   onSubmit: (e: React.FormEvent) => void;
   saving: boolean;
@@ -21,8 +23,10 @@ type ContactFormProps = {
 export function ContactForm({
   name,
   address,
+  memo,
   onNameChange,
   onAddressChange,
+  onMemoChange,
   error,
   onSubmit,
   saving,
@@ -32,6 +36,7 @@ export function ContactForm({
   const id = useId();
   const nameId = `${id}-name`;
   const addressId = `${id}-address`;
+  const memoId = `${id}-memo`;
   const errorId = `${id}-error`;
 
   return (
@@ -54,11 +59,22 @@ export function ContactForm({
           id={addressId}
           value={address}
           onChange={(e) => onAddressChange(e.target.value)}
-          placeholder="0x…"
+          placeholder="G…"
           autoComplete="off"
           className="pr-mono"
           aria-invalid={Boolean(error) || undefined}
           aria-describedby={error ? errorId : undefined}
+        />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor={memoId}>Memo (optional)</Label>
+        <Input
+          id={memoId}
+          value={memo}
+          onChange={(e) => onMemoChange(e.target.value)}
+          placeholder="Required by most exchanges"
+          autoComplete="off"
+          className="pr-mono"
         />
       </div>
       <FieldError id={errorId} message={error} />

@@ -7,7 +7,7 @@ import { jsonLdScript, pageMetadata } from "@/lib/seo";
 export const metadata: Metadata = pageMetadata({
   title: "Sandia",
   description:
-    "Create a USD payment link or send USDG. Payers settle from their own chain, and USDG arrives on Robinhood Chain.",
+    "Create a USD payment link or send USDC. Payers settle from Stellar or another chain, and USDC arrives on Stellar.",
   path: "/",
   absolute: true,
 });
@@ -20,15 +20,7 @@ const homeFaqs = [
   },
   {
     question: "Where does the payment arrive?",
-    answer: "USDG arrives on Robinhood Chain. The payer can start from another chain.",
-  },
-  {
-    question: "When can I trade a stock token?",
-    answer: "A stock trade is offered only after a live quote says that market is open.",
-  },
-  {
-    question: "What is Earn?",
-    answer: "Earn is where you deposit, withdraw, and redeem USDG.",
+    answer: "USDC arrives on Stellar. The payer can start from another chain.",
   },
 ] as const;
 
@@ -64,17 +56,17 @@ export default function HomePage() {
           </div>
           <div className="pr-hero-copy max-w-2xl space-y-6">
             <h1 className="pr-display pr-animate-in pr-animate-in-delay-1 text-3xl sm:text-5xl">
-              Request dollars. Receive USDG on Robinhood Chain.
+              Request dollars. Receive USDC on Stellar.
             </h1>
             <p className="pr-lede pr-animate-in pr-animate-in-delay-2">
-              Create a payment link or send USDG. Switch modes from the navigation to get started.
+              Create a payment link or send USDC. Switch modes from the navigation to get started.
             </p>
             <div className="pr-animate-in pr-animate-in-delay-3 flex flex-wrap gap-3 pbs-2">
               <Button asChild size="lg">
                 <Link href="/requests/new">Create a request</Link>
               </Button>
               <Button asChild size="lg" variant="secondary">
-                <Link href="/send">Send USDG</Link>
+                <Link href="/send">Send USDC</Link>
               </Button>
               <Button asChild size="lg" variant="outline">
                 <Link href="/dashboard">Your requests</Link>
@@ -84,25 +76,17 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="pr-grid-3">
+      <section className="pr-grid-2">
         {[
           {
             title: "Request",
-            body: "Create a USD payment link. Payers settle from their own chain, and USDG arrives on Robinhood Chain. No Sandia account required.",
+            body: "Create a USD payment link. Payers settle from Stellar or another chain, and USDC arrives on Stellar. No Sandia account required.",
             links: [{ href: "/requests/new", label: "Create a request" }],
           },
           {
             title: "Send",
-            body: "Push USDG to one recipient or a batch, with a review step before anything is sent.",
-            links: [{ href: "/send", label: "Send USDG" }],
-          },
-          {
-            title: "Stocks and earn",
-            body: "Stock trades appear only after a live quote says they are open. Deposit, withdraw, and redeem USDG from Earn.",
-            links: [
-              { href: "/stocks", label: "Stocks" },
-              { href: "/earn", label: "Earn" },
-            ],
+            body: "Push USDC to one recipient or a batch, with a review step before anything is sent.",
+            links: [{ href: "/send", label: "Send USDC" }],
           },
         ].map((item) => (
           <div key={item.title} className="pr-feature">

@@ -1,14 +1,8 @@
+import { isStellarRecipient } from "./stellar/strkey";
+
 export const MAX_AGENT_PROMPT_LENGTH = 200;
 
-export const INTENT_ACTIONS = [
-  "send",
-  "batch_send",
-  "request",
-  "earn_deposit",
-  "earn_withdraw",
-  "stock_buy",
-  "stock_sell",
-] as const;
+export const INTENT_ACTIONS = ["send", "batch_send", "request"] as const;
 
 export type IntentAction = (typeof INTENT_ACTIONS)[number];
 export type IntentProbabilities = Record<string, number>;
@@ -23,20 +17,20 @@ export type IntentRouting =
   | { status: "unsupported"; reason: string };
 
 export type AgentContact = { name: string; address: string };
-export type AgentStock = {
-  symbol: string;
-  name: string;
-  shortName: string;
-  contractAddress: string;
-  tokenDecimals: number;
-};
 export type BatchRecipientDraft = { address: string; amount: string };
 
-export function resolveExplicitAddress(prompt: string): string {
-  return prompt.match(/\b0x[a-fA-F0-9]{40}\b/)?.[0] ?? "";
+/** Stellar `G…` and muxed `M…` addresses in a prompt, checked by their checksum. */
+function stellarAddressesIn(prompt: string): Array<{ address: string; index: number }> {
+  return [...prompt.matchAll(/\b(?:G[A-Z2-7]{55}|M[A-Z2-7]{68})\b/g)]
+    .filter((match) => isStellarRecipient(match[0]))
+    .map((match) => ({ address: match[0], index: match.index ?? 0 }));
 }
 
-const AMOUNT_TOKEN = String.raw`(?:\$\s*(\d+(?:\.\d{1,6})?)|\b(\d+(?:\.\d{1,6})?)\s*(?:USDG|USD|dollars?|shares?)\b)`;
+export function resolveExplicitAddress(prompt: string): string {
+  return stellarAddressesIn(prompt)[0]?.address ?? "";
+}
+
+const AMOUNT_TOKEN = String.raw`(?:\$\s*(\d+(?:\.\d{1,6})?)|\b(\d+(?:\.\d{1,6})?)\s*(?:USDC|USD|dollars?)\b)`;
 const AMOUNT_PATTERN = new RegExp(AMOUNT_TOKEN, "gi");
 
 export function extractExplicitAmount(prompt: string): string | null {
@@ -85,10 +79,7 @@ export function resolveBatchRecipients(
     address: contact.address,
     index,
   }));
-  const addresses = [...prompt.matchAll(/\b0x[a-fA-F0-9]{40}\b/g)].map((match) => ({
-    address: match[0],
-    index: match.index ?? 0,
-  }));
+  const addresses = stellarAddressesIn(prompt);
   const recipients = [...mentions, ...addresses].sort((a, b) => a.index - b.index);
   if (recipients.length < 2) return [];
   if (
@@ -103,26 +94,4 @@ export function resolveBatchRecipients(
     return recipients.map(({ address }) => ({ address, amount: amounts[0] }));
   if (amounts.length !== recipients.length) return [];
   return recipients.map(({ address }, index) => ({ address, amount: amounts[index] }));
-}
-
-export function resolveStock(prompt: string, assets: AgentStock[]): AgentStock | null {
-  const normalizedPrompt = prompt.replace(/\bNVDIA\b/giu, "NVIDIA");
-  const candidates = assets.filter((asset) =>
-    [asset.symbol, asset.name, asset.shortName].some((label) => {
-      const normalizedLabel = label.trim();
-      if (!normalizedLabel) return false;
-      return new RegExp(
-        `(?:^|[^a-z0-9])${escapeRegExp(normalizedLabel)}(?=$|[^a-z0-9])`,
-        "iu",
-      ).test(normalizedPrompt);
-    }),
-  );
-  return candidates.length === 1 ? candidates[0] : null;
-}
-
-export function extractStockUnit(prompt: string): "usd" | "shares" | null {
-  const usd = /\$|\b(?:USD|USDG|dollars?)\b/i.test(prompt);
-  const shares = /\bshares?\b/i.test(prompt);
-  if (usd === shares) return null;
-  return usd ? "usd" : "shares";
 }

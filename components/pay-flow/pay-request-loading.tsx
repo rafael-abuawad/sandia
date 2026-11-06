@@ -1,5 +1,4 @@
 import Image from "next/image";
-import { QuoteSkeleton } from "@/components/quote-skeleton";
 import { FieldSkeleton } from "@/components/skeletons/field-skeleton";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -40,7 +39,10 @@ export function PayRequestLoading() {
           <FieldSkeleton />
           <FieldSkeleton />
         </div>
-        <QuoteSkeleton />
+        <div className="pr-inset flex items-center justify-between px-4 py-3" aria-hidden>
+          <Skeleton className="h-4 w-24" />
+          <Skeleton className="h-4 w-28" />
+        </div>
         <Skeleton className="h-10 w-full" />
       </div>
     </div>

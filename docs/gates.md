@@ -1,40 +1,48 @@
-# Release gates checked 23 Sep 2026
+# Release gates checked 6 Nov 2026
 
-These calls were made from this workspace against public endpoints. They are not a completed mainnet payment.
+These checks ran from this workspace against public endpoints. They are not a completed mainnet payment.
 
-## Steakhouse USDG vault
+## Verified
 
-Address `0xBeEff033F34C046626B8D0A041844C5d1A5409dd` on chain 4663.
+### Stellar account and fee flow (testnet)
 
-- Bytecode was present (21808 bytes).
-- `asset()` returned `0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168` (USDG).
-- `totalAssets()` returned `493859497664019` base units.
-- `maxDeposit` for `0x0000000000000000000000000000000000000001` returned `0`.
+A script ran the real flow end to end on Stellar testnet, with a test-issued asset standing in for USDC:
 
-Morpho Vault V2 always returns 0 from `maxDeposit`, `maxWithdraw`, and `maxRedeem`. That is not a closed vault. Earn submits `deposit`, `withdraw`, and `redeem`, then checks the receipt for a `Deposit` or `Withdraw` log. The lending screen reads APY, deposits, and liquidity from the vault snapshot.
+- Account setup with sponsored reserves succeeded for a new key holding 0 XLM: `beginSponsoringFutureReserves`, `createAccount` with a 0 starting balance, `changeTrust`, `endSponsoringFutureReserves`. The new key signed the raw transaction hash, the way Privy does. The account shows `num_sponsored: 3`, which is 1.5 XLM locked on the sponsor.
+- A two-payment batch from that 0 XLM account succeeded when the sponsor fee-bumped it. The network charged 300 stroops.
+- Without a fee-bump, the same account fails with `tx_insufficient_balance`.
+- A payment to an account without a trustline fails with `tx_fee_bump_inner_failed`, `tx_failed`, and `op_no_trust`.
+- Horizon finds the transaction by both its fee-bump hash and its inner hash.
+- Muxed payments report `to` (the `G…` account) and `to_muxed` (the `M…` address).
 
-## Stock trading
+### USDC on Stellar (mainnet)
 
-Buy and sell on the stock ticket quote the selected asset against USDG on Robinhood Chain (4663). The app checks Uniswap v3 fee tiers 500 and 3000 and the v2 pair reserves, keeps the best amount, and protects it by 1%. Swap calldata is built in the app and submitted only to SwapRouter02 (`0xCaf681a66D020601342297493863E78C959E5cb2`). The sell token is approved to that router for the quoted amount when the allowance is short. Stock tickets do not call 0x.
+Horizon reports `USDC:GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN` with contract `CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75`. The asset is `auth_revocable`, so Circle can freeze a trustline. Clawback is off.
 
-ETH on this screen is wrapped ETH (`0x0Bd7D308f8E1639FAb988df18A8011f41EAcAD73`). A buy delivers WETH. HOOD is the Robinhood Markets token at `0x274C8C4665c0343730C78B184e560F902A8Bf200`. The ETH → USDG payment path still uses 0x and is separate from these tickets.
+### NEAR Intents 1Click (mainnet)
 
-## Payer wallet
+`/v0/tokens` lists Stellar USDC by that issuer. Quotes for exactly 100 USDC to a real Stellar account with a trustline:
 
-Payers connect an external wallet on `/pay/[publicId]` through Privy’s `connectWallet`. That uses the same `@privy-io/wagmi` provider as the app. Sandia accounts sign in with email and use the Privy embedded wallet. Paying does not run the Convex wallet claim.
+| Origin      | Input                       | Estimate |
+| ----------- | --------------------------- | -------- |
+| Base USDC   | 101.05 USDC, minimum 100.04 | 50 s     |
+| Solana USDC | 101.05 USDC, minimum 100.04 | 35 s     |
+| Base ETH    | 0.0453 ETH, minimum 0.0449  | 50 s     |
 
-Opening the connect modal, connecting an injected wallet, switching chain, and paying still needs a browser with a wallet extension and a live Convex request.
+These include the 0.25% fee 1Click adds without a partner key. Input above what the route needs is refunded to `refundTo`. A quote to an account that doesn't exist returned an error, so recipients need to finish account setup first.
 
-## Privy outbound send
+## Not verified
 
-Outbound USDG sends use Privy's sponsored embedded-wallet transactions on Robinhood Chain (chain id 4663). Privy uses a paymaster for gas, so the signed-in wallet does not need ETH. Both steps of a batch send (USDG approval and Sandia Send) request sponsorship through the React SDK (`sponsor: true`), which authenticates with the signed-in Privy session. The app secret is not sent to the browser.
+These need credentials or real funds, so they haven't run:
 
-Live sending still requires, in the Privy Dashboard for the same app as `NEXT_PUBLIC_PRIVY_APP_ID`:
+- **Privy raw signing with a Stellar wallet.** `useCreateWallet` and `useSignRawHash` follow Privy's docs, and the signature format is tested with local keys. Sign in once and confirm a wallet is created and signs.
+- **A sponsored transaction on mainnet.** It needs a funded `STELLAR_SPONSOR_SECRET`.
+- **A cross-chain payment settling.** Quotes are live, but no deposit has been sent.
+- **Stellar Wallets Kit in a browser, with a real wallet.**
 
-- An app secret under **Configuration → App settings → Basics**. Store it only as Convex `PRIVY_APP_SECRET`. Never as `NEXT_PUBLIC_`. The app does not read it yet. Regenerating it invalidates the previous secret.
-- TEE wallet execution under **Wallets → Advanced**. Leave automatic migration enabled.
-- **Fee sponsorship → Sponsor gas fees** (App pays). User pays does not include Robinhood Chain.
-- Robinhood Chain in supported chains, client-initiated sponsored transactions allowed, and a spend cap.
-- Credits and a payment method under **Billing → Fee sponsorship**.
+## Setup before launch
 
-A live sponsored send and receipt have not been verified from this workspace.
+- **Privy:** in the Dashboard, enable Stellar for embedded wallets. Privy may require TEE execution under **Wallets → Advanced**. Privy's gas sponsorship doesn't cover Stellar, so Sandia pays fees itself.
+- **Sponsor account:** create a Stellar account, fund it with XLM, and set `STELLAR_SPONSOR_SECRET` on Convex only. Each user locks 1.5 XLM in reserves. Keep the balance small and refill it, because a hot key can always be stolen.
+- **NEAR Intents:** get a partner key from the [Partner Dashboard](https://partners.near-intents.org/home) and set `NEAR_INTENTS_API_KEY`, or 1Click adds 0.25% to every route.
+- **Horizon:** set `NEXT_PUBLIC_STELLAR_HORIZON_URL` to an endpoint you control. The default is a public service with no guarantees.
