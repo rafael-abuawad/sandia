@@ -5,6 +5,7 @@ allowBuilds:
   esbuild: true
   keccak: false
   prisma: false
+  secp256k1: set this to true or false
   sharp: true
   unrs-resolver: true
   utf-8-validate: false
