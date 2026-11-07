@@ -36,7 +36,7 @@ function RequestDetail({ publicId }: { publicId: string }) {
     isSignedIn ? { publicId } : "skip",
   );
   const { results: attempts } = usePaginatedQuery(
-    api.paymentAttempts.listByRequest,
+    api.settlementAttempts.listByRequest,
     { publicId },
     { initialNumItems: 20 },
   );
@@ -85,9 +85,11 @@ function RequestMissing() {
 
 type AttemptRow = {
   _id: string;
-  depositTxnRef?: string;
-  originChainId: number;
-  acrossStatus: string;
+  kind: "direct" | "near_intents";
+  txHash?: string;
+  originSymbol?: string;
+  originChain?: string;
+  status: string;
 };
 
 function RequestDetailLoaded({
@@ -312,15 +314,17 @@ function RequestDetailLoaded({
                 className="pr-inset flex items-center justify-between gap-3 px-3 py-2 text-xs text-muted"
               >
                 <span className="min-w-0 truncate">
-                  {a.depositTxnRef ? (
-                    <TxLink chainId={a.originChainId} hash={a.depositTxnRef} className="text-xs">
-                      {a.depositTxnRef.slice(0, 10)}…
+                  {a.txHash ? (
+                    <TxLink hash={a.txHash} className="text-xs">
+                      {a.txHash.slice(0, 10)}…
                     </TxLink>
+                  ) : a.kind === "near_intents" ? (
+                    `${a.originSymbol ?? "Token"} on ${a.originChain ?? "another network"}`
                   ) : (
                     "—"
                   )}
                 </span>
-                <StatusBadge status={a.acrossStatus} />
+                <StatusBadge status={a.status} />
               </li>
             ))}
           </ul>

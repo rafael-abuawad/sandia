@@ -1,19 +1,17 @@
 import { ExternalLink } from "lucide-react";
-import { explorerTxUrl } from "@/lib/chains";
+import { explorerTxUrl } from "@/lib/stellar/constants";
 import { cn } from "@/lib/utils";
 
 export function TxLink({
-  chainId,
   hash,
   children,
   className,
 }: {
-  chainId: number;
   hash: string;
   children: React.ReactNode;
   className?: string;
 }) {
-  const href = explorerTxUrl(chainId, hash);
+  const href = explorerTxUrl(hash);
   if (!href) {
     return <span className={cn("pr-mono", className)}>{children}</span>;
   }

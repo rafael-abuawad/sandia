@@ -1,13 +1,14 @@
 # Sandia
 
-USD-denominated payment requests settled as stablecoins on **Robinhood Chain** via [Across Protocol](https://docs.across.to/).
+USD-denominated payment requests settled as **USDC on [Stellar](https://stellar.org)**. Payers on other networks reach Stellar through [NEAR Intents](https://docs.near-intents.org/).
 
 ## Stack
 
 - Next.js App Router + React 19
 - Convex (database + backend functions)
-- Privy for Sandia accounts (email OTP and an embedded wallet) and for payer wallet connection, wagmi/viem for chain reads and sends
-- Across Swap API for quotes, approvals, bridging, and deposit tracking
+- Privy for Sandia accounts (email OTP and an embedded Stellar wallet)
+- `@stellar/stellar-sdk` and Horizon for transactions and reads, with Stellar Wallets Kit for payer wallets
+- NEAR Intents 1Click for cross-chain deposits
 
 ## Setup
 
@@ -39,7 +40,7 @@ npx convex dev
 NEXT_PUBLIC_PRIVY_APP_ID=<privy-app-id>
 ```
 
-Create a Privy app with email OTP and wallets enabled. Allow `http://localhost:3000`. On Convex, set the same app id and the wallet-claim secret:
+Create a Privy app with email OTP and Stellar embedded wallets enabled. Allow `http://localhost:3000`. On Convex, set the same app id and the wallet-claim secret:
 
 ```bash
 npx convex env set PRIVY_APP_ID <same-as-NEXT_PUBLIC_PRIVY_APP_ID>
@@ -52,15 +53,17 @@ The Privy app secret stays on Convex only. Copy it from **Configuration → App 
 npx convex env set PRIVY_APP_SECRET <app-secret>
 ```
 
-Batch sends also need the deployed Sandia Send address in `.env.local`:
+Sandia pays Stellar fees and account reserves from its own account. Fund a Stellar account with XLM and set its secret on Convex only:
 
 ```bash
-NEXT_PUBLIC_SANDIA_SEND_ADDRESS=<sandia-send-address>
+npx convex env set STELLAR_SPONSOR_SECRET <S...>
 ```
 
-The Sandia Send contract, deployment scripts, and contract tests live in [sandia-core](https://github.com/rafael-abuawad/sandia-core).
+Set a NEAR Intents partner key too. Without one, 1Click adds 0.25% to every route:
 
-A single recipient still transfers USDG directly. Two or more recipients approve that contract, then call `sandia_send`.
+```bash
+npx convex env set NEAR_INTENTS_API_KEY <key>
+```
 
 5. In another terminal:
 
@@ -72,19 +75,24 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ## Product flow
 
-1. Creator signs in with email+OTP. Privy creates an embedded wallet, and that wallet is claimed automatically so they can create requests and send.
-2. Create a request: USD amount, optional description and expiry. The recipient is that wallet. The destination token is USDG on Robinhood Chain.
-3. Share the public `/pay/{id}` URL.
-4. Payer connects an external wallet through Privy, selects an Across-supported source chain/token, reviews quote (input, fees, min received, ETA), approves if needed, and pays. Paying does not create a Sandia account.
-5. The request is marked **completed** only after a deposit receipt matches the request and Across `/deposit` reports `filled` with destination chain 4663, the request token, the snapshotted recipient, an output amount at least as large as the request, and a fill transaction. `/deposit/status` is not used as proof. A minute cron keeps checking if the payer closes the tab.
+1. A creator signs in with email and OTP. Privy creates an embedded Stellar wallet, and Sandia links it with one signature. Sandia's sponsor then pays the reserves for the account and its USDC trustline, so the user holds no XLM.
+2. They create a request: USD amount, optional description and expiry. The recipient is that wallet, and the destination is always USDC on Stellar.
+3. They share the public `/pay/{id}` URL.
+4. A payer picks one of two ways to pay. Neither creates a Sandia account.
+   - **Stellar wallet:** connect through Stellar Wallets Kit and send USDC directly. The payer's wallet pays a small XLM fee.
+   - **Another network:** choose a network and token and give a refund address. Sandia returns a 1Click deposit address and the amount to send. Any excess is refunded.
+5. The request is marked **completed** only after Sandia reads the payment back from Stellar. A direct payment must carry the request's memo (`sandia:{id}`), be newer than the request, and pay at least the requested amount. A cross-chain payment needs 1Click `SUCCESS` plus a matching Stellar transaction, and `SUCCESS` alone settles nothing. A cron checks each minute in case the payer closes the tab.
 
 ## Notes
 
-- Monetary values are stored as integer base units / USD micros — no floating-point arithmetic.
-- Destination tokens are discovered live from `GET /swap/tokens?chainId=4663` filtered to `USDC|USDT|USDG`.
-- The payer's browser also polls every 10 seconds. The server calls Across `GET /deposit` (or `/deposits`) with `ACROSS_API_KEY` on Convex, not a public env var.
-- Register an Across integrator id and set Convex `ACROSS_INTEGRATOR_ID`.
-- `/otc` redirects to `/requests/new`.
-- App accounts use the Privy embedded wallet on Robinhood Chain. The public pay page uses the same Privy wagmi provider and connects an external wallet for payment, so paying does not claim a Sandia account. WalletConnect for payers is the connector enabled in the Privy dashboard.
-- Outbound USDG sends use Privy's embedded-wallet gas sponsorship on Robinhood Chain (chain id 4663), so the sender does not need ETH. The browser calls `useSendTransaction` with `sponsor: true`; that uses the signed-in session, not the app secret. In the Privy Dashboard: enable TEE execution under **Wallets → Advanced** (do not disable automatic wallet migration), turn on **Fee sponsorship → Sponsor gas fees** (App pays; User pays does not cover Robinhood Chain), add Robinhood Chain, allow client-initiated sponsored transactions, set a spend cap, and add credits plus a payment method under **Billing → Fee sponsorship**. Store the app secret only as Convex `PRIVY_APP_SECRET`. Batch sends sponsor both the USDG approval and the Sandia Send call.
-- Stock buy and sell quote Uniswap v2 and v3 on Robinhood Chain and submit the swap to SwapRouter02. Steakhouse USDG deposits, withdrawals, and redemptions are submitted from Earn. See `docs/gates.md`.
+- Monetary values are stored as integer base units and USD micros. Stellar USDC has 7 decimals, so one USD micro is 10 stroops.
+- Stellar addresses are case-sensitive. Never lowercase them.
+- Sandia signs only what `lib/stellar/policy.ts` allows, and the sponsor pays only for the same set: USDC payments. The browser and Convex both check this. Sponsored transactions are limited to 60 per user per hour.
+- A batch is one transaction of up to 100 payments, all succeeding or failing together. It needs no contract or approval.
+- A recipient needs a Stellar account and a USDC trustline. Send checks this before signing, and also checks for accounts that require a memo (SEP-29).
+- `/otc` redirects to `/requests/new`. `/stocks`, `/earn`, and `/lending` redirect to `/`.
+- See `docs/gates.md` for what has been verified and what's needed before launch.
+
+### Moving from Robinhood Chain
+
+The cutover is clean: nothing migrates on-chain. Signing in again creates a Stellar wallet and replaces the user's stored address. Old requests show as unavailable and old contacts are hidden. `npx convex run migrations:clearLegacyData` deletes them. Tables dropped from the schema (`paymentAttempts`, `outboundTransfers`, `swapFills`, `vaultActivities`) stay in the database unread until you clear them in the Convex dashboard.

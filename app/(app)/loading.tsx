@@ -28,7 +28,7 @@ export default function Loading() {
         </div>
       </section>
 
-      <section className="pr-grid-3">
+      <section className="pr-grid-2">
         <div className="pr-feature space-y-2">
           <Skeleton className="h-5 w-20" />
           <Skeleton className="h-4 w-full" />
@@ -40,12 +40,6 @@ export default function Loading() {
           <Skeleton className="h-4 w-full" />
           <Skeleton className="h-4 w-4/5" />
           <Skeleton className="h-4 w-1/2" />
-        </div>
-        <div className="pr-feature space-y-2">
-          <Skeleton className="h-5 w-28" />
-          <Skeleton className="h-4 w-full" />
-          <Skeleton className="h-4 w-4/5" />
-          <Skeleton className="h-4 w-2/3" />
         </div>
       </section>
     </div>

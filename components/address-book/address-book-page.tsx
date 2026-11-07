@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react";
 import { useMutation, useQuery } from "convex/react";
-import { isAddress } from "viem";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { api } from "@/convex/_generated/api";
 import type { Doc } from "@/convex/_generated/dataModel";
@@ -20,6 +19,8 @@ import {
   ResponsiveDialogHeader,
   ResponsiveDialogTitle,
 } from "@/components/responsive-dialog";
+import { memoError } from "@/lib/stellar/memo";
+import { isStellarRecipient } from "@/lib/stellar/strkey";
 import { shortenAddress } from "@/lib/utils";
 import { userFacingError } from "@/lib/user-facing-error";
 
@@ -35,6 +36,7 @@ function useAddressBookEditor() {
   const [editor, setEditor] = useState<Editor | null>(null);
   const [name, setName] = useState("");
   const [address, setAddress] = useState("");
+  const [memo, setMemo] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -42,6 +44,7 @@ function useAddressBookEditor() {
     setEditor(null);
     setName("");
     setAddress("");
+    setMemo("");
     setError(null);
     setSaving(false);
   }
@@ -49,6 +52,7 @@ function useAddressBookEditor() {
   function startCreate() {
     setName("");
     setAddress("");
+    setMemo("");
     setError(null);
     setEditor({ mode: "create" });
   }
@@ -56,6 +60,7 @@ function useAddressBookEditor() {
   function startEdit(contact: Doc<"contacts">) {
     setName(contact.name);
     setAddress(contact.address);
+    setMemo(contact.memo ?? "");
     setError(null);
     setEditor({ mode: "edit", contact });
   }
@@ -73,19 +78,25 @@ function useAddressBookEditor() {
       setError("Enter a name");
       return;
     }
-    if (!isAddress(address)) {
-      setError("Enter a valid wallet address");
+    if (!isStellarRecipient(address.trim())) {
+      setError("Enter a valid Stellar address");
+      return;
+    }
+    const memoProblem = memoError(memo.trim());
+    if (memoProblem) {
+      setError(memoProblem);
       return;
     }
     setSaving(true);
     try {
       if (editor.mode === "create") {
-        await createContact({ name: name.trim(), address });
+        await createContact({ name: name.trim(), address: address.trim(), memo: memo.trim() });
       } else {
         await updateContact({
           contactId: editor.contact._id,
           name: name.trim(),
-          address,
+          address: address.trim(),
+          memo: memo.trim(),
         });
       }
       closeEditor();
@@ -114,10 +125,12 @@ function useAddressBookEditor() {
     editor,
     name,
     address,
+    memo,
     error,
     saving,
     setName,
     setAddress,
+    setMemo,
     closeEditor,
     startCreate,
     startEdit,
@@ -167,10 +180,12 @@ export function AddressBookPage() {
         editor={editor.editor}
         name={editor.name}
         address={editor.address}
+        memo={editor.memo}
         error={editor.error}
         saving={editor.saving}
         onNameChange={editor.setName}
         onAddressChange={editor.setAddress}
+        onMemoChange={editor.setMemo}
         onClose={editor.closeEditor}
         onSave={editor.onSave}
         onDelete={editor.onDelete}
@@ -276,10 +291,12 @@ function AddressBookEditorDialog({
   editor,
   name,
   address,
+  memo,
   error,
   saving,
   onNameChange,
   onAddressChange,
+  onMemoChange,
   onClose,
   onSave,
   onDelete,
@@ -287,10 +304,12 @@ function AddressBookEditorDialog({
   editor: Editor | null;
   name: string;
   address: string;
+  memo: string;
   error: string | null;
   saving: boolean;
   onNameChange: (value: string) => void;
   onAddressChange: (value: string) => void;
+  onMemoChange: (value: string) => void;
   onClose: () => void;
   onSave: (e: React.FormEvent) => Promise<void>;
   onDelete: () => Promise<void>;
@@ -311,10 +330,12 @@ function AddressBookEditorDialog({
             mode={editor?.mode === "edit" ? "edit" : "create"}
             name={name}
             address={address}
+            memo={memo}
             error={error}
             saving={saving}
             onNameChange={onNameChange}
             onAddressChange={onAddressChange}
+            onMemoChange={onMemoChange}
             onClose={onClose}
             onSave={onSave}
           />
@@ -369,20 +390,24 @@ function SaveContactDialog({
   mode,
   name,
   address,
+  memo,
   error,
   saving,
   onNameChange,
   onAddressChange,
+  onMemoChange,
   onClose,
   onSave,
 }: {
   mode: "create" | "edit";
   name: string;
   address: string;
+  memo: string;
   error: string | null;
   saving: boolean;
   onNameChange: (value: string) => void;
   onAddressChange: (value: string) => void;
+  onMemoChange: (value: string) => void;
   onClose: () => void;
   onSave: (e: React.FormEvent) => Promise<void>;
 }) {
@@ -402,8 +427,10 @@ function SaveContactDialog({
         <ContactForm
           name={name}
           address={address}
+          memo={memo}
           onNameChange={onNameChange}
           onAddressChange={onAddressChange}
+          onMemoChange={onMemoChange}
           error={error}
           onSubmit={(e) => void onSave(e)}
           saving={saving}

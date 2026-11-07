@@ -4,7 +4,6 @@ import { useId } from "react";
 import { Button } from "@/components/ui/button";
 import { FieldError } from "@/components/ui/field-error";
 import { TxLink } from "@/components/tx-link";
-import { robinhoodChain } from "@/lib/chains";
 import { formatUsdFromMicros } from "@/lib/money";
 import { truncateAddress } from "@/components/send-form/helpers";
 import { SendSummaryDetails } from "@/components/send-form/summary-details";
@@ -27,9 +26,7 @@ function getProgressMessage(progress: SendTransactionProgress, confirming: boole
 
 function getActionLabel(progress: SendTransactionProgress, confirming: boolean) {
   if (progress.phase === "pending" && progress.hash !== null) {
-    return progress.stage === "approval"
-      ? "Check approval and continue"
-      : "Check transaction status";
+    return "Check transaction status";
   }
   if (!confirming) return "Confirm send";
   if (progress.phase === "awaiting-wallet") return "Waiting for wallet…";
@@ -72,8 +69,8 @@ export function SendReviewPanel({
           <h2 className="pr-section-title">Review send</h2>
           <p className="mbs-1 text-sm text-muted">
             {review.mode === "massive"
-              ? "Robinhood Chain · USDG. This batch is one send after you approve USDG for the total. Sandia covers the network fees."
-              : "Robinhood Chain · USDG. This is a direct transfer. Sandia covers the network fee."}
+              ? "Stellar · USDC. Every payment in this batch succeeds or fails together. Sandia covers the network fee."
+              : "Stellar · USDC. This is a direct transfer. Sandia covers the network fee."}
           </p>
         </div>
 
@@ -87,7 +84,7 @@ export function SendReviewPanel({
             >
               <span className="pr-mono truncate text-muted">{truncateAddress(r.address)}</span>
               <span className="pr-mono shrink-0 font-medium">
-                {formatUsdFromMicros(r.amountUsdMicros)} USDG
+                {formatUsdFromMicros(r.amountUsdMicros)} USDC
               </span>
             </li>
           ))}
@@ -105,8 +102,8 @@ export function SendReviewPanel({
           {progress.hash ? (
             <p className="text-xs">
               Transaction{" "}
-              <TxLink chainId={robinhoodChain.id} hash={progress.hash} className="text-xs">
-                {progress.hash.slice(0, 10)}…{progress.hash.slice(-6)}
+              <TxLink hash={progress.hash} className="text-xs">
+                {progress.hash.slice(0, 8)}…{progress.hash.slice(-6)}
               </TxLink>
             </p>
           ) : null}

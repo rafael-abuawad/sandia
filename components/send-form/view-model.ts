@@ -1,5 +1,5 @@
 import { formatTokenAmountGrouped, parseUsdToMicros } from "@/lib/money";
-import { MAX_SEND_RECIPIENTS } from "@/lib/send/calls";
+import { MAX_SEND_RECIPIENTS } from "@/lib/stellar/constants";
 import { getSendBlocker, type BalanceStatus } from "@/lib/send/view-state";
 import type { RecipientRow, ReviewPayload } from "@/components/send-form/state";
 
@@ -31,11 +31,11 @@ export function getBalanceMessage({
   decimals: number;
 }): string | null {
   if (!isSignedIn) return null;
-  if (balanceStatus === "error") return "Could not read your USDG balance.";
-  if (balanceStatus === "loading" || balance === undefined) return "Checking your USDG balance…";
+  if (balanceStatus === "error") return "Could not read your USDC balance.";
+  if (balanceStatus === "loading" || balance === undefined) return "Checking your USDC balance…";
 
   const available = formatTokenAmountGrouped(balance.toString(), decimals);
-  return `Available balance: ${available} USDG`;
+  return `Available balance: ${available} USDC`;
 }
 
 export function canConfirmSend({
@@ -43,50 +43,40 @@ export function canConfirmSend({
   confirming,
   pendingTransaction,
   isSignedIn,
-  chainReady,
   balanceStatus,
   withinCap,
-  sendConfigured,
 }: {
   review: ReviewPayload | null;
   confirming: boolean;
   pendingTransaction: boolean;
   isSignedIn: boolean;
-  chainReady: boolean;
   balanceStatus: BalanceStatus;
   withinCap: boolean;
-  sendConfigured: boolean;
 }): boolean {
   if (!review || confirming) return false;
   if (pendingTransaction) return true;
-  return isSignedIn && chainReady && balanceStatus === "ready" && withinCap && sendConfigured;
+  return isSignedIn && balanceStatus === "ready" && withinCap;
 }
 
 export function getReviewBlocker({
   review,
   pendingTransaction,
   isSignedIn,
-  chainReady,
   balanceStatus,
   withinCap,
-  sendConfigured,
 }: {
   review: ReviewPayload | null;
   pendingTransaction: boolean;
   isSignedIn: boolean;
-  chainReady: boolean;
   balanceStatus: BalanceStatus;
   withinCap: boolean;
-  sendConfigured: boolean;
 }): string | null {
   if (!review || pendingTransaction) return null;
   return getSendBlocker({
     isSignedIn,
-    chainReady,
     balanceStatus,
     maxRecipients: MAX_SEND_RECIPIENTS,
     withinCap,
-    sendConfigured,
   });
 }
 

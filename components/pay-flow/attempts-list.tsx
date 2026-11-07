@@ -6,9 +6,11 @@ import { shortenAddress } from "@/lib/utils";
 
 type Attempt = {
   _id: string;
-  depositTxnRef?: string;
-  originChainId: number;
-  acrossStatus: string;
+  kind: "direct" | "near_intents";
+  txHash?: string;
+  originSymbol?: string;
+  originChain?: string;
+  status: string;
 };
 
 export function PayAttemptsList({ attempts }: { attempts: Attempt[] }) {
@@ -24,15 +26,17 @@ export function PayAttemptsList({ attempts }: { attempts: Attempt[] }) {
             className="pr-inset flex items-center justify-between px-3 py-2 text-xs text-muted"
           >
             <span>
-              {a.depositTxnRef ? (
-                <TxLink chainId={a.originChainId} hash={a.depositTxnRef} className="text-xs">
-                  {shortenAddress(a.depositTxnRef, 6)}
+              {a.txHash ? (
+                <TxLink hash={a.txHash} className="text-xs">
+                  {shortenAddress(a.txHash, 6)}
                 </TxLink>
+              ) : a.kind === "near_intents" ? (
+                `${a.originSymbol ?? "Token"} on ${a.originChain ?? "another network"}`
               ) : (
                 "no tx yet"
               )}
             </span>
-            <StatusBadge status={a.acrossStatus} />
+            <StatusBadge status={a.status} />
           </li>
         ))}
       </ul>
@@ -56,28 +60,24 @@ function unavailableCopy(status: string | undefined): string {
 export function PayTerminalStatus({
   kind,
   statusLabel,
-  depositTxnRef,
-  depositChainId,
+  txHash,
+  message,
 }: {
   kind: "completed" | "unavailable";
   statusLabel?: string;
-  depositTxnRef?: string | null;
-  depositChainId?: number | null;
+  txHash?: string | null;
+  message?: string | null;
 }) {
   if (kind === "completed") {
     return (
       <section className="pr-inset pr-inset--success p-5 text-sm text-success">
-        Payment complete. USDG settled on Robinhood Chain.
-        {depositTxnRef ? (
+        {message ?? "Payment complete. USDC settled on Stellar."}
+        {txHash ? (
           <p className="mbs-2 text-xs text-muted">
-            Deposit:{" "}
-            {depositChainId != null ? (
-              <TxLink chainId={depositChainId} hash={depositTxnRef} className="text-xs">
-                {shortenAddress(depositTxnRef, 8)}
-              </TxLink>
-            ) : (
-              <span className="pr-mono">{shortenAddress(depositTxnRef, 8)}</span>
-            )}
+            Transaction:{" "}
+            <TxLink hash={txHash} className="text-xs">
+              {shortenAddress(txHash, 8)}
+            </TxLink>
           </p>
         ) : null}
       </section>

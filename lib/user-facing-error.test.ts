@@ -29,8 +29,8 @@ describe("userFacingError", () => {
   });
 
   it("uses the fallback when the message is still technical", () => {
-    expect(userFacingError(new Error("Morpho returned 502"), "Vault unavailable.")).toBe(
-      "Vault unavailable.",
+    expect(userFacingError(new Error("[CONVEX A(x)] Request ID: 1"), "Balance unavailable.")).toBe(
+      "Balance unavailable.",
     );
   });
 });

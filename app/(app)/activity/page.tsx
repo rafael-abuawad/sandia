@@ -12,8 +12,6 @@ import ActivityLoading, { ActivityListSkeleton } from "./loading";
 const KIND_LABEL: Record<string, string> = {
   request: "Request",
   send: "Send",
-  swap: "Stock",
-  vault: "Earn",
 };
 
 export default function ActivityPage() {
@@ -28,15 +26,12 @@ export default function ActivityPage() {
         <div className="space-y-2">
           <h1 className="pr-display text-2xl">Activity</h1>
           <p className="text-sm leading-relaxed text-muted">
-            Payment requests, USDG sends, stock fills, and vault actions for this account show up
-            here.
+            Payment requests and USDC sends for this account show up here.
           </p>
         </div>
         <div className="pr-panel pr-panel--padded flex flex-col items-center gap-3">
           <LoginButton />
-          <p className="text-center text-sm text-muted">
-            Sign in to see requests, sends, stocks, and vault activity.
-          </p>
+          <p className="text-center text-sm text-muted">Sign in to see requests and sends.</p>
         </div>
       </div>
     );
@@ -50,8 +45,8 @@ export default function ActivityPage() {
         <div className="pr-panel pr-panel--padded space-y-3">
           <p className="font-medium">No activity yet</p>
           <p className="text-sm text-muted">
-            Payment requests, USDG sends, stock fills, and vault actions for this account show up
-            here. Guests who only pay a link do not get a history.
+            Payment requests and USDC sends for this account show up here. Guests who only pay a
+            link do not get a history.
           </p>
           <Button asChild>
             <Link href="/requests/new">Create a request</Link>

@@ -1,13 +1,15 @@
-import type { Hex } from "viem";
-import type { SentPayment } from "@/components/pay-flow/state";
 import { userFacingError } from "@/lib/user-facing-error";
+import { isStellarAccount } from "@/lib/stellar/strkey";
 
-const HASH = /^0x[a-fA-F0-9]{64}$/;
-const ADDRESS = /^0x[a-fA-F0-9]{40}$/;
+/** A signed Stellar payment that may already be on the network. It's verified, never paid again. */
+export type SentPayment = {
+  hash: string;
+  payerAddress: string;
+  /** Unix seconds. After this, a payment the network hasn't seen can never land. */
+  expiresAt: number;
+};
 
-function isTxHash(value: unknown): value is Hex {
-  return typeof value === "string" && HASH.test(value);
-}
+const HASH = /^[0-9a-f]{64}$/;
 
 export function unverifiedPaymentKey(publicId: string): string {
   return `sandia-unverified:${publicId}`;
@@ -29,50 +31,16 @@ export function unverifiedPaymentMessage(error: unknown): string {
 export const RESTORED_PAYMENT_MESSAGE =
   "Your payment was already sent, so don't pay again. Check it again to confirm it.";
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
-function readDetails(value: unknown): SentPayment | null {
-  if (!isRecord(value)) return null;
-  const { hash, chainId, payerAddress, kind } = value;
-  if (!isTxHash(hash)) return null;
-  if (typeof payerAddress !== "string" || !ADDRESS.test(payerAddress)) return null;
-  if (typeof chainId !== "number" || !Number.isInteger(chainId)) return null;
-  if (kind === "direct" || kind === "eth") {
-    return { kind, hash, chainId, payerAddress };
-  }
-  if (kind !== "across" || !isRecord(value.details)) return null;
-  const details = value.details;
-  if (typeof details.originChainId !== "number" || !Number.isInteger(details.originChainId)) {
-    return null;
-  }
-  if (typeof details.inputToken !== "string" || !details.inputToken) return null;
-  if (typeof details.quotedInputAmount !== "string") return null;
-  if (typeof details.expectedOutputAmount !== "string") return null;
-  if (typeof details.minOutputAmount !== "string") return null;
-  if (typeof details.feesJson !== "string") return null;
-  return {
-    kind: "across",
-    hash,
-    chainId,
-    payerAddress,
-    details: {
-      originChainId: details.originChainId,
-      inputToken: details.inputToken,
-      quotedInputAmount: details.quotedInputAmount,
-      expectedOutputAmount: details.expectedOutputAmount,
-      minOutputAmount: details.minOutputAmount,
-      feesJson: details.feesJson,
-      quoteId: typeof details.quoteId === "string" ? details.quoteId : undefined,
-    },
-  };
-}
-
 /** Restore a wallet payment that was sent but not yet recorded. Invalid JSON is dropped. */
 export function parseStoredSentPayment(raw: string): SentPayment | null {
   try {
-    return readDetails(JSON.parse(raw) as unknown);
+    const value = JSON.parse(raw) as Partial<SentPayment> | null;
+    if (typeof value !== "object" || value === null) return null;
+    const { hash, payerAddress, expiresAt } = value;
+    if (typeof hash !== "string" || !HASH.test(hash)) return null;
+    if (typeof payerAddress !== "string" || !isStellarAccount(payerAddress)) return null;
+    if (typeof expiresAt !== "number" || !Number.isInteger(expiresAt)) return null;
+    return { hash, payerAddress, expiresAt };
   } catch {
     return null;
   }

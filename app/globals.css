@@ -413,14 +413,14 @@ samp {
   gap: clamp(2.5rem, 1rem + 3.75vw, 4rem);
 }
 
-.pr-grid-3 {
+.pr-grid-2 {
   display: grid;
   gap: clamp(1.25rem, 0.5rem + 1.875vw, 2rem);
 }
 
 @media (min-width: 640px) {
-  .pr-grid-3 {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+  .pr-grid-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 

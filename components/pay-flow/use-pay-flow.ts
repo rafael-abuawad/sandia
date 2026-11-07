@@ -1,30 +1,19 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
-import {
-  useAccount,
-  useBalance,
-  useReadContract,
-  useSendTransaction,
-  useSwitchChain,
-  useWaitForTransactionReceipt,
-} from "wagmi";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAction, usePaginatedQuery, useQuery } from "convex/react";
-import { type Hex, type Address, createPublicClient, erc20Abi, http } from "viem";
 import { api } from "@/convex/_generated/api";
-import type { ChainOption, TokenOption } from "@/components/token-chain-select";
+import type { Id } from "@/convex/_generated/dataModel";
+import { usdMicrosToStroops } from "@/lib/stellar/amount";
 import {
-  fetchAcrossChains,
-  fetchAcrossTokens,
-  quoteFundingGap,
-  type AcrossSwapQuote,
-} from "@/lib/across/client";
-import { appChains, PAYER_CHAIN_IDS, isPayerTokenAllowed, displayTokenSymbol } from "@/lib/chains";
-import { isDirectUsdgPay, isRobinhoodEthPay, ROBINHOOD_USDG } from "@/lib/destination";
-import { ethSpendBaseUnits } from "@/lib/zerox-quote";
-import { buildUsdgPaymentTransfer } from "@/lib/send/calls";
-import { initialPayFlowState, payFlowReducer, type SentPayment } from "@/components/pay-flow/state";
-import { statusLabel } from "@/components/status-badge";
+  fetchAccountState,
+  fetchTransaction,
+  StellarSubmitError,
+  submitEnvelope,
+} from "@/lib/stellar/horizon";
+import { requestMemo } from "@/lib/stellar/memo";
+import { isStellarAccount } from "@/lib/stellar/strkey";
+import { useStellarAccount } from "@/lib/stellar/use-account";
 import { userFacingError } from "@/lib/user-facing-error";
 import {
   parseStoredSentPayment,
@@ -32,368 +21,94 @@ import {
   trackedDepositKey,
   unverifiedPaymentKey,
   unverifiedPaymentMessage,
+  type SentPayment,
 } from "@/lib/unverified-payment";
+import type { PayRoute } from "@/lib/near-intents";
 
-const CHAIN_ORDER = [1, 8453, 42161, 10, 137, 56, 43114, 143, 4663];
-const SYMBOL_ORDER = [
-  "USDC",
-  "USDT",
-  "USDT0",
-  "DAI",
-  "CRVUSD",
-  "WETH",
-  "ETH",
-  "USDG",
-  "WBNB",
-  "BNB",
-  "WAVAX",
-  "AVAX",
-  "WMATIC",
-  "MATIC",
-  "WPOL",
-  "POL",
-  "WMON",
-  "MON",
-];
+export type PayMethod = "stellar" | "route";
+export type PayStep = "idle" | "paying" | "done" | "error";
+export type DirectPayBalance = "loading" | "short" | "ready" | "unavailable" | "no_trustline";
 
-export type DirectPayBalance = "loading" | "short" | "ready" | "unavailable";
+const DEPOSIT_POLL_MS = 10_000;
 
-const TRACKED_MESSAGE: Record<SentPayment["kind"], string> = {
-  across: "Deposit submitted. Waiting for settlement…",
-  direct: "Transfer submitted. Confirming settlement…",
-  eth: "Swap submitted. Confirming settlement…",
-};
-
-function acrossStatusCopy(status: string): string {
-  switch (status) {
-    case "submitted":
-      return "Submitted — waiting for the bridge.";
-    case "pending":
-      return "Bridging to Robinhood Chain…";
-    case "filled":
-      return "Payment settled on Robinhood Chain.";
-    default:
-      return `Bridge status: ${statusLabel(status)}.`;
-  }
-}
-
-function settlementStatusCopy(status: string, direct: boolean): string {
-  if (!direct) return acrossStatusCopy(status);
-  if (status === "filled") return "Payment settled on Robinhood Chain.";
-  if (status === "submitted" || status === "pending") return "Confirming the USDG transfer…";
-  return `Transfer status: ${statusLabel(status)}.`;
-}
-
-async function waitForHash(hash: Hex, chainId: number) {
-  const chain = appChains.find((c) => c.id === chainId);
-  const client = createPublicClient({
-    chain: chain ?? appChains[0],
-    transport: http(chain?.rpcUrls.default.http[0]),
-  });
-  await client.waitForTransactionReceipt({ hash, timeout: 180_000 });
-  return hash;
+function payerBalanceState(input: {
+  loading: boolean;
+  error: boolean;
+  exists: boolean | undefined;
+  hasTrustline: boolean | undefined;
+  balance: bigint | undefined;
+  required: bigint | null;
+}): DirectPayBalance {
+  if (input.error) return "unavailable";
+  if (input.loading || input.balance === undefined || input.required === null) return "loading";
+  if (!input.exists || !input.hasTrustline) return "no_trustline";
+  return input.balance < input.required ? "short" : "ready";
 }
 
 export function usePayFlow(publicId: string) {
   const request = useQuery(api.paymentRequests.getByPublicId, { publicId });
   const { results: attempts } = usePaginatedQuery(
-    api.paymentAttempts.listByRequest,
+    api.settlementAttempts.listByRequest,
     { publicId },
     { initialNumItems: 20 },
   );
-  const quoteSwap = useAction(api.across.quoteSwap);
-  const quoteEthToUsdg = useAction(api.zerox.quoteEthToUsdg);
-  const submitDeposit = useAction(api.across.submitDeposit);
-  const submitDirect = useAction(api.directSettlement.submitDirect);
-  const submitEthSwap = useAction(api.zerox.submitEthSwap);
-  const syncStatus = useAction(api.across.syncDepositStatus);
+  const submitDirect = useAction(api.settlement.submitDirect);
+  const listRoutes = useAction(api.nearIntents.listRoutes);
+  const createDeposit = useAction(api.nearIntents.createDeposit);
+  const syncDeposit = useAction(api.nearIntents.syncDeposit);
 
-  const { address, chainId, isConnected } = useAccount();
-  const { switchChainAsync } = useSwitchChain();
-  const { sendTransactionAsync } = useSendTransaction();
+  const [method, setMethod] = useState<PayMethod>("stellar");
+  const [payerAddress, setPayerAddress] = useState<string | undefined>();
+  const [connecting, setConnecting] = useState(false);
+  const [step, setStep] = useState<PayStep>("idle");
+  const [statusMsg, setStatusMsg] = useState<string | null>(null);
+  const [settledHash, setSettledHash] = useState<string | null>(null);
+  const [sentPayment, setSentPayment] = useState<SentPayment | null>(null);
+  const [verifying, setVerifying] = useState(false);
+  const payLock = useRef(false);
 
-  const [state, dispatch] = useReducer(payFlowReducer, initialPayFlowState);
-  const quoteGeneration = useRef(0);
-  const {
-    chains,
-    tokens,
-    originChainId,
-    inputToken,
-    quote,
-    ethQuote,
-    tradeType,
-    quoteError,
-    step,
-    statusMsg,
-    depositTxnRef,
-    pendingTx,
-    unverifiedPayment,
-    verifying,
-  } = state;
+  const [routes, setRoutes] = useState<PayRoute[]>([]);
+  const [routesError, setRoutesError] = useState<string | null>(null);
+  const [network, setNetwork] = useState("");
+  const [assetId, setAssetId] = useState("");
+  const [refundTo, setRefundTo] = useState("");
+  const [depositId, setDepositId] = useState<Id<"settlementAttempts"> | null>(null);
+  const [creatingDeposit, setCreatingDeposit] = useState(false);
+  const [depositError, setDepositError] = useState<string | null>(null);
 
-  const { isSuccess: txSuccess, isError: txError } = useWaitForTransactionReceipt({
-    hash: pendingTx,
-  });
+  const recipient = request?.recipientAddress;
+  /** Requests from before the Stellar cutover point at an EVM address. */
+  const legacyRequest = Boolean(recipient) && !isStellarAccount(recipient as string);
+  const required = useMemo(
+    () => (request && !legacyRequest ? usdMicrosToStroops(request.amountUsdMicros) : null),
+    [request, legacyRequest],
+  );
 
-  const chainOptions: ChainOption[] = useMemo(() => {
-    return [...chains]
-      .sort((a, b) => {
-        const ai = CHAIN_ORDER.indexOf(a.chainId);
-        const bi = CHAIN_ORDER.indexOf(b.chainId);
-        return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+  const payer = useStellarAccount(method === "stellar" ? payerAddress : undefined);
+  const recipientAccount = useStellarAccount(legacyRequest ? undefined : recipient);
+  const directBalance: DirectPayBalance | null = payerAddress
+    ? payerBalanceState({
+        loading: payer.isLoading,
+        error: payer.isError,
+        exists: payer.data?.exists,
+        hasTrustline: payer.data?.hasUsdcTrustline,
+        balance: payer.data?.usdcBalance,
+        required,
       })
-      .map((c) => ({
-        value: String(c.chainId),
-        name: c.name.replace(" Smart Chain", "").replace(" Chain", ""),
-        logoUrl: c.logoUrl,
-      }));
-  }, [chains]);
+    : null;
+  const recipientReady = recipientAccount.data?.hasUsdcTrustline ?? false;
 
-  const tokenOptions: TokenOption[] = useMemo(() => {
-    if (!originChainId) return [];
-    const options: Array<TokenOption & { sortSymbol: string }> = [];
-    for (const t of tokens) {
-      if (t.chainId !== originChainId || !isPayerTokenAllowed(t.symbol, t.address, originChainId)) {
-        continue;
-      }
-      options.push({
-        value: t.address.toLowerCase(),
-        symbol: displayTokenSymbol(t.symbol),
-        logoUrl: t.logoUrl,
-        sortSymbol: t.symbol.toUpperCase(),
-      });
-    }
-    options.sort((a, b) => {
-      const sa = SYMBOL_ORDER.indexOf(a.sortSymbol);
-      const sb = SYMBOL_ORDER.indexOf(b.sortSymbol);
-      return (sa === -1 ? 999 : sa) - (sb === -1 ? 999 : sb);
-    });
-    return options.map(({ sortSymbol: _s, ...option }) => option);
-  }, [tokens, originChainId]);
+  const activeDeposit = useMemo(
+    () => attempts?.find((attempt) => attempt._id === depositId) ?? null,
+    [attempts, depositId],
+  );
 
-  function onChainChange(value: string) {
-    dispatch({ type: "originChainChanged", chainId: Number(value) });
-  }
-
-  function onTokenChange(value: string) {
-    const direct = isDirectUsdgPay(originChainId, value);
-    dispatch({
-      type: "inputTokenChanged",
-      token: value,
-      nextStep: !direct && isConnected && address ? "quoting" : "idle",
-    });
-  }
-
+  // Restore a payment or deposit that was in flight when the tab closed.
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const [c, t] = await Promise.all([fetchAcrossChains(), fetchAcrossTokens()]);
-        if (cancelled) return;
-        dispatch({
-          type: "routesLoaded",
-          chains: c.filter((ch) => PAYER_CHAIN_IDS.has(ch.chainId)),
-          tokens: t.filter(
-            (token) =>
-              PAYER_CHAIN_IDS.has(token.chainId) &&
-              isPayerTokenAllowed(token.symbol, token.address, token.chainId),
-          ),
-        });
-      } catch (e) {
-        if (!cancelled) {
-          dispatch({
-            type: "routesFailed",
-            error: userFacingError(
-              e,
-              "Chains and tokens could not be loaded. Refresh and try again.",
-            ),
-          });
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (originChainId !== null || !chains.length) return;
-    const base = chains.find((c) => c.chainId === 8453) ?? chains[0];
-    if (base) dispatch({ type: "preferOriginChain", chainId: base.chainId });
-  }, [chains, originChainId]);
-
-  useEffect(() => {
-    if (!originChainId || !inputToken) return;
-    const stillValid = tokens.some(
-      (t) =>
-        t.chainId === originChainId &&
-        t.address.toLowerCase() === inputToken.toLowerCase() &&
-        isPayerTokenAllowed(t.symbol, t.address, originChainId),
-    );
-    if (!stillValid) dispatch({ type: "clearInvalidToken" });
-  }, [originChainId, tokens, inputToken]);
-
-  const directPay = isDirectUsdgPay(originChainId, inputToken);
-  const robinhoodEth = isRobinhoodEthPay(originChainId, inputToken);
-  const {
-    data: usdgBalance,
-    isPending: usdgBalancePending,
-    isError: usdgBalanceError,
-  } = useReadContract({
-    address: ROBINHOOD_USDG.address as Address,
-    abi: erc20Abi,
-    functionName: "balanceOf",
-    args: address ? [address] : undefined,
-    chainId: ROBINHOOD_USDG.chainId,
-    query: { enabled: Boolean(address && directPay) },
-  });
-  const {
-    data: nativeBalance,
-    isPending: ethBalancePending,
-    isError: ethBalanceError,
-  } = useBalance({
-    address,
-    chainId: ROBINHOOD_USDG.chainId,
-    query: { enabled: Boolean(address && robinhoodEth) },
-  });
-
-  const refreshQuote = useCallback(async () => {
-    if (!request || !address || !originChainId || !inputToken) return;
-    if (isDirectUsdgPay(originChainId, inputToken)) return;
-    if (request.status !== "open" && request.status !== "pending") return;
-
-    if (isRobinhoodEthPay(originChainId, inputToken)) {
-      const generation = ++quoteGeneration.current;
-      dispatch({ type: "quoteStarted" });
-      try {
-        const raw = await quoteEthToUsdg({ publicId, taker: address });
-        if (quoteGeneration.current !== generation) return;
-        dispatch({ type: "ethQuoteSucceeded", quote: raw });
-      } catch (e) {
-        if (quoteGeneration.current !== generation) return;
-        dispatch({
-          type: "quoteFailed",
-          error: userFacingError(e, "No route is available for this token. Try another one."),
-        });
-      }
-      return;
-    }
-
-    const generation = ++quoteGeneration.current;
-    dispatch({ type: "quoteStarted" });
-    try {
-      let raw;
-      let tt: "exactOutput" | "minOutput" = "exactOutput";
-      try {
-        raw = await quoteSwap({
-          publicId,
-          inputToken,
-          originChainId,
-          depositor: address,
-          tradeType: "exactOutput",
-        });
-      } catch {
-        tt = "minOutput";
-        raw = await quoteSwap({
-          publicId,
-          inputToken,
-          originChainId,
-          depositor: address,
-          tradeType: "minOutput",
-        });
-      }
-      if (quoteGeneration.current !== generation) return;
-      const q = raw as AcrossSwapQuote;
-      if (q.quoteExpiryTimestamp && q.quoteExpiryTimestamp * 1000 < Date.now()) {
-        throw new Error("Quote expired before display — try again");
-      }
-      dispatch({ type: "quoteSucceeded", quote: q, tradeType: tt });
-    } catch (e) {
-      if (quoteGeneration.current !== generation) return;
-      dispatch({
-        type: "quoteFailed",
-        error: userFacingError(e, "No route is available for this token. Try another one."),
-      });
-    }
-  }, [request, address, originChainId, inputToken, publicId, quoteSwap, quoteEthToUsdg]);
-
-  useEffect(() => {
-    if (!isConnected || !address || !request) return;
-    if (request.status !== "open" && request.status !== "pending") return;
-    if (!originChainId || !inputToken) return;
-    if (isDirectUsdgPay(originChainId, inputToken)) {
-      quoteGeneration.current += 1;
-      return;
-    }
-    void refreshQuote();
-  }, [isConnected, address, request, originChainId, inputToken, refreshQuote]);
-
-  useEffect(() => {
-    if (!depositTxnRef || !request) return;
-    if (request.status === "completed") {
-      dispatch({ type: "paymentDone" });
-      return;
-    }
-
-    let cancelled = false;
-    dispatch({ type: "stepChanged", step: "tracking" });
-
-    const poll = async () => {
-      try {
-        const result = await syncStatus({ depositTxnRef });
-        if (cancelled) return;
-        if (result.acrossStatus === "filled" || result.requestStatus === "completed") {
-          dispatch({
-            type: "paymentDone",
-            message: "Payment settled on Robinhood Chain.",
-          });
-          return;
-        }
-        if (result.attemptStatus === "failed") {
-          dispatch({
-            type: "paymentFailed",
-            message: result.reason ?? "The fill did not match this request.",
-          });
-          return;
-        }
-        if (result.acrossStatus === "expired" || result.acrossStatus === "refunded") {
-          dispatch({
-            type: "paymentFailed",
-            message:
-              result.acrossStatus === "refunded"
-                ? "This transfer was refunded. You can try again."
-                : "This transfer expired. Funds will be refunded. You can try again.",
-          });
-          return;
-        }
-        dispatch({
-          type: "statusChanged",
-          message: settlementStatusCopy(result.acrossStatus, directPay || robinhoodEth),
-        });
-      } catch (e) {
-        if (!cancelled) {
-          dispatch({
-            type: "statusChanged",
-            message: userFacingError(e, "Settlement status could not be refreshed."),
-          });
-        }
-      }
-    };
-
-    void poll();
-    const id = setInterval(() => void poll(), 10_000);
-    return () => {
-      cancelled = true;
-      clearInterval(id);
-    };
-  }, [depositTxnRef, request, syncStatus, directPay, robinhoodEth]);
-
-  useEffect(() => {
-    const saved = window.sessionStorage.getItem(trackedDepositKey(publicId));
-    if (saved) {
-      window.sessionStorage.removeItem(unverifiedPaymentKey(publicId));
-      dispatch({ type: "depositTracked", depositTxnRef: saved });
-      return;
+    const savedDeposit = window.sessionStorage.getItem(trackedDepositKey(publicId));
+    if (savedDeposit) {
+      setDepositId(savedDeposit as Id<"settlementAttempts">);
+      setMethod("route");
     }
     const raw = window.sessionStorage.getItem(unverifiedPaymentKey(publicId));
     if (!raw) return;
@@ -402,323 +117,263 @@ export function usePayFlow(publicId: string) {
       window.sessionStorage.removeItem(unverifiedPaymentKey(publicId));
       return;
     }
-    dispatch({ type: "pendingTxSet", hash: payment.hash });
-    dispatch({
-      type: "paymentUnverified",
-      payment,
-      message: RESTORED_PAYMENT_MESSAGE,
-    });
+    setSentPayment(payment);
+    setStep("error");
+    setStatusMsg(RESTORED_PAYMENT_MESSAGE);
   }, [publicId]);
 
-  const selectedToken = useMemo(
+  useEffect(() => {
+    if (method !== "route" || routes.length > 0) return;
+    let cancelled = false;
+    void listRoutes({})
+      .then((rows) => {
+        if (cancelled) return;
+        setRoutes(rows);
+        setRoutesError(null);
+        setNetwork((current) => current || rows[0]?.blockchain || "");
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        setRoutesError(
+          userFacingError(error, "Networks and tokens could not be loaded. Refresh and try again."),
+        );
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [method, routes.length, listRoutes]);
+
+  // Follow a live deposit, so a settled request updates while this page stays open.
+  useEffect(() => {
+    if (!activeDeposit) return;
+    if (activeDeposit.status !== "awaiting_deposit" && activeDeposit.status !== "processing") {
+      return;
+    }
+    const id = activeDeposit._id;
+    const poll = () => {
+      void syncDeposit({ attemptId: id }).catch((error: unknown) => {
+        console.error("deposit_sync_failed", {
+          attemptId: id,
+          message: error instanceof Error ? error.message : String(error),
+        });
+      });
+    };
+    poll();
+    const timer = setInterval(poll, DEPOSIT_POLL_MS);
+    return () => clearInterval(timer);
+  }, [activeDeposit, syncDeposit]);
+
+  const networks = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const route of routes) seen.set(route.blockchain, route.network);
+    return [...seen].map(([value, name]) => ({ value, name }));
+  }, [routes]);
+
+  const tokens = useMemo(
     () =>
-      tokens.find(
-        (t) => t.chainId === originChainId && t.address.toLowerCase() === inputToken.toLowerCase(),
-      ),
-    [tokens, originChainId, inputToken],
+      routes
+        .filter((route) => route.blockchain === network)
+        .map((route) => ({ value: route.assetId, symbol: route.symbol })),
+    [routes, network],
   );
 
-  function rememberSentPayment(sent: SentPayment) {
-    window.sessionStorage.setItem(unverifiedPaymentKey(publicId), JSON.stringify(sent));
+  function onNetworkChange(value: string) {
+    setNetwork(value);
+    setAssetId("");
+    setDepositError(null);
   }
 
-  async function recordSentPayment(sent: SentPayment) {
-    rememberSentPayment(sent);
+  async function connect() {
+    if (connecting) return;
+    setConnecting(true);
+    setStatusMsg(null);
+    if (step === "error") setStep("idle");
     try {
-      await waitForHash(sent.hash, sent.chainId);
-      const tracked = sent.hash.toLowerCase();
-      if (sent.kind === "across") {
-        await submitDeposit({
+      const { connectPayerWallet } = await import("@/lib/wallet-kit");
+      const address = await connectPayerWallet();
+      setPayerAddress(address);
+      console.log("payer_wallet_connected", { address });
+    } catch (error) {
+      console.error("payer_wallet_connect_failed", {
+        message: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setConnecting(false);
+    }
+  }
+
+  const recordSentPayment = useCallback(
+    async (sent: SentPayment) => {
+      try {
+        const result = await submitDirect({
           publicId,
           payerAddress: sent.payerAddress,
-          ...sent.details,
-          depositTxnRef: tracked,
+          txHash: sent.hash,
         });
-      } else if (sent.kind === "direct") {
-        await submitDirect({ publicId, payerAddress: sent.payerAddress, depositTxnRef: tracked });
-      } else {
-        await submitEthSwap({ publicId, payerAddress: sent.payerAddress, depositTxnRef: tracked });
+        window.sessionStorage.removeItem(unverifiedPaymentKey(publicId));
+        setSentPayment(null);
+        setSettledHash(sent.hash);
+        setStep("done");
+        setStatusMsg(
+          result.status === "settled"
+            ? "Payment settled on Stellar."
+            : "Your payment arrived after this request closed. The recipient still received it.",
+        );
+      } catch (error) {
+        console.error("payment_verification_failed", {
+          publicId,
+          txHash: sent.hash,
+          message: error instanceof Error ? error.message : String(error),
+        });
+        setSentPayment(sent);
+        setStep("error");
+        setStatusMsg(unverifiedPaymentMessage(error));
       }
-      window.sessionStorage.setItem(trackedDepositKey(publicId), tracked);
-      window.sessionStorage.removeItem(unverifiedPaymentKey(publicId));
-      dispatch({
-        type: "depositTracked",
-        depositTxnRef: tracked,
-        message: TRACKED_MESSAGE[sent.kind],
+    },
+    [publicId, submitDirect],
+  );
+
+  async function executePayment() {
+    if (payLock.current || !request || !payerAddress || required === null) return;
+    payLock.current = true;
+    setStep("paying");
+    setStatusMsg(null);
+    try {
+      const [
+        { buildUsdcPaymentTx, parseTransaction, transactionHashHex, TX_TIMEOUT_SECONDS },
+        kit,
+      ] = await Promise.all([import("@/lib/stellar/tx"), import("@/lib/wallet-kit")]);
+      const account = await fetchAccountState(payerAddress);
+      if (!account.sequence) throw new Error("This wallet doesn't have a Stellar account yet.");
+
+      const tx = buildUsdcPaymentTx({
+        source: payerAddress,
+        sequence: account.sequence,
+        memo: requestMemo(publicId),
+        payments: [{ destination: request.recipientAddress, stroops: required }],
       });
-    } catch (e) {
-      console.error("payment_verification_failed", {
-        publicId,
-        depositTxnRef: sent.hash,
-        kind: sent.kind,
-        message: e instanceof Error ? e.message : String(e),
-      });
-      dispatch({
-        type: "paymentUnverified",
-        payment: sent,
-        message: unverifiedPaymentMessage(e),
-      });
+      const signed = await kit.signWithPayerWallet(tx.toXDR(), payerAddress);
+      const sent: SentPayment = {
+        hash: transactionHashHex(parseTransaction(signed)),
+        payerAddress,
+        expiresAt: Math.floor(Date.now() / 1000) + TX_TIMEOUT_SECONDS,
+      };
+      // Saved before submitting. If the response is lost, the payer can't pay twice by accident.
+      window.sessionStorage.setItem(unverifiedPaymentKey(publicId), JSON.stringify(sent));
+      setSentPayment(sent);
+      try {
+        await submitEnvelope(signed);
+      } catch (error) {
+        if (error instanceof StellarSubmitError && !error.indeterminate) {
+          window.sessionStorage.removeItem(unverifiedPaymentKey(publicId));
+          setSentPayment(null);
+          throw error;
+        }
+        setStep("error");
+        setStatusMsg(unverifiedPaymentMessage(error));
+        return;
+      }
+      await recordSentPayment(sent);
+    } catch (error) {
+      setStep("error");
+      setStatusMsg(userFacingError(error, "Payment could not be submitted. Try again."));
+    } finally {
+      payLock.current = false;
     }
   }
 
   async function retryVerification() {
-    if (!unverifiedPayment || verifying) return;
-    dispatch({ type: "verificationStarted" });
-    await recordSentPayment(unverifiedPayment);
-  }
-
-  async function executeDirectPayment() {
-    if (!address || !request) return;
-    const required = /^\d+$/.test(request.outputAmountBaseUnits)
-      ? BigInt(request.outputAmountBaseUnits)
-      : null;
-    if (required === null || usdgBalance === undefined || usdgBalance < required) {
-      dispatch({
-        type: "paymentFailed",
-        message: "This wallet doesn't have enough USDG on Robinhood Chain.",
-      });
-      return;
-    }
-
-    let hash: Hex;
+    if (!sentPayment || verifying) return;
+    setVerifying(true);
+    setStatusMsg("Checking your payment…");
     try {
-      if (chainId !== ROBINHOOD_USDG.chainId) {
-        await switchChainAsync({ chainId: ROBINHOOD_USDG.chainId });
-      }
-      dispatch({ type: "stepChanged", step: "paying" });
-      const call = buildUsdgPaymentTransfer(
-        request.recipientAddress,
-        request.outputAmountBaseUnits,
-      );
-      hash = await sendTransactionAsync({
-        to: call.to,
-        data: call.data,
-        value: call.value,
-        chainId: ROBINHOOD_USDG.chainId,
-      });
-      dispatch({ type: "pendingTxSet", hash });
-    } catch (e) {
-      dispatch({
-        type: "paymentFailed",
-        message: userFacingError(e, "Payment could not be submitted. Try again."),
-      });
-      return;
-    }
-    await recordSentPayment({
-      kind: "direct",
-      hash,
-      chainId: ROBINHOOD_USDG.chainId,
-      payerAddress: address,
-    });
-  }
-
-  async function executeEthPayment() {
-    if (!address || !request || !ethQuote) return;
-    const shown = ethSpendBaseUnits(ethQuote);
-
-    let hash: Hex;
-    try {
-      const fresh = await quoteEthToUsdg({ publicId, taker: address });
-      if (ethSpendBaseUnits(fresh) > shown) {
-        dispatch({ type: "ethQuoteSucceeded", quote: fresh });
-        dispatch({
-          type: "statusChanged",
-          message: "The ETH price moved. Review the updated amount, then pay again.",
-        });
+      const found = await fetchTransaction(sentPayment.hash);
+      if (!found && Math.floor(Date.now() / 1000) > sentPayment.expiresAt) {
+        window.sessionStorage.removeItem(unverifiedPaymentKey(publicId));
+        setSentPayment(null);
+        setStep("idle");
+        setStatusMsg(
+          "That payment never reached the network, so nothing was sent. You can pay again.",
+        );
         return;
       }
-
-      if (chainId !== ROBINHOOD_USDG.chainId) {
-        await switchChainAsync({ chainId: ROBINHOOD_USDG.chainId });
-      }
-      dispatch({ type: "stepChanged", step: "paying" });
-      hash = await sendTransactionAsync({
-        to: fresh.transaction.to as Address,
-        data: fresh.transaction.data as Hex,
-        value: BigInt(fresh.transaction.value),
-        gas: fresh.transaction.gas ? BigInt(fresh.transaction.gas) : undefined,
-        chainId: ROBINHOOD_USDG.chainId,
-      });
-      dispatch({ type: "pendingTxSet", hash });
-    } catch (e) {
-      dispatch({
-        type: "paymentFailed",
-        message: userFacingError(e, "Payment could not be submitted. Try again."),
-      });
-      return;
+      await recordSentPayment(sentPayment);
+    } catch (error) {
+      setStatusMsg(unverifiedPaymentMessage(error));
+    } finally {
+      setVerifying(false);
     }
-    await recordSentPayment({
-      kind: "eth",
-      hash,
-      chainId: ROBINHOOD_USDG.chainId,
-      payerAddress: address,
-    });
   }
 
-  async function executePayment() {
-    if (directPay) {
-      await executeDirectPayment();
-      return;
-    }
-    if (robinhoodEth) {
-      await executeEthPayment();
-      return;
-    }
-    if (!quote?.swapTx || !address || !request || !originChainId || !inputToken) {
-      return;
-    }
-    if (quote.quoteExpiryTimestamp && quote.quoteExpiryTimestamp * 1000 < Date.now()) {
-      dispatch({
-        type: "quoteFailed",
-        error: "Quote expired — refreshing…",
-      });
-      await refreshQuote();
-      return;
-    }
-
-    let hash: Hex;
-    let swapChainId: number;
+  async function requestDeposit() {
+    if (creatingDeposit || !assetId || !refundTo.trim()) return;
+    setCreatingDeposit(true);
+    setDepositError(null);
     try {
-      if (chainId !== originChainId) {
-        await switchChainAsync({ chainId: originChainId });
-      }
-
-      if (quote.approvalTxns?.length) {
-        dispatch({ type: "stepChanged", step: "approving" });
-        // Approvals are ordered: each mined tx updates nonce/allowance for the next.
-        // react-doctor-disable-next-line react-doctor/async-await-in-loop
-        for (const approval of quote.approvalTxns) {
-          if (chainId !== approval.chainId) {
-            await switchChainAsync({ chainId: approval.chainId });
-          }
-          const hash = await sendTransactionAsync({
-            to: approval.to as Address,
-            data: approval.data as Hex,
-            chainId: approval.chainId,
-          });
-          dispatch({ type: "pendingTxSet", hash });
-          await waitForHash(hash, approval.chainId);
-        }
-      }
-
-      dispatch({ type: "stepChanged", step: "paying" });
-      const swap = quote.swapTx;
-      if (chainId !== swap.chainId) {
-        await switchChainAsync({ chainId: swap.chainId });
-      }
-      hash = await sendTransactionAsync({
-        to: swap.to as Address,
-        data: swap.data as Hex,
-        value: swap.value ? BigInt(swap.value) : undefined,
-        gas: swap.gas ? BigInt(swap.gas) : undefined,
-        chainId: swap.chainId,
-      });
-      swapChainId = swap.chainId;
-      dispatch({ type: "pendingTxSet", hash });
-    } catch (e) {
-      dispatch({
-        type: "paymentFailed",
-        message: userFacingError(e, "Payment could not be submitted. Try again."),
-      });
-      return;
+      const id = await createDeposit({ publicId, originAsset: assetId, refundTo: refundTo.trim() });
+      window.sessionStorage.setItem(trackedDepositKey(publicId), id);
+      setDepositId(id);
+    } catch (error) {
+      setDepositError(
+        userFacingError(error, "No route is available for this token. Try another one."),
+      );
+    } finally {
+      setCreatingDeposit(false);
     }
-    await recordSentPayment({
-      kind: "across",
-      hash,
-      chainId: swapChainId,
-      payerAddress: address,
-      details: {
-        originChainId,
-        inputToken,
-        quotedInputAmount: quote.inputAmount ?? quote.maxInputAmount ?? "0",
-        expectedOutputAmount: quote.expectedOutputAmount ?? request.outputAmountBaseUnits,
-        minOutputAmount: quote.minOutputAmount ?? request.outputAmountBaseUnits,
-        feesJson: JSON.stringify(quote.fees ?? {}),
-        quoteId: quote.id,
-      },
-    });
   }
 
-  const paymentInProgress = request?.status === "pending" && !depositTxnRef;
-  const fundingGap = quote ? quoteFundingGap(quote) : null;
-  const simulationBlocked =
-    quote?.swapTx?.simulationSuccess === false && fundingGap !== "allowance";
+  function clearDeposit() {
+    window.sessionStorage.removeItem(trackedDepositKey(publicId));
+    setDepositId(null);
+    setDepositError(null);
+  }
 
-  const requiredUsdg =
-    directPay && request && /^\d+$/.test(request.outputAmountBaseUnits)
-      ? BigInt(request.outputAmountBaseUnits)
-      : null;
-  const directBalance: DirectPayBalance | null = !directPay
-    ? null
-    : usdgBalanceError
-      ? "unavailable"
-      : usdgBalancePending || usdgBalance === undefined || requiredUsdg === null
-        ? "loading"
-        : usdgBalance < requiredUsdg
-          ? "short"
-          : "ready";
-
-  const requiredEth = robinhoodEth && ethQuote ? ethSpendBaseUnits(ethQuote) : null;
-  const ethBalance: DirectPayBalance | null = !robinhoodEth
-    ? null
-    : ethBalanceError
-      ? "unavailable"
-      : ethBalancePending || nativeBalance === undefined || requiredEth === null
-        ? "loading"
-        : nativeBalance.value < requiredEth
-          ? "short"
-          : "ready";
-
-  const payStepOpen =
-    !!request &&
-    request.status === "open" &&
-    !paymentInProgress &&
-    !unverifiedPayment &&
+  const paymentInProgress = request?.status === "pending" && !activeDeposit && !sentPayment;
+  const canPay =
+    request?.status === "open" &&
+    !legacyRequest &&
+    recipientReady &&
+    directBalance === "ready" &&
+    !sentPayment &&
     !verifying &&
-    step !== "approving" &&
     step !== "paying" &&
-    step !== "tracking" &&
     step !== "done";
-
-  const canPay = directPay
-    ? payStepOpen && directBalance === "ready"
-    : robinhoodEth
-      ? payStepOpen && ethBalance === "ready" && !quoteError
-      : payStepOpen && !!quote?.swapTx && !simulationBlocked && !quoteError;
 
   return {
     request,
     attempts,
-    isConnected,
-    originChainId,
-    inputToken,
-    chainOptions,
-    tokenOptions,
-    step,
-    quoteError,
-    quote,
-    ethQuote,
-    tradeType,
-    selectedToken,
-    chains,
-    directPay,
+    legacyRequest,
+    recipientReady,
+    recipientChecked: recipientAccount.isSuccess,
+    method,
+    setMethod,
+    payerAddress,
+    connecting,
+    connect,
     directBalance,
-    robinhoodEth,
-    ethBalance,
     canPay,
-    paymentInProgress,
-    payerAddress: address,
+    step,
     statusMsg,
-    pendingTx,
-    txSuccess,
-    txError,
-    depositTxnRef,
-    onChainChange,
-    onTokenChange,
-    paymentSent: Boolean(unverifiedPayment),
+    settledHash,
+    paymentSent: Boolean(sentPayment),
+    pendingHash: sentPayment?.hash ?? null,
     checkingPayment: verifying,
-    refreshQuote,
+    paymentInProgress: Boolean(paymentInProgress),
     executePayment,
     retryVerification,
+    networks,
+    tokens,
+    routesError,
+    network,
+    onNetworkChange,
+    assetId,
+    setAssetId,
+    refundTo,
+    setRefundTo,
+    creatingDeposit,
+    depositError,
+    activeDeposit,
+    requestDeposit,
+    clearDeposit,
   };
 }

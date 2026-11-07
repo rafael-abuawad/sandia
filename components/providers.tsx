@@ -4,12 +4,10 @@ import { useState } from "react";
 import { useTheme } from "next-themes";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { PrivyProvider } from "@privy-io/react-auth";
-import { WagmiProvider } from "@privy-io/wagmi";
 import { ConvexProviderWithAuth, ConvexReactClient } from "convex/react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useConvexPrivyAuth } from "@/lib/convex-privy-auth";
 import { privyConfig } from "@/lib/privy-config";
-import { wagmiConfig } from "@/lib/wagmi-config";
 
 const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
 const privyAppId = process.env.NEXT_PUBLIC_PRIVY_APP_ID;
@@ -70,11 +68,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
       }}
     >
       <QueryClientProvider client={queryClient}>
-        <WagmiProvider config={wagmiConfig}>
-          <ConvexProviderWithAuth client={convex} useAuth={useConvexPrivyAuth}>
-            <TooltipProvider delayDuration={200}>{children}</TooltipProvider>
-          </ConvexProviderWithAuth>
-        </WagmiProvider>
+        <ConvexProviderWithAuth client={convex} useAuth={useConvexPrivyAuth}>
+          <TooltipProvider delayDuration={200}>{children}</TooltipProvider>
+        </ConvexProviderWithAuth>
       </QueryClientProvider>
     </PrivyProvider>
   );

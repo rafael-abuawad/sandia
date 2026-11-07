@@ -2,30 +2,28 @@ import { describe, expect, it } from "vitest";
 import { sendErrorMessage } from "./errors";
 
 describe("sendErrorMessage", () => {
-  it("treats nested wallet rejection as a cancellation", () => {
-    expect(
-      sendErrorMessage({
-        message: "Transaction failed",
-        cause: { code: 4001, message: "User rejected the request." },
-      }),
-    ).toBe("You canceled the send. Your USDG was not sent.");
+  it("explains a rejected signature", () => {
+    expect(sendErrorMessage({ code: 4001, message: "User rejected the request" })).toContain(
+      "You canceled the send",
+    );
   });
 
-  it("explains when Privy cannot sponsor the send", () => {
-    expect(sendErrorMessage(new Error("Gas sponsorship is not enabled."))).toContain(
+  it("explains unavailable sponsorship", () => {
+    expect(sendErrorMessage(new Error("Fee sponsorship isn't configured."))).toContain(
       "Fee sponsorship is unavailable",
     );
   });
 
-  it("does not expose technical error messages", () => {
-    expect(sendErrorMessage(new Error("RPC transport returned error at chain.ts:42"))).toBe(
-      "Robinhood Chain is temporarily unavailable. Check your connection and retry.",
-    );
+  it("explains network failures", () => {
+    expect(sendErrorMessage(new Error("Failed to fetch"))).toContain("temporarily unavailable");
   });
 
-  it("uses a safe fallback for unclassified provider details", () => {
-    expect(sendErrorMessage(new Error("secret provider response at internal.ts:42"))).toBe(
-      "Send could not be submitted.",
-    );
+  it("keeps recipient preflight messages", () => {
+    const message = "GABC…WXYZ hasn't enabled USDC on their account. Nothing was sent.";
+    expect(sendErrorMessage(new Error(message))).toBe(message);
+  });
+
+  it("hides unknown provider payloads", () => {
+    expect(sendErrorMessage(new Error('{"internal":"boom"}'), "Try again.")).toBe("Try again.");
   });
 });

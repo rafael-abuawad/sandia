@@ -21,10 +21,6 @@ export function LoginButton() {
     );
   }
 
-  if (authenticated && address) {
-    return <WalletAddress address={address} />;
-  }
-
   if (authenticated && failed) {
     return (
       <div className="w-full space-y-2">
@@ -36,6 +32,10 @@ export function LoginButton() {
         </Button>
       </div>
     );
+  }
+
+  if (authenticated && address) {
+    return <WalletAddress address={address} />;
   }
 
   if (authenticated) {

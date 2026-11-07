@@ -1,44 +1,35 @@
 import { describe, expect, it } from "vitest";
 import { parseStoredSentPayment, unverifiedPaymentMessage } from "./unverified-payment";
 
-const HASH = "0x146dd994926266aded947d58baba8d8ee40ea59dbd00be45ced1a151769a193d";
-const PAYER = "0xC14fF56E720f79d08413CE00533256433D2ED929";
+const HASH = "a".repeat(64);
+const PAYER = "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN";
 
 describe("parseStoredSentPayment", () => {
-  it("restores a direct USDG transfer", () => {
-    const raw = JSON.stringify({
-      kind: "direct",
-      hash: HASH,
-      chainId: 4663,
-      payerAddress: PAYER,
-    });
-    expect(parseStoredSentPayment(raw)).toEqual({
-      kind: "direct",
-      hash: HASH,
-      chainId: 4663,
-      payerAddress: PAYER,
-    });
+  it("restores a sent payment", () => {
+    const payment = { hash: HASH, payerAddress: PAYER, expiresAt: 1_800_000_000 };
+    expect(parseStoredSentPayment(JSON.stringify(payment))).toEqual(payment);
   });
 
   it("drops a truncated hash", () => {
-    const raw = JSON.stringify({
-      kind: "direct",
-      hash: "0x146d",
-      chainId: 4663,
-      payerAddress: PAYER,
-    });
-    expect(parseStoredSentPayment(raw)).toBe(null);
+    expect(
+      parseStoredSentPayment(JSON.stringify({ hash: "abc", payerAddress: PAYER, expiresAt: 1 })),
+    ).toBe(null);
   });
 
-  it("drops invalid JSON", () => {
-    expect(parseStoredSentPayment("{")).toBe(null);
+  it("drops an EVM payer and invalid JSON", () => {
+    expect(
+      parseStoredSentPayment(
+        JSON.stringify({ hash: HASH, payerAddress: `0x${"1".repeat(40)}`, expiresAt: 1 }),
+      ),
+    ).toBe(null);
+    expect(parseStoredSentPayment("{nope")).toBe(null);
   });
 });
 
 describe("unverifiedPaymentMessage", () => {
-  it("keeps the server reason and the do-not-pay-again warning as two sentences", () => {
-    expect(unverifiedPaymentMessage(new Error("Same-chain pay only settles USDG"))).toBe(
-      "Same-chain pay only settles USDG. Your payment was already sent, so don't pay again.",
+  it("warns against paying twice", () => {
+    expect(unverifiedPaymentMessage(new Error("Stellar is slow."))).toBe(
+      "Stellar is slow. Your payment was already sent, so don't pay again.",
     );
   });
 });

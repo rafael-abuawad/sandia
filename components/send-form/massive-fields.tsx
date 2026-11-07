@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { AddressBookButton } from "@/components/address-book/contact-picker";
 import { TokenChainChip } from "@/components/token-chain-select";
-import { ROBINHOOD_USDG } from "@/lib/destination";
+import { STELLAR_USDC } from "@/lib/stellar/constants";
 import { parseRecipientsCsv, type SendFieldErrors } from "@/components/send-form/helpers";
 import type { RecipientRow, SendFormAction } from "@/components/send-form/state";
 
@@ -47,19 +47,21 @@ export function MassiveSendFields({
 
   return (
     <>
-      <p className="pr-help">Send different USDG amounts to multiple recipients in one batch.</p>
+      <p className="pr-help">
+        Send different USDC amounts to up to 100 recipients in one transaction. A recipient that
+        needs a memo should use its M… address.
+      </p>
       <TokenChainChip
-        tokenSymbol={ROBINHOOD_USDG.symbol}
-        tokenLogoUrl={ROBINHOOD_USDG.logoUrl}
-        chainName={ROBINHOOD_USDG.chainName}
-        chainLogoUrl={ROBINHOOD_USDG.chainLogoUrl}
-        chainId={ROBINHOOD_USDG.chainId}
+        tokenSymbol={STELLAR_USDC.symbol}
+        tokenLogoUrl={STELLAR_USDC.logoUrl}
+        chainName={STELLAR_USDC.chainName}
+        chainLogoUrl={STELLAR_USDC.chainLogoUrl}
       />
       <div className="space-y-3">
         <div className="flex items-end justify-between gap-3">
           <p className="text-sm font-medium">Recipients</p>
           {liveTotalLabel ? (
-            <p className="pr-mono text-xs text-muted">Total {liveTotalLabel} USDG</p>
+            <p className="pr-mono text-xs text-muted">Total {liveTotalLabel} USDC</p>
           ) : null}
         </div>
         <ul className="space-y-3">
@@ -93,7 +95,7 @@ export function MassiveSendFields({
                           patch: { address: e.target.value },
                         })
                       }
-                      placeholder="0x…"
+                      placeholder="G…"
                       required
                       aria-invalid={Boolean(fieldErrors[row.id]?.address) || undefined}
                       aria-describedby={
@@ -115,7 +117,7 @@ export function MassiveSendFields({
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor={`send-amt-${row.id}`}>Amount (USDG)</Label>
+                  <Label htmlFor={`send-amt-${row.id}`}>Amount (USDC)</Label>
                   <Input
                     id={`send-amt-${row.id}`}
                     inputMode="decimal"
@@ -172,9 +174,9 @@ export function MassiveSendFields({
           CSV format: address,amount (header optional). Replaces the current recipient list.{" "}
           <a
             href={`data:text/csv;charset=utf-8,${encodeURIComponent(
-              "address,amount\n0x0000000000000000000000000000000000000001,10.00\n0x0000000000000000000000000000000000000002,25.50\n",
+              "address,amount\nGA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN,10.00\nGBD7QFQVR4QWNEJSHP4VN7RAAUKXTMZ4EJ4EBMCR7CP3HMF7RXEASTD7,25.50\n",
             )}`}
-            download="usdg-send-template.csv"
+            download="usdc-send-template.csv"
             className="font-medium text-foreground underline underline-offset-2 hover:text-foreground"
           >
             Download template

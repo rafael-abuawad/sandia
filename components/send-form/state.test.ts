@@ -4,7 +4,7 @@ import { createInitialSendFormState, sendFormReducer } from "./state";
 
 describe("sendFormReducer", () => {
   it("keeps the selected contact in the single send compose state", () => {
-    const address = "0x1111111111111111111111111111111111111111";
+    const address = "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN";
     const state = sendFormReducer(createInitialSendFormState(), {
       type: "setSingleAddress",
       address,
@@ -15,7 +15,7 @@ describe("sendFormReducer", () => {
   });
 
   it("can review a send immediately after selecting a saved contact", () => {
-    const address = "0x1111111111111111111111111111111111111111";
+    const address = "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN";
     const state = sendFormReducer(createInitialSendFormState(), {
       type: "setSingleAddress",
       address,
@@ -31,11 +31,11 @@ describe("sendFormReducer", () => {
   });
 
   it("retains a submitted hash as pending so confirmation cannot submit again", () => {
-    const hash = `0x${"a".repeat(64)}` as const;
+    const hash = "a".repeat(64);
     const state = sendFormReducer(createInitialSendFormState(), {
       type: "transactionSubmitted",
       stage: "transfer",
-      label: "Confirm USDG transfer",
+      label: "Confirm USDC transfer",
       hash,
     });
     const pending = sendFormReducer(state, { type: "transactionPending" });

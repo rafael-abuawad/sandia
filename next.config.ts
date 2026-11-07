@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 import imageLoader from "./lib/image-loader";
 
 const nextConfig: NextConfig = {
-  transpilePackages: ["@privy-io/react-auth", "@privy-io/wagmi"],
+  transpilePackages: ["@privy-io/react-auth"],
   logging: {
     incomingRequests: {
       ignore: [/\/json(\/|$)/],
@@ -16,8 +16,18 @@ const nextConfig: NextConfig = {
         permanent: true,
       },
       {
+        source: "/stocks/:path*",
+        destination: "/",
+        permanent: true,
+      },
+      {
+        source: "/earn",
+        destination: "/",
+        permanent: true,
+      },
+      {
         source: "/lending",
-        destination: "/earn",
+        destination: "/",
         permanent: true,
       },
     ];

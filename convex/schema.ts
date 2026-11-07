@@ -10,17 +10,17 @@ export const paymentRequestStatus = v.union(
   v.literal("failed"),
 );
 
-export const acrossAttemptStatus = v.union(
-  v.literal("submitted"),
-  v.literal("pending"),
-  v.literal("filled"),
+export const settlementStatus = v.union(
+  v.literal("awaiting_deposit"),
+  v.literal("processing"),
+  v.literal("settled"),
   v.literal("expired"),
   v.literal("refunded"),
   v.literal("failed"),
   v.literal("ignored_duplicate"),
 );
 
-export const settlementKind = v.union(v.literal("across"), v.literal("direct"));
+export const settlementKind = v.union(v.literal("direct"), v.literal("near_intents"));
 
 export const activityStatus = v.union(
   v.literal("submitted"),
@@ -35,6 +35,7 @@ export default defineSchema({
     email: v.optional(v.string()),
     authIssuer: v.optional(v.string()),
     authSubject: v.optional(v.string()),
+    // Legacy account-abstraction fields. Rows written before the Stellar cutover may carry them.
     smartAccountAddress: v.optional(v.string()),
     kernelVersion: v.optional(v.string()),
     entryPointVersion: v.optional(v.string()),
@@ -52,7 +53,8 @@ export default defineSchema({
     creatorAddress: v.string(),
     amountUsdMicros: v.number(),
     recipientAddress: v.string(),
-    destinationChainId: v.number(),
+    // Legacy. Requests from before the Stellar cutover carry a chain id, and are no longer payable.
+    destinationChainId: v.optional(v.number()),
     destinationTokenSymbol: v.string(),
     destinationTokenAddress: v.string(),
     destinationTokenDecimals: v.number(),
@@ -69,43 +71,54 @@ export default defineSchema({
     .index("by_status", ["status"])
     .index("by_status_and_expiresAt", ["status", "expiresAt"]),
 
-  paymentAttempts: defineTable({
+  settlementAttempts: defineTable({
     requestId: v.id("paymentRequests"),
-    payerAddress: v.string(),
-    originChainId: v.number(),
-    inputToken: v.string(),
-    quotedInputAmount: v.string(),
-    expectedOutputAmount: v.string(),
-    minOutputAmount: v.string(),
-    feesJson: v.string(),
-    quoteId: v.optional(v.string()),
-    depositTxnRef: v.optional(v.string()),
-    fillTxnRef: v.optional(v.string()),
-    acrossStatus: acrossAttemptStatus,
-    settlementKind: v.optional(settlementKind),
+    kind: settlementKind,
+    status: settlementStatus,
+    /** The Stellar transaction that paid the recipient. Unique, so a payment settles once. */
+    txHash: v.optional(v.string()),
+    payerAddress: v.optional(v.string()),
+    amountBaseUnits: v.string(),
+    // NEAR Intents deposit details.
+    originAsset: v.optional(v.string()),
+    originSymbol: v.optional(v.string()),
+    originChain: v.optional(v.string()),
+    originDecimals: v.optional(v.number()),
+    depositAddress: v.optional(v.string()),
+    depositMemo: v.optional(v.string()),
+    amountIn: v.optional(v.string()),
+    minAmountIn: v.optional(v.string()),
+    refundTo: v.optional(v.string()),
+    deadline: v.optional(v.number()),
+    timeEstimate: v.optional(v.number()),
+    correlationId: v.optional(v.string()),
+    quoteSignature: v.optional(v.string()),
     failureReason: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index("by_request", ["requestId"])
-    .index("by_depositTxnRef", ["depositTxnRef"])
-    .index("by_acrossStatus", ["acrossStatus"]),
+    .index("by_txHash", ["txHash"])
+    .index("by_status", ["status"])
+    .index("by_depositAddress", ["depositAddress"]),
 
   contacts: defineTable({
     userId: v.id("users"),
     name: v.string(),
     address: v.string(),
+    /** Memo some recipients, such as exchanges, require on incoming payments. */
+    memo: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index("by_user", ["userId"])
     .index("by_user_and_address", ["userId", "address"]),
 
-  outboundTransfers: defineTable({
+  sends: defineTable({
     userId: v.id("users"),
-    userOpHash: v.string(),
-    bundleTxHash: v.optional(v.string()),
+    txHash: v.string(),
     callsJson: v.string(),
+    memo: v.optional(v.string()),
     status: activityStatus,
     failureReason: v.optional(v.string()),
     createdAt: v.number(),
@@ -113,35 +126,12 @@ export default defineSchema({
   })
     .index("by_user", ["userId"])
     .index("by_status", ["status"])
-    .index("by_userOpHash", ["userOpHash"]),
+    .index("by_txHash", ["txHash"]),
 
-  swapFills: defineTable({
+  /** Hourly count of transactions the Sandia sponsor paid for, per user. */
+  sponsorUsage: defineTable({
     userId: v.id("users"),
-    symbol: v.string(),
-    sellToken: v.string(),
-    buyToken: v.string(),
-    sellAmount: v.string(),
-    buyAmount: v.optional(v.string()),
-    minBuyAmount: v.optional(v.string()),
-    userOpHash: v.optional(v.string()),
-    status: activityStatus,
-    failureReason: v.optional(v.string()),
-    createdAt: v.number(),
-    updatedAt: v.number(),
-  }).index("by_user", ["userId"]),
-
-  vaultActivities: defineTable({
-    userId: v.id("users"),
-    vaultAddress: v.string(),
-    kind: v.union(v.literal("deposit"), v.literal("withdraw"), v.literal("redeem")),
-    assets: v.string(),
-    shares: v.optional(v.string()),
-    userOpHash: v.optional(v.string()),
-    status: activityStatus,
-    failureReason: v.optional(v.string()),
-    createdAt: v.number(),
-    updatedAt: v.number(),
-  })
-    .index("by_user", ["userId"])
-    .index("by_userOpHash", ["userOpHash"]),
+    windowStart: v.number(),
+    count: v.number(),
+  }).index("by_user_and_window", ["userId", "windowStart"]),
 });

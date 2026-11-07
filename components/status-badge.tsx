@@ -7,6 +7,9 @@ const STATUS_VARIANT: Record<string, "accent" | "warning" | "success" | "neutral
   refunded: "warning",
   completed: "success",
   filled: "success",
+  settled: "success",
+  processing: "warning",
+  awaiting_deposit: "accent",
   expired: "neutral",
   cancelled: "neutral",
   failed: "danger",
@@ -14,9 +17,12 @@ const STATUS_VARIANT: Record<string, "accent" | "warning" | "success" | "neutral
 
 const STATUS_LABEL: Record<string, string> = {
   open: "Open",
-  pending: "Bridging",
+  pending: "Processing",
   submitted: "Submitted",
   filled: "Complete",
+  settled: "Complete",
+  processing: "Processing",
+  awaiting_deposit: "Awaiting deposit",
   completed: "Complete",
   expired: "Expired",
   cancelled: "Cancelled",

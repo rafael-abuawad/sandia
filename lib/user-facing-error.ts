@@ -1,5 +1,5 @@
 const TECHNICAL =
-  /\[CONVEX\b|Request ID:|Server Error|Uncaught |Called by client|\bat\s+\S+\.(?:ts|tsx|js|jsx)\b|maxDeposit|Morpho returned/i;
+  /\[CONVEX\b|Request ID:|Server Error|Uncaught |Called by client|\bat\s+\S+\.(?:ts|tsx|js|jsx)\b/i;
 
 const REPLACEMENTS: Array<[RegExp, string]> = [
   [/^user not found$/i, "Sign in again to continue."],
@@ -10,12 +10,6 @@ const REPLACEMENTS: Array<[RegExp, string]> = [
   [/^no valid route$/i, "No route is available for this token. Try another one."],
   [/^no executable quote/i, "No route is available for this token. Try another one."],
   [/^route simulation failed\b/i, "This route could not be quoted. Try another token."],
-  [
-    /0x did not return executable liquidity/i,
-    "Trading is unavailable until a quote shows liquidity.",
-  ],
-  [/^deposits are closed because maxdeposit is 0$/i, "Deposits are closed right now."],
-  [/^vault snapshot failed$/i, "Vault details are unavailable right now."],
 ];
 
 function innerMessage(raw: string): string {

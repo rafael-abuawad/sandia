@@ -1,244 +1,236 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { ROBINHOOD_USDG } from "@/lib/destination";
+import { Keypair } from "@stellar/stellar-sdk";
+import { describe, expect, it, vi } from "vitest";
 import type { ReviewPayload } from "@/components/send-form/state";
-import { executeSend, type SendExecutionClient } from "./execute";
+import { parseAccountState, type StellarAccountState } from "@/lib/stellar/horizon";
+import { STELLAR_USDC } from "@/lib/stellar/constants";
+import { parseTransaction, transactionHashHex } from "@/lib/stellar/tx";
+import {
+  callsForReview,
+  executeSend,
+  SendPendingError,
+  type SendDependencies,
+  type SubmittedSendTransaction,
+} from "./execute";
 
-const account = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" as const;
-const firstRecipient = "0x1111111111111111111111111111111111111111" as const;
-const secondRecipient = "0x2222222222222222222222222222222222222222" as const;
-const hashOne = `0x${"1".repeat(64)}` as const;
-const hashTwo = `0x${"2".repeat(64)}` as const;
+const user = Keypair.random();
+const account = user.publicKey();
+const alice = Keypair.random().publicKey();
+const bob = Keypair.random().publicKey();
 
-afterEach(() => vi.unstubAllEnvs());
+const review: ReviewPayload = {
+  mode: "single",
+  recipients: [{ address: alice, amountUsdMicros: 1_000_000 }],
+  totalUsdMicros: 1_000_000,
+};
 
-function review(recipients: ReviewPayload["recipients"]): ReviewPayload {
-  return {
-    mode: recipients.length === 1 ? "single" : "massive",
-    recipients,
-    totalUsdMicros: recipients.reduce((total, recipient) => total + recipient.amountUsdMicros, 0),
-  };
+function funded(balance = "100.0000000"): StellarAccountState {
+  return parseAccountState({
+    sequence: "7",
+    balances: [
+      {
+        asset_type: "credit_alphanum4",
+        asset_code: "USDC",
+        asset_issuer: STELLAR_USDC.issuer,
+        balance,
+      },
+    ],
+  });
 }
 
-function client(overrides: Partial<SendExecutionClient> = {}): SendExecutionClient {
+const missing: StellarAccountState = {
+  exists: false,
+  hasUsdcTrustline: false,
+  usdcBalance: 0n,
+  memoRequired: false,
+  sequence: null,
+};
+
+function deps(overrides: Partial<SendDependencies> = {}): SendDependencies {
   return {
-    readContract: async (request) => (request.functionName === "balanceOf" ? 100_000_000n : 0n),
-    call: async () => undefined,
-    waitForTransactionReceipt: async () => ({ status: "success" }),
+    loadAccount: vi.fn(async () => funded()),
+    lookupTransaction: vi.fn(async () => null),
+    sign: vi.fn(async (hash: string) =>
+      Buffer.from(user.sign(Buffer.from(hash, "hex"))).toString("hex"),
+    ),
+    submit: vi.fn(async () => ({ ok: true as const, hash: "f".repeat(64) })),
     ...overrides,
   };
 }
 
+function run(
+  overrides: Partial<SendDependencies> = {},
+  input: { review?: ReviewPayload; pending?: SubmittedSendTransaction | null; now?: number } = {},
+) {
+  const dependencies = deps(overrides);
+  const onSubmitted = vi.fn();
+  const onCleared = vi.fn();
+  const onAwaiting = vi.fn();
+  const promise = executeSend({
+    review: input.review ?? review,
+    account,
+    pending: input.pending ?? null,
+    deps: dependencies,
+    now: input.now === undefined ? undefined : () => input.now as number,
+    onAwaiting,
+    onSubmitted,
+    onCleared,
+  });
+  return { promise, dependencies, onSubmitted, onCleared, onAwaiting };
+}
+
 describe("executeSend", () => {
-  it("simulates and confirms a sponsored single transfer", async () => {
-    const events: string[] = [];
-    const result = await executeSend({
-      review: review([{ address: firstRecipient, amountUsdMicros: 10_000_000 }]),
-      account,
-      chainId: ROBINHOOD_USDG.chainId,
-      client: client({
-        readContract: async () => {
-          events.push("balance");
-          return 100_000_000n;
-        },
-        call: async () => {
-          events.push("simulate");
-        },
-        waitForTransactionReceipt: async () => {
-          events.push("receipt");
-          return { status: "success" };
-        },
-      }),
-      pending: null,
-      sendSponsored: async (_call, stage) => {
-        events.push(`sponsor:${stage}`);
-        return hashOne;
-      },
-      onSubmitted: () => events.push("submitted"),
-      onCleared: () => events.push("cleared"),
-    });
+  it("signs, submits, and scales amounts to 7 decimals", async () => {
+    const { promise, dependencies, onSubmitted } = run();
+    const result = await promise;
+    expect(result.hash).toBe("f".repeat(64));
+    expect(result.calls).toEqual([{ recipient: alice, amount: 10_000_000n }]);
 
-    expect(result.hash).toBe(hashOne);
-    expect(result.calls).toEqual([{ recipient: firstRecipient, amount: 10_000_000n }]);
-    expect(events).toEqual(["balance", "simulate", "sponsor:transfer", "submitted", "receipt"]);
+    const xdr = vi.mocked(dependencies.submit).mock.calls[0][0];
+    const tx = parseTransaction(xdr);
+    expect(tx.signatures).toHaveLength(1);
+    expect(tx.operations).toHaveLength(1);
+    expect(onSubmitted).toHaveBeenCalledWith(
+      expect.objectContaining({ hash: transactionHashHex(tx), stage: "transfer" }),
+    );
   });
 
-  it("checks a pending transfer receipt without broadcasting it again", async () => {
-    const sponsor = vi.fn(async () => hashTwo);
-    const result = await executeSend({
-      review: review([{ address: firstRecipient, amountUsdMicros: 2_000_000 }]),
-      account,
-      chainId: ROBINHOOD_USDG.chainId,
-      client: client({
-        waitForTransactionReceipt: async ({ hash }) => {
-          expect(hash).toBe(hashOne);
-          return { status: "success" };
-        },
-      }),
-      pending: { hash: hashOne, stage: "transfer", label: "USDG transfer" },
-      sendSponsored: sponsor,
-      onSubmitted: () => {},
-      onCleared: () => {},
-    });
-
-    expect(result.hash).toBe(hashOne);
-    expect(sponsor).not.toHaveBeenCalled();
+  it("puts a batch in one transaction", async () => {
+    const batch: ReviewPayload = {
+      mode: "massive",
+      recipients: [
+        { address: alice, amountUsdMicros: 1_000_000 },
+        { address: bob, amountUsdMicros: 2_000_000 },
+      ],
+      totalUsdMicros: 3_000_000,
+    };
+    const { promise, dependencies } = run({}, { review: batch });
+    await promise;
+    expect(dependencies.submit).toHaveBeenCalledTimes(1);
+    const tx = parseTransaction(vi.mocked(dependencies.submit).mock.calls[0][0]);
+    expect(tx.operations).toHaveLength(2);
   });
 
-  it("blocks a transfer when the latest balance is too low", async () => {
-    const sponsor = vi.fn(async () => hashOne);
+  it("stops before signing when the wallet is short", async () => {
+    const { promise, dependencies } = run({ loadAccount: vi.fn(async () => funded("0.5000000")) });
+    await expect(promise).rejects.toThrow("enough USDC");
+    expect(dependencies.sign).not.toHaveBeenCalled();
+  });
+
+  it("stops before signing when a recipient can't receive USDC", async () => {
+    const noTrustline = parseAccountState({ sequence: "1", balances: [] });
+    const { promise, dependencies } = run({
+      loadAccount: vi.fn(async (address: string) => (address === account ? funded() : noTrustline)),
+    });
+    await expect(promise).rejects.toThrow("hasn't enabled USDC");
+    expect(dependencies.sign).not.toHaveBeenCalled();
+  });
+
+  it("reports a recipient without an account", async () => {
+    const { promise } = run({
+      loadAccount: vi.fn(async (address: string) => (address === account ? funded() : missing)),
+    });
+    await expect(promise).rejects.toThrow("doesn't have a Stellar account");
+  });
+
+  it("requires a memo when the recipient demands one", async () => {
+    const memoRequired = { ...funded(), memoRequired: true };
+    const loadAccount = vi.fn(async (address: string) =>
+      address === account ? funded() : memoRequired,
+    );
+    await expect(run({ loadAccount }).promise).rejects.toThrow("requires a memo");
     await expect(
-      executeSend({
-        review: review([{ address: firstRecipient, amountUsdMicros: 10_000_000 }]),
-        account,
-        chainId: ROBINHOOD_USDG.chainId,
-        client: client({ readContract: async () => 9_000_000n }),
-        pending: null,
-        sendSponsored: sponsor,
-        onSubmitted: () => {},
-        onCleared: () => {},
-      }),
-    ).rejects.toThrow("doesn't have enough USDG");
-
-    expect(sponsor).not.toHaveBeenCalled();
+      run({ loadAccount }, { review: { ...review, memo: "123" } }).promise,
+    ).resolves.toBeTruthy();
   });
 
-  it("retains a submitted hash after a delayed receipt and resumes without resending", async () => {
-    const submitted = vi.fn();
-    const sponsor = vi.fn(async () => hashOne);
-    const initialClient = client({
-      waitForTransactionReceipt: async () => {
-        throw new Error("Timed out while waiting for transaction receipt");
-      },
+  it("clears after a definite rejection", async () => {
+    const { promise, onCleared } = run({
+      submit: vi.fn(async () => ({
+        ok: false as const,
+        message: "A recipient hasn't enabled USDC on their Stellar account.",
+        indeterminate: false,
+      })),
     });
-    await expect(
-      executeSend({
-        review: review([{ address: firstRecipient, amountUsdMicros: 1_000_000 }]),
-        account,
-        chainId: ROBINHOOD_USDG.chainId,
-        client: initialClient,
-        pending: null,
-        sendSponsored: sponsor,
-        onSubmitted: submitted,
-        onCleared: () => {},
-      }),
-    ).rejects.toThrow("Timed out");
-    expect(submitted).toHaveBeenCalledWith({
-      hash: hashOne,
+    await expect(promise).rejects.toThrow("hasn't enabled USDC");
+    expect(onCleared).toHaveBeenCalled();
+  });
+
+  it("stays pending when the outcome is unknown", async () => {
+    const { promise, onCleared } = run({
+      submit: vi.fn(async () => ({
+        ok: false as const,
+        message: "The Stellar network didn't respond in time.",
+        indeterminate: true,
+      })),
+    });
+    await expect(promise).rejects.toBeInstanceOf(SendPendingError);
+    expect(onCleared).not.toHaveBeenCalled();
+  });
+
+  describe("status check for a pending send", () => {
+    const pending: SubmittedSendTransaction = {
+      hash: "a".repeat(64),
       stage: "transfer",
-      label: "Confirm USDG transfer in your wallet",
+      label: "Confirm",
+      expiresAt: 1000,
+    };
+
+    it("never signs again while the first transaction may land", async () => {
+      const { promise, dependencies } = run({}, { pending, now: 999 });
+      await expect(promise).rejects.toBeInstanceOf(SendPendingError);
+      expect(dependencies.sign).not.toHaveBeenCalled();
     });
 
-    const result = await executeSend({
-      review: review([{ address: firstRecipient, amountUsdMicros: 1_000_000 }]),
-      account,
-      chainId: ROBINHOOD_USDG.chainId,
-      client: client({
-        waitForTransactionReceipt: async ({ hash }) => {
-          expect(hash).toBe(hashOne);
-          return { status: "success" };
+    it("finishes when the transaction landed", async () => {
+      const { promise } = run(
+        {
+          lookupTransaction: vi.fn(async () => ({
+            hash: "b".repeat(64),
+            successful: true,
+            created_at: "",
+            source_account: account,
+          })),
         },
-      }),
-      pending: { hash: hashOne, stage: "transfer", label: "Confirm USDG transfer" },
-      sendSponsored: sponsor,
-      onSubmitted: () => {},
-      onCleared: () => {},
+        { pending, now: 999 },
+      );
+      await expect(promise).resolves.toMatchObject({ hash: "b".repeat(64) });
     });
 
-    expect(result.hash).toBe(hashOne);
-    expect(sponsor).toHaveBeenCalledTimes(1);
-  });
-
-  it("clears a reverted single transfer so the user can review and retry", async () => {
-    const cleared = vi.fn();
-    await expect(
-      executeSend({
-        review: review([{ address: firstRecipient, amountUsdMicros: 1_000_000 }]),
-        account,
-        chainId: ROBINHOOD_USDG.chainId,
-        client: client({
-          waitForTransactionReceipt: async () => ({ status: "reverted" }),
-        }),
-        pending: null,
-        sendSponsored: async () => hashOne,
-        onSubmitted: () => {},
-        onCleared: cleared,
-      }),
-    ).rejects.toThrow("transfer reverted");
-
-    expect(cleared).toHaveBeenCalledOnce();
-  });
-
-  it("waits for exact approval before simulating and submitting a batch", async () => {
-    vi.stubEnv("NEXT_PUBLIC_SANDIA_SEND_ADDRESS", account);
-    const events: string[] = [];
-    let allowanceReads = 0;
-    let sponsoredCalls = 0;
-    const result = await executeSend({
-      review: review([
-        { address: firstRecipient, amountUsdMicros: 1_000_000 },
-        { address: secondRecipient, amountUsdMicros: 2_000_000 },
-      ]),
-      account,
-      chainId: ROBINHOOD_USDG.chainId,
-      client: client({
-        readContract: async (request) => {
-          if (request.functionName === "balanceOf") {
-            events.push("balance");
-            return 100_000_000n;
-          }
-          allowanceReads += 1;
-          events.push(`allowance:${allowanceReads}`);
-          return allowanceReads === 1 ? 0n : 3_000_000n;
-        },
-        call: async ({ to }) => {
-          events.push(to === ROBINHOOD_USDG.address ? "simulate-approval" : "simulate-batch");
-        },
-        waitForTransactionReceipt: async ({ hash }) => {
-          events.push(hash === hashOne ? "approval-receipt" : "batch-receipt");
-          return { status: "success" };
-        },
-      }),
-      pending: null,
-      sendSponsored: async (_call, stage) => {
-        sponsoredCalls += 1;
-        events.push(`sponsor:${stage}`);
-        return sponsoredCalls === 1 ? hashOne : hashTwo;
-      },
-      onSubmitted: ({ stage }) => events.push(`submitted:${stage}`),
-      onCleared: () => events.push("cleared"),
+    it("clears once the transaction can no longer land", async () => {
+      const { promise, onCleared, dependencies } = run({}, { pending, now: 1001 });
+      await expect(promise).rejects.toThrow("expired");
+      expect(onCleared).toHaveBeenCalled();
+      expect(dependencies.sign).not.toHaveBeenCalled();
     });
 
-    expect(result.hash).toBe(hashTwo);
-    expect(result.calls).toHaveLength(2);
-    expect(events.indexOf("approval-receipt")).toBeLessThan(events.indexOf("allowance:2"));
-    expect(events.indexOf("allowance:2")).toBeLessThan(events.indexOf("simulate-batch"));
-    expect(events.indexOf("simulate-batch")).toBeLessThan(events.indexOf("sponsor:transfer"));
-    expect(sponsoredCalls).toBe(2);
+    it("reports a failed transaction", async () => {
+      const { promise, onCleared } = run(
+        {
+          lookupTransaction: vi.fn(async () => ({
+            hash: pending.hash,
+            successful: false,
+            created_at: "",
+            source_account: account,
+          })),
+        },
+        { pending, now: 999 },
+      );
+      await expect(promise).rejects.toThrow("failed");
+      expect(onCleared).toHaveBeenCalled();
+    });
   });
 
-  it("does not continue a batch after its approval reverts", async () => {
-    vi.stubEnv("NEXT_PUBLIC_SANDIA_SEND_ADDRESS", account);
-    const sponsor = vi.fn(async () => hashOne);
-    const clear = vi.fn();
-    await expect(
-      executeSend({
-        review: review([
-          { address: firstRecipient, amountUsdMicros: 1_000_000 },
-          { address: secondRecipient, amountUsdMicros: 2_000_000 },
-        ]),
-        account,
-        chainId: ROBINHOOD_USDG.chainId,
-        client: client({
-          waitForTransactionReceipt: async () => ({ status: "reverted" }),
-        }),
-        pending: null,
-        sendSponsored: sponsor,
-        onSubmitted: () => {},
-        onCleared: clear,
-      }),
-    ).rejects.toThrow("USDG approval reverted");
+  it("refuses to start over while only the activity update is left", async () => {
+    const { promise } = run(
+      {},
+      { pending: { hash: "a".repeat(64), stage: "activity", label: "Updating" } },
+    );
+    await expect(promise).rejects.toThrow("Retry its activity update");
+  });
+});
 
-    expect(sponsor).toHaveBeenCalledTimes(1);
-    expect(clear).toHaveBeenCalledTimes(1);
+describe("callsForReview", () => {
+  it("converts to stroops", () => {
+    expect(callsForReview(review)).toEqual([{ recipient: alice, amount: 10_000_000n }]);
   });
 });

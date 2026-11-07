@@ -1,15 +1,8 @@
-import { mutation, query } from "./_generated/server";
+import { internalQuery, mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { getCurrentUserOrNull } from "./lib/auth";
-import { assertClaimNonce, recoverClaimAddress, signClaimNonce } from "./lib/walletClaim";
-
-function normalizeAddress(address: string): string {
-  const lower = address.toLowerCase();
-  if (!/^0x[a-f0-9]{40}$/.test(lower)) {
-    throw new Error("Invalid Ethereum address");
-  }
-  return lower;
-}
+import { assertClaimNonce, signClaimNonce, verifyWalletClaim } from "./lib/walletClaim";
+import { isStellarAccount } from "../lib/stellar/strkey";
 
 function claimSecret(): string {
   const secret = process.env.SANDIA_NONCE_SECRET ?? process.env.PRIVY_APP_ID;
@@ -42,6 +35,17 @@ export const me = query({
   },
 });
 
+/** Actions read the signed-in user's claimed wallet through this. */
+export const currentForAction = internalQuery({
+  args: {},
+  returns: v.union(v.object({ userId: v.id("users"), address: v.string() }), v.null()),
+  handler: async (ctx) => {
+    const user = await getCurrentUserOrNull(ctx);
+    if (!user || !isStellarAccount(user.address)) return null;
+    return { userId: user._id, address: user.address };
+  },
+});
+
 export const issueNonce = mutation({
   args: {},
   returns: v.string(),
@@ -67,9 +71,9 @@ export const store = mutation({
 
     const now = Date.now();
     await assertClaimNonce(identity.subject, args.nonce, claimSecret(), now);
-    const recovered = await recoverClaimAddress(args.nonce, args.signature);
-    const address = normalizeAddress(args.address);
-    if (recovered !== address) {
+    const address = args.address.trim();
+    if (!isStellarAccount(address)) throw new Error("Invalid Stellar address");
+    if (!(await verifyWalletClaim(address, args.nonce, args.signature))) {
       throw new Error("Signature does not match this wallet");
     }
 

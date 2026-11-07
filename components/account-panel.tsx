@@ -5,7 +5,7 @@ import { useId, useRef, useState } from "react";
 import { LoginButton } from "@/components/login-button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useAppAuth } from "@/lib/auth-bridge";
-import { UsdgBalanceCard } from "@/components/usdg-balance-card";
+import { UsdcBalanceCard } from "@/components/usdc-balance-card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -47,7 +47,7 @@ export function AccountPanel({ className, onAfterLogout }: AccountPanelProps) {
   return (
     <>
       <div className={cn("space-y-3", className)}>
-        <UsdgBalanceCard />
+        <UsdcBalanceCard />
         <div className="space-y-2 border-bs border-border pbs-3">
           <div className="flex justify-center md:justify-start">
             <LoginButton />

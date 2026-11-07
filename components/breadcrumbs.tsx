@@ -6,17 +6,6 @@ export type BreadcrumbItem = {
   label: string;
 };
 
-export function stockBreadcrumbItems(symbol?: string): BreadcrumbItem[] {
-  const items: BreadcrumbItem[] = [
-    { href: "/", label: "Home" },
-    { href: "/stocks", label: "Stocks" },
-  ];
-  if (symbol) {
-    items.push({ href: `/stocks/${encodeURIComponent(symbol)}`, label: symbol });
-  }
-  return items;
-}
-
 export function Breadcrumbs({ items }: { items: BreadcrumbItem[] }) {
   const origin = siteOrigin();
   const jsonLd = {

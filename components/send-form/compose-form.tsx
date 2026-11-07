@@ -4,6 +4,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { LoginButton } from "@/components/login-button";
 import { Button } from "@/components/ui/button";
 import { FieldError } from "@/components/ui/field-error";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { AmountCompose } from "@/components/amount-compose";
@@ -17,6 +18,7 @@ type SendComposeFormProps = {
   mode: SendMode;
   singleAddress: string;
   singleAmount: string;
+  singleMemo: string;
   rows: RecipientRow[];
   liveTotalLabel: string | null;
   error: string | null;
@@ -59,7 +61,7 @@ function SendComposeFooter({
     return (
       <div className="flex flex-col items-center gap-3">
         <LoginButton />
-        <p className="text-center text-sm text-muted">Sign in to send USDG.</p>
+        <p className="text-center text-sm text-muted">Sign in to send USDC.</p>
       </div>
     );
   }
@@ -82,6 +84,7 @@ export function SendComposeForm({
   mode,
   singleAddress,
   singleAmount,
+  singleMemo,
   rows,
   liveTotalLabel,
   error,
@@ -99,6 +102,7 @@ export function SendComposeForm({
   const errorId = useId();
   const singleAddressErrorId = useId();
   const singleAmountErrorId = useId();
+  const singleMemoErrorId = useId();
   const [bookOpen, setBookOpen] = useState(false);
   const bookRowIdRef = useRef<string | null>(null);
   const [bookDraft, setBookDraft] = useState("");
@@ -150,12 +154,13 @@ export function SendComposeForm({
     setBookOpen(true);
   }
 
-  function onPickAddress(address: string) {
+  function onPickAddress(address: string, memo?: string) {
     if (bookRowIdRef.current) {
       dispatch({ type: "updateRow", id: bookRowIdRef.current, patch: { address } });
       return;
     }
     dispatch({ type: "setSingleAddress", address });
+    dispatch({ type: "setSingleMemo", memo: memo ?? "" });
   }
 
   return (
@@ -175,7 +180,7 @@ export function SendComposeForm({
         <AmountCompose
           kicker="You're sending"
           prefix="$"
-          suffix="USDG"
+          suffix="USDC"
           value={singleAmount}
           onChange={(amount) => dispatch({ type: "setSingleAmount", amount })}
           footer={footer}
@@ -191,7 +196,7 @@ export function SendComposeForm({
                 id="send-recipient"
                 value={singleAddress}
                 onChange={(e) => dispatch({ type: "setSingleAddress", address: e.target.value })}
-                placeholder="0x… or pick from address book"
+                placeholder="G… or pick from address book"
                 required
                 aria-invalid={Boolean(fieldErrors.single?.address) || undefined}
                 aria-describedby={fieldErrors.single?.address ? singleAddressErrorId : undefined}
@@ -205,6 +210,20 @@ export function SendComposeForm({
               </InputGroupAddon>
             </InputGroup>
             <FieldError id={singleAddressErrorId} message={fieldErrors.single?.address} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="send-memo">Memo (optional)</Label>
+            <Input
+              id="send-memo"
+              value={singleMemo}
+              onChange={(e) => dispatch({ type: "setSingleMemo", memo: e.target.value })}
+              placeholder="Required by most exchanges"
+              autoComplete="off"
+              aria-invalid={Boolean(fieldErrors.single?.memo) || undefined}
+              aria-describedby={fieldErrors.single?.memo ? singleMemoErrorId : undefined}
+              className="pr-mono"
+            />
+            <FieldError id={singleMemoErrorId} message={fieldErrors.single?.memo} />
           </div>
           <FieldError id={errorId} message={error} />
         </AmountCompose>

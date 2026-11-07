@@ -1,25 +1,30 @@
-export type WalletSetupAction = "wait" | "create" | "activate" | "done";
+export type WalletSetupAction = "wait" | "create" | "done";
 
 export function walletSetupAction(input: {
   authenticated: boolean;
-  walletsReady: boolean;
-  embeddedAddress?: string;
-  activeAddress?: string;
-  connectorReady: boolean;
+  ready: boolean;
+  stellarAddress?: string;
   createAttempted: boolean;
 }): WalletSetupAction {
-  if (!input.authenticated || !input.walletsReady) return "wait";
-  if (!input.embeddedAddress) return input.createAttempted ? "wait" : "create";
-  if (input.activeAddress?.toLowerCase() === input.embeddedAddress.toLowerCase()) return "done";
-  if (!input.connectorReady) return "wait";
-  return "activate";
+  if (!input.authenticated || !input.ready) return "wait";
+  if (input.stellarAddress) return "done";
+  return input.createAttempted ? "wait" : "create";
 }
 
-/** Privy wagmi connector ids end with the embedded wallet address. */
-export function privyConnectorReady(
-  connectorIds: readonly string[],
-  embeddedAddress: string,
-): boolean {
-  const address = embeddedAddress.toLowerCase();
-  return connectorIds.some((id) => id.toLowerCase().includes(address));
+type LinkedAccount = {
+  type?: string;
+  chainType?: string;
+  walletClientType?: string;
+  address?: string;
+};
+
+/** The user's Privy-managed Stellar wallet, from the accounts linked to their sign-in. */
+export function stellarWalletAddress(accounts: readonly unknown[] | undefined): string | undefined {
+  const wallet = (accounts as readonly LinkedAccount[] | undefined)?.find(
+    (account) =>
+      account.type === "wallet" &&
+      account.chainType === "stellar" &&
+      account.walletClientType === "privy",
+  );
+  return wallet?.address;
 }

@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { SendSummaryDetails } from "@/components/send-form/summary-details";
 import { TxLink } from "@/components/tx-link";
 import type { ReviewPayload } from "@/components/send-form/state";
-import { robinhoodChain } from "@/lib/chains";
 import { shortenAddress } from "@/lib/utils";
 
 export function SendSuccessPanel({
@@ -16,7 +15,7 @@ export function SendSuccessPanel({
   onReset,
 }: {
   review: ReviewPayload;
-  transactionHash: `0x${string}` | null;
+  transactionHash: string | null;
   activityError: string | null;
   activitySyncing: boolean;
   onRetryActivity: () => void;
@@ -25,17 +24,17 @@ export function SendSuccessPanel({
   return (
     <div className="space-y-5">
       <section className="pr-panel pr-panel--padded space-y-3">
-        <p className="text-sm font-semibold text-success">USDG sent</p>
+        <p className="text-sm font-semibold text-success">USDC sent</p>
         <p className="text-sm leading-relaxed text-muted" role="status">
           {review.recipients.length === 1
-            ? "Your USDG transfer is confirmed on Robinhood Chain."
-            : "The confirmed receipt includes a USDG transfer for every recipient."}
+            ? "Your USDC transfer is confirmed on Stellar."
+            : "The confirmed transaction paid every recipient in USDC."}
         </p>
         <SendSummaryDetails review={review} />
         {transactionHash ? (
           <p className="border-bs border-border pbs-3 text-xs text-muted">
             Transaction{" "}
-            <TxLink chainId={robinhoodChain.id} hash={transactionHash} className="text-xs">
+            <TxLink hash={transactionHash} className="text-xs">
               {shortenAddress(transactionHash, 4)}
             </TxLink>
           </p>

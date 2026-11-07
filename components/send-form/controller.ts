@@ -1,29 +1,27 @@
-import type { Address, Hex } from "viem";
 import {
+  callsForReview,
   executeSend,
-  type SendExecutionClient,
+  SendPendingError,
+  type SendCall,
+  type SendDependencies,
   type SubmittedSendTransaction,
 } from "@/lib/send/execute";
 import { sendErrorMessage } from "@/lib/send/errors";
 import type { ReviewPayload, SendFormAction } from "@/components/send-form/state";
 
-type SendCall = { to: Address; data: Hex; value: bigint };
-type SendCalls = Array<{ recipient: Address; amount: bigint }>;
-
 type SendControllerDependencies = {
   review: ReviewPayload | null;
-  address: Address | undefined;
-  chainId: number | undefined;
-  client: SendExecutionClient | undefined;
+  address: string | undefined;
+  deps: SendDependencies;
   dispatch: React.Dispatch<SendFormAction>;
   sendLock: { current: boolean };
   submittedTransaction: { current: SubmittedSendTransaction | null };
-  sendSponsored: (call: SendCall, stage: "approval" | "transfer", label: string) => Promise<Hex>;
   recordSend: (args: {
-    userOpHash: string;
-    calls: Array<{ recipient: Address; amount: string }>;
+    txHash: string;
+    calls: Array<{ recipient: string; amount: string }>;
+    memo?: string;
   }) => Promise<unknown>;
-  attachBundle: (args: { userOpHash: string; txHashes: string[] }) => Promise<{
+  confirmSend: (args: { txHash: string }) => Promise<{
     status: "submitted" | "filled" | "failed";
     reason?: string;
   }>;
@@ -35,48 +33,34 @@ export function createSendController(dependencies: SendControllerDependencies) {
   const {
     review,
     address,
-    chainId,
-    client,
+    deps,
     dispatch,
     sendLock,
     submittedTransaction,
-    sendSponsored,
     recordSend,
-    attachBundle,
+    confirmSend,
     refetchBalance,
     onPendingChange,
   } = dependencies;
 
-  function callsForReview(payload: ReviewPayload): SendCalls {
-    return payload.recipients.map((recipient) => ({
-      recipient: recipient.address as Address,
-      amount: BigInt(recipient.amountUsdMicros),
-    }));
-  }
-
-  async function recordFilled(userOpHash: Hex, calls: SendCalls) {
-    if (!userOpHash.startsWith("0x") || userOpHash.length !== 66) {
-      throw new Error("The transfer was submitted, but no transaction hash was returned.");
-    }
+  async function recordFilled(hash: string, calls: SendCall[], memo: string | undefined) {
     await recordSend({
-      userOpHash,
-      calls: calls.map((call) => ({
-        recipient: call.recipient,
-        amount: call.amount.toString(),
-      })),
+      txHash: hash,
+      calls: calls.map((call) => ({ recipient: call.recipient, amount: call.amount.toString() })),
+      ...(memo ? { memo } : {}),
     });
-    const verified = await attachBundle({ userOpHash, txHashes: [userOpHash] });
+    const verified = await confirmSend({ txHash: hash });
     if (verified.status !== "filled") {
-      throw new Error(verified.reason ?? "The receipt did not pay every recipient.");
+      throw new Error(verified.reason ?? "The transaction did not pay every recipient.");
     }
   }
 
-  async function finishConfirmedTransfer(hash: Hex, calls: SendCalls) {
+  async function finishConfirmedTransfer(hash: string, payload: ReviewPayload, calls: SendCall[]) {
     submittedTransaction.current = { hash, stage: "activity", label: "Updating send activity" };
     dispatch({ type: "transactionRecording", hash });
     void refetchBalance();
     try {
-      await recordFilled(hash, calls);
+      await recordFilled(hash, calls, payload.memo);
       submittedTransaction.current = null;
       dispatch({ type: "confirmSucceeded" });
     } catch {
@@ -94,12 +78,11 @@ export function createSendController(dependencies: SendControllerDependencies) {
     dispatch({ type: "confirmStarted" });
     dispatch({ type: "setError", error: null });
     try {
-      if (!address) throw new Error("Sign in to send USDG.");
-      if (!client) throw new Error("Robinhood Chain is not reachable. Refresh and try again.");
+      if (!address) throw new Error("Sign in to send USDC.");
 
       const pending = submittedTransaction.current;
       if (pending?.stage === "activity") {
-        await finishConfirmedTransfer(pending.hash, callsForReview(review));
+        await finishConfirmedTransfer(pending.hash, review, callsForReview(review));
         return;
       }
       if (pending) {
@@ -114,10 +97,9 @@ export function createSendController(dependencies: SendControllerDependencies) {
       const result = await executeSend({
         review,
         account: address,
-        chainId,
-        client,
         pending,
-        sendSponsored,
+        deps,
+        onAwaiting: (label) => dispatch({ type: "transactionAwaiting", stage: "transfer", label }),
         onSubmitted: (transaction) => {
           submittedTransaction.current = transaction;
           dispatch({
@@ -132,9 +114,9 @@ export function createSendController(dependencies: SendControllerDependencies) {
           dispatch({ type: "transactionCleared" });
         },
       });
-      await finishConfirmedTransfer(result.hash, result.calls);
+      await finishConfirmedTransfer(result.hash, review, result.calls);
     } catch (err) {
-      if (isBroadcastPending(submittedTransaction.current)) {
+      if (err instanceof SendPendingError || isBroadcastPending(submittedTransaction.current)) {
         dispatch({ type: "transactionPending" });
       } else if (submittedTransaction.current?.stage !== "activity") {
         dispatch({ type: "transactionCleared" });
@@ -159,7 +141,7 @@ export function createSendController(dependencies: SendControllerDependencies) {
     onPendingChange?.(true);
     dispatch({ type: "activitySyncStarted" });
     try {
-      await recordFilled(hash, callsForReview(review));
+      await recordFilled(hash, callsForReview(review), review.memo);
       submittedTransaction.current = null;
       dispatch({ type: "confirmSucceeded" });
     } catch {
@@ -185,5 +167,5 @@ export function createSendController(dependencies: SendControllerDependencies) {
 }
 
 function isBroadcastPending(transaction: SubmittedSendTransaction | null) {
-  return transaction?.stage === "approval" || transaction?.stage === "transfer";
+  return transaction?.stage === "transfer";
 }

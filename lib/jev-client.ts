@@ -45,14 +45,10 @@ export async function resolveIntentWithJev(
             instructions:
               "Choose the single financial operation the user explicitly requested. Select unsupported for questions, advice, unrelated tasks, missing operation intent, or compound requests that combine different financial operations.",
             criteria: {
-              send: "Send USDG to one recipient. A named or addressed recipient, optionally with an amount.",
+              send: "Send USDC to one recipient. A named or addressed recipient, optionally with an amount.",
               batch_send:
-                "Send USDG to multiple recipients in one batch, with explicit per-recipient or each amounts.",
-              request: "Create a payment request for USDG.",
-              earn_deposit: "Deposit USDG into the Earn vault.",
-              earn_withdraw: "Withdraw or redeem funds from the Earn vault.",
-              stock_buy: "Buy a stock token using USDG.",
-              stock_sell: "Sell a stock token for USDG.",
+                "Send USDC to multiple recipients in one batch, with explicit per-recipient or each amounts.",
+              request: "Create a payment request for USDC.",
               unsupported:
                 "No single supported operation was explicitly requested, or the request combines multiple different operations.",
             },
@@ -60,7 +56,7 @@ export async function resolveIntentWithJev(
           multiple_operations: {
             type: "noul",
             instructions:
-              "Does this request ask to perform two or more distinct financial operations? A batch send to multiple recipients is one operation. A send and a deposit together are multiple operations.",
+              "Does this request ask to perform two or more distinct financial operations? A batch send to multiple recipients is one operation. A send and a payment request together are multiple operations.",
             criteria: {
               true: "The user explicitly asks for multiple distinct financial operations.",
               false: "The user asks for one operation or an unsupported question/task.",
